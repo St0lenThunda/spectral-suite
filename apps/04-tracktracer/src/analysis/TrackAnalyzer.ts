@@ -103,14 +103,14 @@ export class TrackAnalyzer {
     let startIdx = 0;
 
     // Smooth both energy and vocal maps for label stability
-    const smoothed = energyMap.map( ( v, i, arr ) => {
+    const smoothed = energyMap.map( ( _v, i, arr ) => {
       const start = Math.max( 0, i - 2 );
       const end = Math.min( arr.length, i + 3 );
       const slice = arr.slice( start, end );
       return slice.reduce( ( a, b ) => a + b, 0 ) / slice.length;
     } );
 
-    const vocalSmoothed = vocalMap.map( ( v, i, arr ) => {
+    const vocalSmoothed = vocalMap.map( ( _v, i, arr ) => {
       const start = Math.max( 0, i - 2 );
       const end = Math.min( arr.length, i + 3 );
       const slice = arr.slice( start, end );
@@ -216,12 +216,8 @@ export class TrackAnalyzer {
     analyser.fftSize = fftSize;
     analyser.smoothingTimeConstant = 0;
 
-    const frequencyData = new Uint8Array( analyser.frequencyBinCount );
-
-    // Calculate frequency bin indices for vocal range (200Hz-3kHz)
-    const binWidth = sampleRate / fftSize;
-    const vocalMinBin = Math.floor( 200 / binWidth );
-    const vocalMaxBin = Math.floor( 3000 / binWidth );
+    // Note: Full FFT implementation would use frequencyData and vocal bin ranges
+    // Currently using simplified RMS-based approach
 
     let maxVocalEnergy = 0;
 

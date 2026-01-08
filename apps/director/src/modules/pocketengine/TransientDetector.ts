@@ -1,4 +1,4 @@
-import Meyda, { MeydaAnalyzer } from 'meyda'
+import Meyda, { type MeydaAnalyzer, type MeydaFeaturesObject } from 'meyda'
 
 /**
  * TransientDetector - Detects audio transients (peaks) for timing analysis
@@ -27,7 +27,7 @@ export class TransientDetector {
         source: source,
         bufferSize: 512,
         featureExtractors: ['rms', 'energy'],
-        callback: ( features ) => {
+        callback: ( features: MeydaFeaturesObject ) => {
           this.analyzeFrame( features )
         }
       } )
@@ -57,7 +57,7 @@ export class TransientDetector {
     this.transientCallbacks.push( callback )
   }
 
-  private analyzeFrame ( features: any ) {
+  private analyzeFrame ( features: MeydaFeaturesObject ) {
     const energy = features.energy || 0
     const now = this.audioContext?.currentTime || 0
 

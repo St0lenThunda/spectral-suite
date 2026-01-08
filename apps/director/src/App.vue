@@ -77,7 +77,7 @@ const updateVolume = () => {
 
     let sum = 0
     for ( let i = 0; i < dataArray.length; i++ ) {
-      sum += dataArray[i]
+      sum += dataArray[i]!
     }
     const average = sum / dataArray.length
     volumeLevel.value = Math.min( 100, ( average / 128 ) * 100 )

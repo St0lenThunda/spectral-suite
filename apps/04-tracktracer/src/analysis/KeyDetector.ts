@@ -1,20 +1,16 @@
-import { Note, Scale } from 'tonal';
+// Note: Tonal will be used when full key detection is implemented
+// import { Note, Scale } from 'tonal';
 
 export class KeyDetector {
   /**
    * Estimates musical key based on pitch class distribution
    */
-  public static async analyze ( buffer: AudioBuffer ): Promise<{ key: string, score: number }> {
-    const data = buffer.getChannelData( 0 );
-    const sampleRate = buffer.sampleRate;
-
+  public static async analyze ( _buffer: AudioBuffer ): Promise<{ key: string, score: number }> {
+  // Note: Full implementation would analyze buffer for dominant pitch classes
     // We'll use a simplified Chroma analysis
-    // Ideally we'd use FFT, but for a fast browser-side approximation, 
+    // Ideally we'd use FFT, but for a fast browser-side approximation,
     // we can use a set of bandpass filters or just a decimated energy map.
     // However, since we have tonal.js, we'll implement a Histogram approach.
-
-    const pitchClasses = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
-    const histogram = new Float32Array( 12 ).fill( 0 );
 
     // Very simplified approach: 
     // Scan the track for dominant frequencies and map to nearest pitch class

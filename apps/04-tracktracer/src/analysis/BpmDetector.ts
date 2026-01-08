@@ -13,7 +13,7 @@ export class BpmDetector {
     for ( let i = 0; i < energy.length; i++ ) {
       let sum = 0;
       for ( let j = 0; j < chunkSize && ( i * chunkSize + j ) < data.length; j++ ) {
-        const val = data[i * chunkSize + j];
+        const val = data[i * chunkSize + j]!;
         sum += val * val;
       }
       energy[i] = Math.sqrt( sum / chunkSize );
@@ -24,7 +24,7 @@ export class BpmDetector {
     const peaks: number[] = [];
 
     for ( let i = 1; i < energy.length - 1; i++ ) {
-      if ( energy[i] > threshold && energy[i] > energy[i - 1] && energy[i] > energy[i + 1] ) {
+      if ( energy[i]! > threshold && energy[i]! > energy[i - 1]! && energy[i]! > energy[i + 1]! ) {
         peaks.push( i * chunkSize / sampleRate );
       }
     }
@@ -34,7 +34,7 @@ export class BpmDetector {
 
     const intervals: number[] = [];
     for ( let i = 1; i < peaks.length; i++ ) {
-      intervals.push( peaks[i] - peaks[i - 1] );
+      intervals.push( peaks[i]! - peaks[i - 1]! );
     }
 
     // 4. Cluster intervals to find the "pulse"
@@ -46,7 +46,7 @@ export class BpmDetector {
     if ( bpms.length === 0 ) return 0;
 
     bpms.sort( ( a, b ) => a - b );
-    const medianBpm = bpms[Math.floor( bpms.length / 2 )];
+    const medianBpm = bpms[Math.floor( bpms.length / 2 )]!;
 
     return Math.round( medianBpm );
   }

@@ -1,0 +1,16 @@
+{
+  "name": "spectral-suite",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:director": "npm run dev --workspace apps/director",
+    "dev:tuner": "npm run dev --workspace apps/01-auratune",
+    "dev:chord": "npm run dev --workspace apps/02-chordcapture",
+    "dev:sleuth": "npm run dev --workspace apps/09-scalesleuth",
+    "dev:all": "npm run dev --workspaces --if-present",
+    "install:all": "npm install && npm install --workspaces"
+  }
+}

@@ -1,11 +1,69 @@
-# Vue 3 + TypeScript + Vite
+# AuraTune
 
-This template should help get you started developing with Vue 3 and TypeScript in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup)## 📖 How to Use
-1. **Enable Audio**: Click the "Enable Audio" button to grant microphone access.
-2. **Standard Tuning**: Play a single note. The tuner will display the current frequency in Hz.
-3. **Stability Tracking**: Watch the "Stability" score. It measures how consistently you hold the pitch over time.
-4. **Visual Feedback**: The strobe indicator at the bottom shows if you are sharp (right) or flat (left).
+Real-time pitch detection and visualization tool with immersive reactive displays.
 
-## 🗺 Implementation Roadmap
+## 🎯 Purpose
 
-Learn more about the recommended Project Setup and IDE Support in the [Vue Docs TypeScript Guide](https://vuejs.org/guide/typescript/overview.html#project-setup).
+AuraTune is designed for musicians who want immediate visual feedback on their pitch accuracy. Whether you're practicing vocals, tuning an instrument, or exploring melodic phrasing, AuraTune provides crystal-clear pitch detection with visual performance indicators.
+
+## ✨ Features
+
+- **Real-time pitch detection** - Instant frequency analysis using advanced FFT algorithms
+- **Note name display** - Shows the detected note (e.g., A, C#, Bb) with cent deviation
+- **Visual tuner** - Color-coded feedback for pitch accuracy
+- **Clarity meter** - Signal strength indicator to show detection confidence
+- **Cent offset display** - Shows how many cents sharp or flat you are
+
+## 🚀 Getting Started
+
+### Installation
+
+```bash
+cd apps/01-auratune
+npm install
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:5173` to use the app.
+
+### Build
+
+```bash
+npm run build
+npm run preview
+```
+
+## 🎵 How to Use
+
+1. **Allow microphone access** - Click the "Start Audio" button and grant microphone permissions
+2. **Play or sing a note** - The app will detect the pitch in real-time
+3. **Read the display**:
+   - **Note name**: Current detected note
+   - **Frequency**: Exact Hz measurement
+   - **Cents**: How far off from perfect pitch (-50 to +50)
+   - **Clarity**: Signal strength (higher is better)
+
+## 🛠️ Tech Stack
+
+- Vue 3 + TypeScript
+- Vite
+- Tailwind CSS
+- `@spectralsuite/core` - Shared audio engine
+- Web Audio API
+
+## 📝 Use Cases
+
+- **Vocal training** - Practice hitting specific pitches accurately
+- **Instrument tuning** - Quickly tune string instruments
+- **Ear training** - Develop pitch recognition skills
+- **Performance** - Use as a live visual performance tool
+
+## 🔗 Related Tools
+
+- **ScaleSleuth** - For identifying scales and modes
+- **ChordCapture** - For recognizing chord progressions

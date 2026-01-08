@@ -1,30 +1,94 @@
-# The Pocket Engine: Rhythm & Timing Analyst
+# Pocket Engine
 
-The Pocket Engine is a "Groove Diagnostic" tool that helps musicians master their internal clock and "time-feel."
+Rhythm and timing diagnostic tool to master your internal clock.
 
-## 🚀 Concept
-Most apps tell you *if* you're on the beat. The Pocket Engine tells you *where* you are in the beat. Do you rush? Do you drag? Is your "swing" consistent? 
+## 🎯 Purpose
 
-## ✨ Core Features
-- **High-Precision Metronome**: A rock-solid timekeeper using the Web Audio high-resolution clock.
-- **Transient Timing Report**: Compares your audio "peaks" (claps, strums, hits) against the metronome click in milliseconds.
-- **The "Pocket" Visualizer**: A moving target UI—land your hits in the center to stay "in the pocket."
-- **Drift Dashboard**: Long-term tracking of your rhythmic tendencies (e.g., "You tend to rush when the tempo increases").
+Pocket Engine helps musicians develop rock-solid timing by providing precision metronome functionality combined with real-time rhythm analysis. Practice staying locked to the beat and measure your timing accuracy.
 
-## 🛠 Technical Stack
-- **Framework**: Vue 3
-- **Styling**: Tailwind CSS (Transitions & Animations for rhythmic feedback)
-- **Audio Engine**: [Meyda](https://meyda.js.org/) for audio feature extraction (RMS/ZCR).
-- **Timing**: Web Audio API `currentTime` (avoiding JS `setTimeout`).
+## ✨ Features
 
-## 🧠 Learning Objectives
-- Understanding the **Sub-millisecond Precision** required for professional audio.
-- Working with **Transient Detection** (Digital Signal Processing).
-- Implementing **Rhythmic Logic** and "Swing" algorithms.
-- Designing **Kinetic UI** that reacts to percussion and transients.
+- **Precision Metronome** - Adjustable BPM from 40 to 300
+- **Transient Detection** - Real-time beat onset tracking
+- **Timing Offset Analysis** - Measures how early or late you play
+- **Visual Feedback** - Color-coded timing indicators
+- **Subdivision Options** - Quarter notes, eighth notes, triplets, sixteenths
+- **Tap Tempo** - Set BPM by tapping
+- **Accent Patterns** - Customizable emphasis on specific beats
 
-## 🗺 Implementation Roadmap
-1. **Phase 1**: Build the high-precision "Lookahead" metronome.
-2. **Phase 3**: Implement transient detection with Meyda.
-3. **Phase 3**: Create the "Pocket" UI comparison logic.
-4. **Phase 4**: Add session logging and "Drift" reports.
+## 🚀 Getting Started
+
+### Installation
+
+```bash
+cd apps/07-pocket-engine
+npm install
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:5173` to use the app.
+
+### Build
+
+```bash
+npm run build
+npm run preview
+```
+
+## 🎵 How to Use
+
+1. **Set your tempo** - Use the BPM slider or tap tempo button
+2. **Start the metronome** - Click "Start" to hear the click track
+3. **Play along** - Your microphone will detect your timing
+4. **Watch the feedback**:
+   - **Green**: On time (within ±10ms)
+   - **Yellow**: Slightly off (±10-30ms)
+   - **Red**: Noticeably off (>30ms)
+   - **Offset Display**: Shows exact millisecond deviation
+
+## ⏱️ Practice Modes
+
+### Straight Time
+Practice maintaining steady tempo in common time signatures:
+- 4/4 (most common)
+- 3/4 (waltz time)
+- 6/8 (compound meter)
+
+### Subdivision Practice
+Develop precision with different note values:
+- Quarter notes (1, 2, 3, 4)
+- Eighth notes (1-and-2-and-3-and-4-and)
+- Triplets (1-trip-let, 2-trip-let)
+- Sixteenth notes (rapid subdivision)
+
+### Accent Exercises
+Program custom emphasis patterns:
+- Downbeat emphasis (1 > 2 3 4)
+- Backbeat (1 2 > 3 > 4)
+- Off-beat accents (1 > 2 3 > 4)
+
+## 🛠️ Tech Stack
+
+- Vue 3 + TypeScript
+- Vite
+- `@spectralsuite/core` - Audio engine
+- Custom transient detection algorithms
+- Web Audio API - Precise timing
+
+## 📝 Use Cases
+
+- **Drumming practice** - Lock in your groove
+- **Click track training** - Play with a metronome comfortably
+- **Timing diagnosis** - Identify rushing or dragging tendencies
+- **Band practice** - Visual timing reference for ensemble playing
+- **Recording preparation** - Develop studio-ready timing
+
+## 🔗 Related Tools
+
+- **Track Tracer** - Detect BPM of existing tracks
+- **AuraTune** - For pitch accuracy training

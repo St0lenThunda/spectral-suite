@@ -1,30 +1,91 @@
-# FrequencyFlow: Engineer’s Swiss Army Knife
+# Frequency Flow
 
-FrequencyFlow is a visualization-heavy diagnostic tool for musicians and audio engineers who want to "see" their sound.
+Engineering-grade spectral analysis and visualization suite for deep audio exploration.
 
-## 🚀 Concept
-Focus on the physics of sound. This app provides multiple high-speed visualizers to analyze the waveform, frequency spectrum, and harmonic content of any input source.
+## 🎯 Purpose
 
-## ✨ Core Features
-- **Virtual Oscilloscope**: View the raw electromagnetic waveform of your sound in real-time.
-- **Spectrogram (Waterfall)**: A rolling 2D map showing frequency intensity over time (perfect for catching feedback).
-- **Harmonograph**: A XY-mode visualizer that creates geometric patterns based on interval ratios (e.g., Octaves, Fifths).
-- **Peak Detailer**: Drills down into specific frequencies to find unwanted "muddiness" or "harshness."
+Frequency Flow provides professional-level spectral analysis tools for engineers, producers, and audio enthusiasts. Visualize the physics of sound with multiple real-time analyzers running simultaneously.
 
-## 🛠 Technical Stack
-- **Framework**: Vue 3
-- **Styling**: Tailwind CSS (Custom CSS Variables for dynamic coloring)
-- **Rendering**: HTML5 Canvas & `requestAnimationFrame` for 60FPS performance.
-- **Audio Hub**: Web Audio API `AnalyserNode`.
+## ✨ Features
 
-## 🧠 Learning Objectives
-- High-performance **Canvas Graphics** in a reactive framework.
-- Deep dive into **FFT (Fast Fourier Transform)** and Buffer Management.
-- Optimizing **CPU/GPU Usage** for browser-based audio processing.
-- Creating "Console-grade" UI with a dark-mode tech aesthetic.
+- **Oscilloscope** - Time-domain waveform visualization
+- **Spectrogram** - Frequency-over-time waterfall display
+- **Harmonograph** - Lissajous curve pattern visualization
+- **Real-time FFT** - Fast Fourier Transform analysis
+- **Multi-view dashboard** - See all visualizers at once
+- **High-resolution display** - Smooth 60fps rendering
 
-## 🗺 Implementation Roadmap
-1. **Phase 1**: Implement the AnalyserNode and data-fetching loop.
-2. **Phase 2**: Build the 2D Oscilloscope using Canvas.
-3. **Phase 3**: Create the Spectrogram with custom color palettes.
-4. **Phase 4**: Design the "Engineer Dashboard" layout with Tailwind Grid.
+## 🚀 Getting Started
+
+### Installation
+
+```bash
+cd apps/03-frequencyflow
+npm install
+```
+
+### Development
+
+```bash
+npm run dev
+```
+
+Visit `http://localhost:5173` to use the app.
+
+### Build
+
+```bash
+npm run build
+npm run preview
+```
+
+## 🎵 How to Use
+
+1. **Initialize audio** - Click "Start Audio" to begin capturing input
+2. **Play audio** - Any sound will be visualized in real-time
+3. **Observe the displays**:
+   - **Oscilloscope**: See the raw waveform shape
+   - **Spectrogram**: Track frequency evolution over time
+   - **Harmonograph**: Visualize phase relationships and harmonics
+
+## 📊 Visualizers Explained
+
+### Oscilloscope
+Shows the amplitude of the audio signal over time. Useful for:
+- Waveform analysis
+- Detecting clipping
+- Identifying wave shapes (sine, square, sawtooth)
+
+### Spectrogram
+Displays frequency content over time in a waterfall view. Useful for:
+- Finding resonant frequencies
+- Analyzing harmonic content
+- Identifying overtones and partials
+
+### Harmonograph
+Creates beautiful Lissajous patterns based on phase relationships. Useful for:
+- Visualizing stereo correlation
+- Artistic performance visuals
+- Understanding wave interference
+
+## 🛠️ Tech Stack
+
+- Vue 3 + TypeScript
+- Vite
+- Canvas API for rendering
+- `@spectralsuite/core` - Audio engine
+- Meyda - Feature extraction
+- Web Audio API - Analyser nodes
+
+## 📝 Use Cases
+
+- **Audio engineering** - Analyze mix frequency balance
+- **Sound design** - Explore synthesizer output characteristics
+- **Music production** - Identify problem frequencies
+- **Education** - Teach acoustics and wave physics
+- **Performance visuals** - Live reactive art displays
+
+## 🔗 Related Tools
+
+- **Track Tracer** - For forensic audio analysis
+- **Pocket Engine** - For rhythm and timing analysis

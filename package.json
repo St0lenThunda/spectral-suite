@@ -11,6 +11,21 @@
     "dev:chord": "npm run dev --workspace apps/02-chordcapture",
     "dev:sleuth": "npm run dev --workspace apps/09-scalesleuth",
     "dev:all": "npm run dev --workspaces --if-present",
-    "install:all": "npm install && npm install --workspaces"
+    "install:all": "npm install && npm install --workspaces",
+    "build": "npm run build --workspaces --if-present",
+    "build:director": "npm run build --workspace apps/director",
+    "build:auratune": "npm run build --workspace apps/01-auratune",
+    "build:chordcapture": "npm run build --workspace apps/02-chordcapture",
+    "build:frequencyflow": "npm run build --workspace apps/03-frequencyflow",
+    "build:tracktracer": "npm run build --workspace apps/04-tracktracer",
+    "build:pocketengine": "npm run build --workspace apps/07-pocket-engine",
+    "build:scalesleuth": "npm run build --workspace apps/09-scalesleuth",
+    "clean": "npm run clean --workspaces --if-present",
+    "clean:dist": "find apps -type d -name 'dist' -exec rm -rf {} + 2>/dev/null || true",
+    "clean:modules": "rm -rf node_modules apps/*/node_modules packages/*/node_modules",
+    "clean:all": "npm run clean:dist && npm run clean:modules",
+    "preview:director": "npm run preview --workspace apps/director",
+    "preview:auratune": "npm run preview --workspace apps/01-auratune",
+    "typecheck": "npm run type-check --workspaces --if-present"
   }
 }

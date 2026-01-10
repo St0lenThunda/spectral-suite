@@ -26,6 +26,13 @@
     "install:all": "npm install && npm install --workspaces",
     "preview:auratune": "npm run preview --workspace apps/01-auratune",
     "preview:director": "npm run preview --workspace apps/director",
-    "typecheck": "npm run type-check --workspaces --if-present"
+    "typecheck": "npm run type-check --workspaces --if-present",
+    "lint": "npm run type-check --workspaces --if-present"
+  },
+  "devDependencies": {
+    "vue-tsc": "3.1.4"
+  },
+  "overrides": {
+    "vue-tsc": "3.1.4"
   }
 }

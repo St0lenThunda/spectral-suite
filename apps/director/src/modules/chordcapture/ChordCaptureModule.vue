@@ -168,10 +168,10 @@ const start = () => {
             <div
               class="font-black text-white leading-none font-outfit drop-shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300"
               :class="[
-                detectedChords.length > 0 && detectedChords[0].symbol.length > 4 ? 'text-[5rem] sm:text-[7rem] md:text-[9rem] lg:text-[11rem]' : 'text-[8rem] sm:text-[10rem] md:text-[12rem] lg:text-[16rem]'
+  detectedChords.length > 0 && ( detectedChords[0]?.symbol?.length ?? 0 ) > 4 ? 'text-[5rem] sm:text-[7rem] md:text-[9rem] lg:text-[11rem]' : 'text-[8rem] sm:text-[10rem] md:text-[12rem] lg:text-[16rem]'
               ]"
             >
-              {{ detectedChords.length > 0 ? detectedChords[0].symbol : (currentNote || '--') }}
+              {{ detectedChords.length > 0 ? detectedChords[0]?.symbol : ( currentNote || '--' ) }}
             </div>
             <div
               class="mt-4 flex items-center justify-center gap-4 text-[10px] md:text-xs font-mono font-bold text-slate-500"

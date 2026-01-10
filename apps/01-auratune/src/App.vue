@@ -295,6 +295,9 @@ const toneQualityLabel = computed(() => {
             class="mt-6 text-sky-400 font-bold hover:underline"
           >Try Again</button>
         </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <style scoped>

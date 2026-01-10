@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
-import { useScaleSleuth, Fretboard, useAudioEngine, Note } from '@spectralsuite/core';
+import { ref, computed, watch, Transition, onMounted } from 'vue';
+import { useScaleSleuth, useAudioEngine, ScaleEngine, SynthEngine, Fretboard, Note } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
+import { sensitivityThreshold } from '@spectralsuite/core';
 
 const {
   pitch,
@@ -24,6 +25,10 @@ const showPlayedNotes = ref( true );
 const showScaleNotes = ref( true );
 const showCAGED = ref( false );
 const selectedCAGEDShape = ref<'C' | 'A' | 'G' | 'E' | 'D'>( 'E' );
+const playbackNote = ref<string | null>( null );
+const isPlaying = ref( false );
+const playingScaleName = ref<string | null>( null );
+let playbackAborted = false;
 
 const scaleNotes = computed( () => {
   const targetName = effectiveScale.value;
@@ -32,7 +37,6 @@ const scaleNotes = computed( () => {
   return found ? found.notes : [];
 } );
 
-// Automatically select the top match if nothing is selected
 const effectiveScale = computed( () => {
   if ( selectedScale.value ) return selectedScale.value;
   return potentialScales.value[0]?.name || null;
@@ -60,9 +64,7 @@ const cagedRange = computed( () => {
   const rootChroma = Note.chroma( rootNote );
   if ( rootChroma === undefined ) return undefined;
 
-  // Find root on 6th string (E) -> fret = (chroma - 4 + 12) % 12
   const r6 = ( rootChroma - ( Note.chroma( 'E' ) || 0 ) + 12 ) % 12;
-  // Find root on 5th string (A) -> fret = (chroma - 9 + 12) % 12
   const r5 = ( rootChroma - ( Note.chroma( 'A' ) || 0 ) + 12 ) % 12;
 
   let baseRange: [number, number];
@@ -75,8 +77,6 @@ const cagedRange = computed( () => {
     default: baseRange = [0, 24];
   }
 
-  // Handle negative ranges or ranges starting too low by shifting by octave if needed
-  // This is a simple implementation that picks one primary position
   if ( baseRange[0] < 0 ) {
     baseRange[0] += 12;
     baseRange[1] += 12;
@@ -94,7 +94,6 @@ const handleScaleClick = ( name: string ) => {
   }
 };
 
-// Toast Notification System
 const toastVisible = ref( false );
 const toastMessage = ref( '' );
 let toastTimeout: any = null;
@@ -106,6 +105,48 @@ const showToast = ( msg: string ) => {
   toastTimeout = setTimeout( () => {
     toastVisible.value = false;
   }, 3500 );
+};
+
+const stopScale = () => {
+  playbackAborted = true;
+  isPlaying.value = false;
+  playingScaleName.value = null;
+  playbackNote.value = null;
+};
+
+const playScale = async ( notes: string[], name: string ) => {
+  if ( isPlaying.value ) {
+    const wasPlayingThis = playingScaleName.value === name;
+    stopScale();
+    if ( wasPlayingThis ) return;
+    await new Promise( resolve => setTimeout( resolve, 50 ) );
+  }
+
+  isPlaying.value = true;
+  playingScaleName.value = name;
+  playbackAborted = false;
+
+  const synth = SynthEngine.getInstance();
+  const interval = 400;
+
+  for ( const note of notes ) {
+    if ( playbackAborted ) break;
+    playbackNote.value = note;
+    const freq = Note.get( note ).freq || Note.freq( `${note}3` ) || Note.freq( `${note}4` ) || 440;
+    synth.playNote( freq, interval - 50 );
+    await new Promise( resolve => setTimeout( resolve, interval ) );
+  }
+
+  if ( !playbackAborted ) {
+    playbackNote.value = notes[0]!;
+    const freq = Note.freq( `${notes[0]}4` ) || 880;
+    synth.playNote( freq, interval - 50 );
+    await new Promise( resolve => setTimeout( resolve, interval ) );
+  }
+
+  isPlaying.value = false;
+  playingScaleName.value = null;
+  playbackNote.value = null;
 };
 
 const maxWeight = computed( () => {
@@ -123,7 +164,6 @@ const getWeightColor = ( note: string ) => {
 };
 
 onMounted( async () => {
-  // Ensure audio engine is initialized
   if ( !isInitialized.value ) {
     await init();
   }
@@ -143,22 +183,16 @@ onMounted( async () => {
         <button
           @click="openInfo( 'scalesleuth' )"
           class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95"
-        >
-          Intelligence
-        </button>
+        >Intelligence</button>
         <button
           @click="clearNotes"
           class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-lg border border-slate-700 transition-all"
-        >
-          Reset Detective
-        </button>
+        >Reset Detective</button>
       </div>
     </header>
 
     <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
-      <!-- Left Column: Detection Info -->
       <div class="xl:col-span-1 space-y-6">
-        <!-- Live Note Card -->
         <div
           class="bg-slate-800/40 rounded-3xl p-6 border border-slate-700/50 backdrop-blur-xl relative overflow-hidden"
         >
@@ -171,7 +205,6 @@ onMounted( async () => {
             <span class="text-5xl font-black text-white font-mono">{{ currentNote || '--' }}</span>
             <span class="text-sky-500 font-mono text-xs">{{ pitch ? pitch.toFixed( 1 ) + 'Hz' : '' }}</span>
           </div>
-          <!-- Clarity Meter -->
           <div class="mt-4 h-1.5 bg-slate-700 rounded-full overflow-hidden">
             <div
               class="h-full bg-sky-500 transition-all duration-75"
@@ -180,7 +213,6 @@ onMounted( async () => {
           </div>
         </div>
 
-        <!-- Played Notes -->
         <div class="bg-slate-800/40 rounded-3xl p-6 border border-slate-700/50 backdrop-blur-xl min-h-[150px]">
           <span class="text-[10px] uppercase font-bold tracking-widest text-slate-500 block mb-4">Detected Set</span>
           <div class="flex flex-wrap gap-4">
@@ -189,29 +221,21 @@ onMounted( async () => {
               :key="note"
               class="group/note perspective-500 relative w-12 h-12"
             >
-              <!-- Flip Container -->
               <div
                 class="relative w-full h-full transition-transform duration-500 preserve-3d group-hover/note:rotate-y-180"
               >
-                <!-- Front: Note Name -->
                 <div
                   class="absolute inset-0 backface-hidden rounded-full bg-slate-900 border border-sky-500/30 flex items-center justify-center font-bold text-sky-400 text-sm shadow-lg"
-                >
-                  {{ note }}
-                </div>
-                <!-- Back: Degree -->
+                >{{ note }}</div>
                 <div
                   class="absolute inset-0 backface-hidden rotate-y-180 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex flex-col items-center justify-center shadow-lg shadow-indigo-500/10"
                 >
                   <span
                     class="text-[8px] text-indigo-400/60 uppercase font-black tracking-tighter leading-none mb-0.5">Degree</span>
-                  <span class="text-xs font-black text-white leading-none">
-                    {{ degreeLabels[Note.chroma( note ) || 0] || '?' }}
-                  </span>
+                  <span
+                    class="text-xs font-black text-white leading-none">{{ degreeLabels[Note.chroma( note ) || 0] || '?' }}</span>
                 </div>
               </div>
-
-              <!-- Weight indicator (stays flat below) -->
               <div
                 class="absolute -bottom-2 left-1/2 -translate-x-1/2 h-1 rounded-full transition-all duration-500 z-0"
                 :class="getWeightColor( note )"
@@ -226,9 +250,7 @@ onMounted( async () => {
         </div>
       </div>
 
-      <!-- Center/Right Column: Fretboard & Scales -->
       <div class="xl:col-span-3 space-y-6">
-        <!-- Fretboard View -->
         <div class="bg-slate-800/20 rounded-3xl p-6 border border-slate-700/50">
           <div class="flex justify-between items-center mb-4">
             <h3 class="text-xs font-bold uppercase tracking-widest text-slate-500">Visual Fretboard</h3>
@@ -238,19 +260,51 @@ onMounted( async () => {
                 class="flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] font-black uppercase"
                 :class="showPlayedNotes ? 'bg-sky-500/10 border-sky-500 text-sky-400' : 'bg-slate-900 border-slate-700 text-slate-500'"
               >
-                <span class="w-2 h-2 rounded-full bg-sky-500"></span>
-                Played
+                <span class="w-2 h-2 rounded-full bg-sky-500"></span> Played
               </button>
               <button
                 @click="showScaleNotes = !showScaleNotes"
                 class="flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] font-black uppercase"
                 :class="showScaleNotes ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'bg-slate-900 border-slate-700 text-slate-500'"
               >
-                <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                Scale
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Scale
               </button>
 
-              <!-- CAGED Mode Toggle -->
+<!-- Refined Play Button -->
+              <button
+               @click="playScale( scaleNotes, 'current' )"
+                :disabled="!selectedScale"
+                class="flex items-center gap-2 px-4 py-1.5 transition-all duration-300 transform active:scale-95 text-[10px] font-black uppercase disabled:opacity-20"
+                :class="isPlaying && playingScaleName === 'current' ? 'bg-red-500 text-white rounded-lg' : 'bg-emerald-500 text-white rounded-full'"
+              >
+                <div class="relative w-3 h-3 flex items-center justify-center">
+                  <svg
+                    v-if=" isPlaying && playingScaleName === 'current' "
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-3 w-3"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <rect
+                      x="6"
+                      y="6"
+                      width="12"
+                      height="12"
+                    />
+                  </svg>
+                  <svg
+                    v-else
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-3 w-3"
+                    fill="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+                {{ isPlaying && playingScaleName === 'current' ? 'Stop' : 'Play' }}
+              </button>
+
               <button
                 @click="showCAGED = !showCAGED"
                 class="flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] font-black uppercase ml-4"
@@ -259,11 +313,8 @@ onMounted( async () => {
                 <span
                   class="w-2 h-2 rounded-full"
                   :class="showCAGED ? 'bg-indigo-500' : 'bg-slate-600'"
-                ></span>
-                CAGED Mode
+                ></span> CAGED Mode
               </button>
-
-              <!-- CAGED Shape Selector -->
               <div
                 v-if=" showCAGED "
                 class="flex bg-slate-950 p-1 rounded-xl border border-white/5 animate-pop-in"
@@ -274,11 +325,8 @@ onMounted( async () => {
                   @click="selectedCAGEDShape = shape as any"
                   class="w-8 h-8 rounded-lg text-[10px] font-black transition-all flex items-center justify-center"
                   :class="selectedCAGEDShape === shape ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-slate-300'"
-                >
-                  {{ shape }}
-                </button>
+                >{{ shape }}</button>
               </div>
-
               <span
                 class="text-[10px] text-sky-500 font-bold ml-2"
                 v-if=" selectedScale "
@@ -291,10 +339,10 @@ onMounted( async () => {
             :labels="degreeLabels"
             :num-frets="24"
             :fret-range="showCAGED ? cagedRange : undefined"
+            :playback-note="playbackNote || undefined"
           />
         </div>
 
-        <!-- Scale Suggestions -->
         <div class="bg-slate-800/40 rounded-3xl p-6 border border-slate-700/50 backdrop-blur-xl">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xs font-bold uppercase tracking-widest text-slate-500">Scale Suggestions</h3>
@@ -311,52 +359,72 @@ onMounted( async () => {
               >Degrees</button>
             </div>
           </div>
-
           <div
             v-if=" potentialScales.length === 0 "
             class="flex flex-col items-center py-10 opacity-30"
           >
             <p class="text-sm">Detecting scales requires at least 3 distinct notes</p>
           </div>
-
           <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
             <button
               v-for=" scale in potentialScales.slice( 0, 10 ) "
               :key="scale.name"
               @click="handleScaleClick( scale.name )"
               class="group relative flex items-center justify-between p-4 rounded-2xl border transition-all overflow-hidden"
-              :class="selectedScale === scale.name ? 'bg-sky-500/10 border-sky-500' : 'bg-slate-900/40 border-slate-700/50 hover:border-slate-500'"
+              :class="selectedScale === scale.name ? 'bg-indigo-500/10 border-indigo-500' : 'bg-slate-900/40 border-slate-700/50 hover:border-slate-500'"
             >
-              <div class="text-left">
-                <div class="text-sm font-bold text-white group-hover:text-sky-400 transition-colors">{{ scale.name }}
+              <div class="flex items-center justify-between flex-1 pr-4">
+                <div class="text-left">
+                  <div class="text-sm font-bold text-white group-hover:text-indigo-400 transition-colors">
+                    {{ scale.name }}</div>
+                  <div class="text-[10px] text-slate-500 uppercase font-mono tracking-tight mt-0.5">
+                    <span v-if=" !showDegrees ">{{ scale.notes.join( ' · ' ) }}</span>
+                    <span
+                      v-else
+                      class="text-indigo-500/80"
+                    >{{ scale.romanIntervals?.join( ' · ' ) || scale.intervals.join( ' · ' ) }}</span>
+                  </div>
                 </div>
-                <div class="text-[10px] text-slate-500 uppercase font-mono tracking-tight mt-0.5">
-                  <span v-if=" !showDegrees ">{{ scale.notes.join( ' · ' ) }}</span>
-                  <span
-                    v-else
-                    class="text-sky-500/80"
-                  >{{ scale.romanIntervals?.join( ' · ' ) || scale.intervals.join( ' · ' ) }}</span>
-                </div>
-                <!-- Modal info placeholder -->
-                <div
-                  v-if=" scale.type.includes( 'Dorian' ) || scale.type.includes( 'Phrygian' ) || scale.type.includes( 'Lydian' ) || scale.type.includes( 'Mixolydian' ) || scale.type.includes( 'Aeolian' ) || scale.type.includes( 'Locrian' ) "
-                  class="text-[8px] text-slate-600 font-bold uppercase tracking-tighter mt-1"
-                >
-                  Theory: Modal of {{ scale.name.split( ' ' )[1] }} Major
+                <div class="flex items-center gap-3">
+                  <!-- Morphing Individual Play Button -->
+                  <button
+                    @click.stop="playScale( scale.notes, scale.name )"
+                    class="w-10 h-10 transition-all duration-300 transform active:scale-95 border border-white/10 flex items-center justify-center text-white shadow-xl"
+                    :class="isPlaying && playingScaleName === scale.name ? 'bg-red-500 rounded-xl' : 'bg-emerald-500 rounded-full'"
+                    title="Play Scale"
+                  >
+                    <svg
+                      v-if=" isPlaying && playingScaleName === scale.name "
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-4 w-4"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <rect
+                        x="6"
+                        y="6"
+                        width="12"
+                        height="12"
+                      />
+                    </svg>
+                    <svg
+                      v-else
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-4 w-4"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </button>
+                  <div
+                    class="w-10 h-10 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-[10px] font-black text-indigo-400"
+                  >{{ ( scale.score * 100 ).toFixed( 0 ) }}</div>
                 </div>
               </div>
-              <div class="text-right">
-                <div
-                  class="text-[10px] font-black"
-                  :class="scale.score === 1 ? 'text-green-500' : 'text-slate-500'"
-                >
-                  {{ Math.round( scale.score * 100 ) }}%
-                </div>
-              </div>
-              <!-- Selection Indicator -->
               <div
                 v-if=" selectedScale === scale.name "
-                class="absolute left-0 top-0 bottom-0 w-1 bg-sky-500"
+                class="absolute left-0 top-0 bottom-0 w-1 bg-indigo-500"
               ></div>
             </button>
           </div>
@@ -364,7 +432,6 @@ onMounted( async () => {
       </div>
     </div>
 
-    <!-- Toast Notification -->
     <Transition name="toast">
       <div
         v-if=" toastVisible "
@@ -374,24 +441,10 @@ onMounted( async () => {
         {{ toastMessage }}
       </div>
     </Transition>
-
   </div>
 </template>
 
 <style scoped>
-@keyframes pulse {
-
-  0%,
-  100% {
-    opacity: 1;
-  }
-
-  50% {
-    opacity: .5;
-  }
-}
-
-/* 3D Flip Utilities */
 .perspective-500 {
   perspective: 500px;
 }

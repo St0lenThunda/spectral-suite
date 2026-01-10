@@ -7,6 +7,7 @@ interface Props {
   numFrets?: number;
   labels?: Record<string, string>;
   fretRange?: [number, number];
+  playbackNote?: string;
 }
 
 const props = withDefaults( defineProps<Props>(), {
@@ -29,6 +30,7 @@ const highlightChromas = computed( () => new Set( props.highlightNotes.map( n =>
 
 const isNoteActive = ( note: string ) => activeChromas.value.has( Note.chroma( note ) );
 const isNoteHighlighted = ( note: string ) => highlightChromas.value.has( Note.chroma( note ) );
+const isPlaybackNote = ( note: string ) => props.playbackNote && Note.chroma( note ) === Note.chroma( props.playbackNote );
 
 const isOpenActive = ( stringRoot: string ) => isNoteActive( getNoteAt( stringRoot, 0 ) );
 const isOpenHighlighted = ( stringRoot: string ) => isNoteHighlighted( getNoteAt( stringRoot, 0 ) );
@@ -160,15 +162,17 @@ const isInsideRange = ( fret: number ) => {
               <div
                 class="rounded-full flex items-center justify-center text-xs font-black transition-all duration-200 cursor-pointer"
                 :class="[
-  isNoteActive( getNoteAt( stringRoot, fret ) ) && isInsideRange( fret )
-                    ? 'w-8 h-8 bg-sky-500 text-white shadow-[0_0_20px_rgba(56,189,248,1)] border-2 border-sky-200'
-    : isNoteHighlighted( getNoteAt( stringRoot, fret ) ) && isInsideRange( fret )
-                      ? 'w-7 h-7 bg-emerald-600 text-white border-2 border-emerald-400 hover:scale-110'
-                      : 'w-5 h-5 opacity-0 hover:opacity-50 hover:bg-slate-500'
+  isPlaybackNote( getNoteAt( stringRoot, fret ) ) && isInsideRange( fret )
+    ? 'w-10 h-10 bg-amber-400 text-slate-900 shadow-[0_0_30px_rgba(251,191,36,1)] border-4 border-amber-200 scale-125 z-50'
+    : isNoteActive( getNoteAt( stringRoot, fret ) ) && isInsideRange( fret )
+      ? 'w-8 h-8 bg-sky-500 text-white shadow-[0_0_20px_rgba(56,189,248,1)] border-2 border-sky-200'
+      : isNoteHighlighted( getNoteAt( stringRoot, fret ) ) && isInsideRange( fret )
+        ? 'w-7 h-7 bg-emerald-600 text-white border-2 border-emerald-400 hover:scale-110'
+        : 'w-5 h-5 opacity-0 hover:opacity-50 hover:bg-slate-500'
                 ]"
               >
                 <span
-                  v-if=" ( isNoteActive( getNoteAt( stringRoot, fret ) ) || isNoteHighlighted( getNoteAt( stringRoot, fret ) ) ) && isInsideRange( fret ) "
+                  v-if=" ( isPlaybackNote( getNoteAt( stringRoot, fret ) ) || isNoteActive( getNoteAt( stringRoot, fret ) ) || isNoteHighlighted( getNoteAt( stringRoot, fret ) ) ) && isInsideRange( fret ) "
                 >
                   {{ getLabel( getNoteAt( stringRoot, fret ) ) }}
                 </span>

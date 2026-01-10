@@ -1,5 +1,6 @@
 export * from './audio/AudioEngine';
 export * from './audio/useAudioEngine';
+export * from './audio/SynthEngine';
 export * from './audio/SpectralAnalysis';
 export * from './audio/usePitch';
 export * from './composables/useAudioRecorder';

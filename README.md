@@ -6,10 +6,10 @@ A modular music analysis suite providing real-time audio processing and visualiz
 
 Spectral Suite is a comprehensive monorepo containing multiple specialized music analysis tools:
 
-- **AuraTune** - Immersive pitch detection and visual performance tool
-- **ScaleSleuth** - Deep scale analysis and mode identification
-- **ChordCapture** - Real-time harmonic recognition
-- **Pocket Engine** - Rhythm and timing diagnostics
+- **AuraTune Pro** - Immersive pitch detection and visual performance tool
+- **ScaleSleuth Pro** - Harmonic forensic lab with CAGED patterns and lock-in playback
+- **ChordCapture Pro** - Real-time harmonic recognition with functional analysis
+- **Pocket Engine Pro** - Rhythm and timing diagnostics with polyrhythmic grids
 - **Frequency Flow** - Engineering-grade spectral visualization
 - **Track Tracer** - Forensic audio analysis (BPM, key, structure)
 - **Spectral Academy** - Interactive lessons to learn music theory by doing
@@ -81,10 +81,11 @@ npm run preview
 
 Shared audio processing library containing:
 - Audio engine with Web Audio API integration
-- Pitch detection algorithms
-- Chord recognition
-- Scale analysis
-- Reusable UI components (Fretboard, InfoPanel)
+- `SynthEngine` for tone generation and audio sequencing
+- Pitch detection algorithms with reactive noise gate
+- Chord recognition and functional analysis
+- Scale analysis with modal identification
+- Reusable UI components (24-fret Fretboard, InfoPanel, MorphContainer)
 
 ## 🛠️ Tech Stack
 

@@ -10,6 +10,7 @@ The core package provides shared audio processing functionality, reusable UI com
 
 ### Audio Engine (`/audio`)
 - **AudioEngine** - Web Audio API wrapper with microphone input
+- **SynthEngine** - Triangle-wave synthesizer for tone generation and sequencing
 - **useAudioEngine** - Vue composable for audio initialization
 - **usePitch** - Real-time pitch detection composable
 
@@ -20,7 +21,8 @@ The core package provides shared audio processing functionality, reusable UI com
 - **useScaleSleuth** - Composable for scale analysis
 
 ### UI Components (`/ui`)
-- **Fretboard.vue** - Interactive guitar fretboard display
+- **Fretboard.vue** - Professional 24-fret guitar display with CAGED and playback support
+- **MorphContainer.vue** - Premium shared container for smooth UI state transitions (as seen in Academy)
 - **InfoPanel.vue** - Slideout documentation panel
 
 ## 🚀 Usage
@@ -104,7 +106,8 @@ const scaleNotes = ref(['C', 'D', 'E', 'F', 'G', 'A', 'B'])
   <Fretboard 
     :activeNotes="activeNotes"
     :highlightNotes="scaleNotes"
-    :numFrets="12"
+    :numFrets="24"
+    :playbackNote="'C'"
   />
 </template>
 ```

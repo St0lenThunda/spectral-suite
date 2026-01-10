@@ -8,21 +8,22 @@ ScaleSleuth Pro is a clinical music theory tool designed to bridge the gap betwe
 
 ## ✨ Pro Features
 
-- **🎹 Weighted Tonic Detection** - Track note frequency (heat map) to mathematically identify the actual tonal center (e.g., C Phrygian vs Ab Major).
-- **📐 Scale Degree HUD** - Toggle between note names and intervals (1, 2, b3, #4) to analyze scale function.
-- **🔗 Modal Relationship Engine** - Instant identification of parent scales (e.g., "D Dorian is the 2nd mode of C Major").
-- **🎸 Advanced Fretboard Map** - Visual mapping of detected notes vs. optimized scale patterns across 15 frets.
-- **🎯 Dynamic Ranking** - Scales are ranked using a multi-pass heuristic that considers note set match, interval priority, and weighting.
+- **🎹 Weighted Tonic Detection** - Track note frequency (heat map) to mathematically identify the actual tonal center.
+- **🔒 Scale Lock-in** - Clicking a suggested scale "freezes" the detective, filters extraneous notes, and focuses the UI on the selection.
+- **📐 Scale Degree HUD** - 3D flipping note bubbles that show Roman Numeral degrees (I, bII, III, etc.) on hover.
+- **🎸 CAGED Position Map** - Visualize standard C-A-G-E-D guitar boxes across the entire fretboard.
+- **🔊 Scale Playback** - Listen to the scale using a high-fidelity triangle-wave synth with synced visual highlighting.
+- **🎯 24-Fret Pro Board** - Pixel-perfect geometry with second-octave markers and open-string indicators.
 
 ## 📊 Competitive Edge
 
-| Feature | ScaleSleuth Pro | Basic Detectors | Theory Handbooks |
-| :--- | :---: | :---: | :---: |
-| **Real-time Map** | **Yes (Fretboard)** | List Only | Static Image |
-| **Scale Degrees** | **Yes (1/b3/#4)** | None | Complex Charts |
-| **Modal Links** | **Yes (Parent Keys)** | None | Passive Text |
-| **Weighting** | **Tonic Heat Map** | Equal Weight | Manual Only |
-| **Engine** | **Tonal.js + Forensics** | Pattern Lookups | Memory |
+| Feature | ScaleSleuth Pro | Basic Detectors |
+| :--- | :---: | :---: |
+| **Real-time Map** | **Yes (24-Fret)** | List Only |
+| **Scale Degrees** | **Yes (Roman Numerals)** | None |
+| **CAGED Boxes** | **Yes (C-A-G-E-D)** | None |
+| **Playback** | **Yes (Synced Synth)** | None |
+| **Noise Gate** | **Dynamic Squelch** | Basic Threshold |
 
 ## 🚀 Getting Started
 
@@ -86,10 +87,11 @@ npm run preview
 ## 🎸 Fretboard Features
 
 - **Standard Tuning**: E-A-D-G-B-E display
-- **Active Notes**: Bright blue highlighting
-- **Scale Notes**: Green highlighting
-- **Interactive**: Click to hear note names
-- **12-fret display**: Full octave visualization
+- **Active Notes**: Sky blue glow highlighting
+- **Scale Notes**: Emerald green highlighting
+- **Playback Highlighting**: High-contrast Amber pulse
+- **24-fret display**: Full double-octave visualization with pro markers
+- **CAGED Overlay**: Interactive fret range masking
 
 ## 🛠️ Tech Stack
 

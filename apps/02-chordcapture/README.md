@@ -10,19 +10,19 @@ ChordCapture Pro is a clinical tool for musicians and composers to document harm
 
 - **🎹 Progression Ledger (The Harmonic Diary)** - Permanently log detected chords into a scrolling sequence. Perfect for capturing song structures as you play them.
 - **📐 Functional Roman Numerals** - See chords as I, IV, V, vii° etc., relative to your chosen key center for deep theoretical insight.
-- **🎸 Integrated Voicing Maps** - Real-time guitar fretboard diagrams for every detected chord, helping you master new voicings.
-- **🧠 Harmonic Next-Step Suggestions** - Intelligent AI-driven suggestions for the next chord based on functional harmony and common cadences (ii-V-I).
-- **🎯 Multi-Pass Forensic Engine** - High-precision detection that recognizes extensions (9ths, 11ths, 13ths) and identifies the most likely harmonic intent.
+- **🎸 24-Fret Pro Board** - Real-time guitar fretboard diagrams for every detected chord across the entire double-octave range.
+- **🧠 Harmonic Next-Step Suggestions** - Intelligent suggestions for the next chord based on functional harmony and common cadences (ii-V-I).
+- **🎯 Dynamic Sensitivity Gate** - High-precision detection with a reactive noise gate that eliminates ambient interference during recording.
 
 ## 📊 Competitive Edge
 
-| Feature | ChordCapture Pro | Basic Detectors | Chordify / Static Apps |
-| :--- | :---: | :---: | :---: |
-| **Direct Analysis** | **Forensic Tonal.js** | Simple Match | AI (Lossy) |
-| **Progression Log** | **Yes (Ledger)** | List Only | Timeline Only |
-| **Functional ID** | **Yes (Romans)** | None | None |
-| **Voicing Help** | **Fretboard Map** | None | Static Images |
-| **Suggestions** | **Functional AI** | None | Generic |
+| Feature | ChordCapture Pro | Basic Detectors |
+| :--- | :---: | :---: |
+| **Direct Analysis** | **Forensic Tonal.js** | Simple Match |
+| **Progression Log** | **Yes (Ledger)** | List Only |
+| **Functional ID** | **Yes (Romans)** | None |
+| **Voicing Help** | **24-Fret Map** | None |
+| **Noise Gate** | **Dynamic Squelch** | Basic |
 
 ## 🚀 Getting Started
 

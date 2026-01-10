@@ -19,18 +19,18 @@ export const TOOL_METADATA: Record<string, ToolMetadata> = {
   scalesleuth: {
     id: 'scalesleuth',
     name: 'ScaleSleuth Pro',
-    whatAmISeeing: 'A real-time Harmonic Forensic Lab. You are seeing potential scale matches ranked by accuracy, an interactive fretboard map, and a modal relationship engine that identifies parent scales and interval degrees.',
-    instructions: '1. Play a melody or a series of notes.\n2. Use the "Notes/Degrees" toggle to switch between letter names and intervals.\n3. Observe the color-coded "Heat Map" bars: Emerald indicates the most likely Tonic (home note), while Blue indicates supporting tones.\n4. Click a suggested scale to map the full pattern onto the fretboard.',
-    practicalApplication: 'Identify complex modes in real-time performance, master modal theory by seeing relationships between parallel keys, and bridge the gap between "ear" and "theory" using interval analysis.',
-    howItWorks: 'ScaleSleuth Pro uses a weighted pitch class profile. It calculates the mathematical distance between your input and thousands of scale structures, then performs a second-pass analysis to identify modal origins and relative scale degrees.'
+    whatAmISeeing: 'A real-time Harmonic Forensic Lab. You are seeing potential scale matches ranked by accuracy, an interactive 24-fret pattern map with CAGED isolation boxes, and a modal relationship engine showing Roman Numeral degrees.',
+    instructions: '1. Play notes to build a profile. Click a suggestion to "Lock" the detective and filter extraneous tones.\n2. Toggle "CAGED Mode" and select a shape (C, A, G, E, D) to isolate specific patterns.\n3. Click "Play Scale" to listen to the sequence with synced Amber highlighting.\n4. Hover notes to flip between letter names and Roman Numeral degrees.',
+    practicalApplication: 'Identify complex modes in real-time, bridge the gap between abstract theory and the guitar fretboard using CAGED patterns, and practice scales with high-contrast visual and audio cues.',
+    howItWorks: 'ScaleSleuth Pro uses a weighted pitch class profile with a reactive noise gate. It maps matches onto a 24-fret matrix and uses a triangle-wave Synth Engine for visual-audio sequencing.'
   },
   chordcapture: {
     id: 'chordcapture',
     name: 'ChordCapture Pro',
-    whatAmISeeing: 'A Forensic Harmonic Diarist. You are seeing real-time chord identification, a Progression Ledger for logging sequences, and a Roman Numeral analysis engine for functional theory.',
-    instructions: '1. Play a series of notes or a chord.\n2. Observe the identified structure and its Roman Numeral (relative to your chosen key).\n3. Click "Capture to Ledger" to permanently log a chord into your harmonic sequence.\n4. Use "Next-Step Suggestions" for creative inspiration and common functional transitions.',
-    practicalApplication: 'Transcribing complex songs, documenting harmonic ideas during composition, and mastering functional harmony (understanding I, IV, V relationships) through real-time feedback.',
-    howItWorks: 'ChordCapture Pro uses a multi-pass detection engine powered by Tonal.js. It extracts pitch classes, identifies best-fit chord symbols, and performs a secondary functional analysis to calculate Roman Numerals and suggested diatonic next-steps.'
+    whatAmISeeing: 'A Forensic Harmonic Diarist. You are seeing real-time chord identification on a professional 24-fret board, a Progression Ledger for logging sequences, and a Roman Numeral analysis engine.',
+    instructions: '1. Play a chord to see its symbol and structure on the 24-fret board.\n2. Observe the Roman Numeral analysis relative to your chosen key.\n3. Click "Capture to Ledger" to permanently log a chord into your sequence.\n4. Use "Next-Step Suggestions" for creative inspiration and common functional transitions.',
+    practicalApplication: 'Transcribing complex songs, documenting harmonic ideas across the entire fretboard range, and mastering functional harmony with engineering-grade sensitivity.',
+    howItWorks: 'Uses Tonal.js with a multi-pass detection engine. It features 24-fret geometry with sub-cent precision and a reactive sensitivity threshold to eliminate ambient noise during capture.'
   },
   pocketengine: {
     id: 'pocketengine',

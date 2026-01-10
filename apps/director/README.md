@@ -66,6 +66,7 @@ All tools share a consistent interface:
 4. **Pocket Engine** ⏱️ - Rhythm and timing
 5. **Frequency Flow** 🌊 - Spectral visualization
 6. **Track Tracer** 🧪 - Audio file analysis
+7. **Spectral Academy** 🎓 - Interactive music theory lessons
 
 ## 🏗️ Architecture
 

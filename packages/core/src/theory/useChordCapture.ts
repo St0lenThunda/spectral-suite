@@ -41,8 +41,8 @@ export function useChordCapture () {
   const keyCenter = globalKeyCenter;
 
   watch( pitch, ( newPitch ) => {
-    // Noise Gate: must have pitch, decent clarity, and exceed volume threshold
-    if ( !newPitch || ( clarity.value || 0 ) < 0.85 || volume.value < NOISE_FLOOR ) {
+    // Noise Gate: must have pitch, decent clarity (lowered for guitar), and exceed volume threshold
+    if ( !newPitch || ( clarity.value || 0 ) < 0.7 || volume.value < NOISE_FLOOR ) {
       currentNote.value = null;
 
       // Start/reset clear timeout if buffer is not empty

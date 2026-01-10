@@ -12,6 +12,7 @@ Spectral Suite is a comprehensive monorepo containing multiple specialized music
 - **Pocket Engine** - Rhythm and timing diagnostics
 - **Frequency Flow** - Engineering-grade spectral visualization
 - **Track Tracer** - Forensic audio analysis (BPM, key, structure)
+- **Spectral Academy** - Interactive lessons to learn music theory by doing
 - **Director** - Unified dashboard for all tools
 
 ## 🏗️ Monorepo Structure

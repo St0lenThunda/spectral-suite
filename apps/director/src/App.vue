@@ -6,10 +6,14 @@ import ChordCaptureModule from './modules/chordcapture/ChordCaptureModule.vue';
 import PocketEngineModule from './modules/pocketengine/PocketEngineModule.vue';
 import FrequencyFlowModule from './modules/frequencyflow/FrequencyFlowModule.vue';
 import TrackTracerModule from './modules/tracktracer/TrackTracerModule.vue';
+import AcademyModule from './modules/academy/AcademyModule.vue';
+import LessonRunner from './modules/academy/LessonRunner.vue';
+import { type Lesson } from './modules/academy/lessons';
 import ToolInfoModal from './components/ToolInfoModal.vue';
 import { useAudioEngine } from '@spectralsuite/core'
 
 const currentModule = ref( 'dashboard' )
+const activeLesson = ref<Lesson | null>( null )
 const { isInitialized, inputGain, setGain, getAnalyser } = useAudioEngine()
 const volumeLevel = ref( 0 )
 let rafId: number | null = null
@@ -156,6 +160,11 @@ const handleGainChange = ( event: Event ) => {
           :class="currentModule === 'dashboard' ? 'text-white' : 'text-slate-500 hover:text-slate-300'"
         >Dashboard</button>
         <button
+          @click="currentModule = 'academy'"
+          class="text-[10px] font-black uppercase tracking-[0.2em] transition-all"
+          :class="currentModule === 'academy' ? 'text-white' : 'text-slate-500 hover:text-slate-300'"
+        >Academy</button>
+        <button
           @click="currentModule = 'settings'"
           class="text-[10px] font-black uppercase tracking-[0.2em] transition-all"
           :class="currentModule === 'settings' ? 'text-white' : 'text-slate-500 hover:text-slate-300'"
@@ -277,6 +286,10 @@ const handleGainChange = ( event: Event ) => {
       <PocketEngineModule v-else-if=" currentModule === 'pocketengine' && enabledTools.pocketengine " />
       <FrequencyFlowModule v-else-if=" currentModule === 'frequencyflow' && enabledTools.frequencyflow " />
       <TrackTracerModule v-else-if=" currentModule === 'tracktracer' && enabledTools.tracktracer " />
+      <AcademyModule
+        v-else-if=" currentModule === 'academy' "
+        @start-lesson="( l ) => activeLesson = l"
+      />
 
       <div
         v-else
@@ -291,6 +304,28 @@ const handleGainChange = ( event: Event ) => {
       </div>
 
       <ToolInfoModal />
+      <ToolInfoModal />
+
+      <!-- ACADEMY OVERLAY (Persistent Lesson Runner) -->
+      <transition
+        enter-active-class="transform transition duration-500 ease-out"
+        enter-from-class="-translate-x-full opacity-0"
+        enter-to-class="translate-x-0 opacity-100"
+        leave-active-class="transform transition duration-300 ease-in"
+        leave-from-class="translate-x-0 opacity-100"
+        leave-to-class="-translate-x-full opacity-0"
+      >
+        <div
+          v-if=" activeLesson "
+          class="fixed top-16 bottom-16 left-0 z-40 w-full max-w-md shadow-2xl border-r border-white/10"
+        >
+          <LessonRunner
+            :lesson="activeLesson"
+            @complete="activeLesson = null; currentModule = 'academy'"
+            @tool-change="( toolId ) => currentModule = toolId"
+          />
+        </div>
+      </transition>
     </main>
 
     <!-- Persistent Global Status Bar -->

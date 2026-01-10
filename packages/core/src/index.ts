@@ -8,4 +8,4 @@ export * from './theory/useChordCapture';
 export { default as Fretboard } from './ui/Fretboard.vue';
 export { default as InfoPanel } from './ui/InfoPanel.vue';
 
-export { Note, Interval } from 'tonal';
+export { Note, Interval, Chord } from 'tonal';

@@ -1,22 +1,21 @@
-# Pocket Engine
+# PocketEngine Pro Suite ⏱️
 
-Rhythm and timing diagnostic tool to master your internal clock.
+Professional rhythm and timing diagnostic lab for mastering internal clock precision.
 
 ## 🎯 Purpose
 
-Pocket Engine helps musicians develop rock-solid timing by providing precision metronome functionality combined with real-time rhythm analysis. Practice staying locked to the beat and measure your timing accuracy.
+PocketEngine Pro helps musicians develop rock-solid timing by providing precision metronome functionality combined with real-time forensic rhythm analysis. Practice staying locked to the beat, diagnose rushing/dragging tendencies, and measure your timing accuracy to the millisecond.
 
-## ✨ Features
+## ✨ Pro Features
 
-- **Advanced Configuration** - Smooth slidedown drawer for professional training tools
-- **Rhythmic Subdivisions** - Support for 1/4, 1/8, 1/12 (triplets), and 1/16 divisions
-- **Visual "Flash" Mode** - High-contrast optical pulse syncing for better visual feedback
-- **Stability Training** - Gap Click mode to build internal time by randomly muting clicks
-- **The Ladder** - Automated tempo progression for systematic speed-building
-- **Transient Detection** - Real-time audio onset tracking via microphone
-- **Timing Offset Analysis** - Forensic millisecond deviation tracking
-- **Visual Feedback** - Color-coded "Pocket" indicators (Rush vs. Drag)
-- **Morphing UI** - Dynamic transition between playback states
+- **⚙️ Advanced Training Drawer** - Professional tools hidden in a smooth slide-down interface.
+- **🔢 Rhythmic Subdivisions** - Support for 1/4, 1/8, 1/12 (triplets), and 1/16 divisions with polyrhythmic potential.
+- **⚡ Visual Flash Mode** - High-contrast optical pulse syncing for silent or visual-first reference.
+- **📉 Gap Click Training** - Build internal time by randomly muting clicks for extended periods.
+- **🪜 The Ladder** - Automated tempo progression for systematic speed-building.
+- **🕵️ Transient Detection** - Real-time audio onset tracking via microphone with forensic accuracy.
+- **🎯 Timing Offset Analysis** - Exact millisecond deviation tracking (e.g., +12ms rush, -5ms drag).
+- **🎨 Pocket Visualizer** - Color-coded "Pocket" indicators (Green=Perfect, Yellow=Drift, Red=Off).
 
 ## 🚀 Getting Started
 

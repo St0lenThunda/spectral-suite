@@ -1,19 +1,19 @@
-# Frequency Flow
+# FrequencyFlow Pro Suite 🌊
 
 Engineering-grade spectral analysis and visualization suite for deep audio exploration.
 
 ## 🎯 Purpose
 
-Frequency Flow provides professional-level spectral analysis tools for engineers, producers, and audio enthusiasts. Visualize the physics of sound with multiple real-time analyzers running simultaneously.
+FrequencyFlow Pro provides professional-level spectral analysis tools for engineers, producers, and audio enthusiasts. Visualize the physics of sound with multiple real-time analyzers running simultaneously, now enhanced with intelligent EQ suggestions and export capabilities.
 
-## ✨ Features
+## ✨ Pro Features
 
-- **Oscilloscope** - Time-domain waveform visualization
-- **Spectrogram** - Frequency-over-time waterfall display
-- **Harmonograph** - Lissajous curve pattern visualization
-- **Real-time FFT** - Fast Fourier Transform analysis
-- **Multi-view dashboard** - See all visualizers at once
-- **High-resolution display** - Smooth 60fps rendering
+- **📊 Intelligent EQ Suggestions** - Real-time analysis detects muddy low-mids, harsh presence, or lacking air, offering specific cut/boost recommendations.
+- **🧗 Peak Hold & Decay** - Trace maximum signal levels over time for precise dynamic analysis.
+- **🎵 Dominant Frequency Tracking** - Instantly identifies the loudest frequency component and its corresponding musical note.
+- **📉 Multi-View Dashboard** - Simultaneous Oscilloscope, Spectrogram, and Harmonograph displays.
+- **🎨 Instrument Range Overlay** - Visualize spectral space occupied by specific instruments (Kick, Snare, Vocals, etc.).
+- **💾 Export & Capture** - Save high-res spectral snapshots as PNG or raw analysis data as JSON.
 
 ## 🚀 Getting Started
 

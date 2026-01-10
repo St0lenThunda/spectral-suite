@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue';
 import { TrackAnalyzer, type AnalysisResult, useAudioRecorder } from '@spectralsuite/core';
+import { useToolInfo } from '../../composables/useToolInfo';
 
-// Standalone specific constants/setup
+const { openInfo } = useToolInfo();
+
 const fileInput = ref<HTMLInputElement | null>( null );
 const urlInput = ref( "" );
 const isAnalyzing = ref( false );
@@ -44,6 +46,7 @@ const startListening = async () => {
     error.value = err.message;
   }
 }
+
 
 const analyzeFile = async ( event: Event ) => {
   const input = event.target as HTMLInputElement;
@@ -94,6 +97,10 @@ const analyzeUrl = async () => {
 const clearUrl = () => {
   urlInput.value = "";
 };
+
+
+
+
 
 const SPECIMENS = [
   { name: "Viper (EDM)", type: "Quantized Pulse", url: "https://raw.githubusercontent.com/mdn/webaudio-examples/main/audio-analyser/viper.mp3" },
@@ -326,16 +333,29 @@ const exportAnalysis = () => {
 </script>
 
 <template>
-  <div class="min-h-screen p-8 lg:p-12 max-w-7xl mx-auto flex flex-col gap-8 bg-[#0a0a0c]">
-    <!-- Standalone Header -->
-    <header class="flex flex-col gap-2">
-      <div class="flex items-center gap-4">
-        <div class="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center font-black text-white italic">T
-        </div>
-        <h1 class="text-3xl font-black tracking-tighter text-white uppercase italic">Track<span
-            class="text-blue-500">Tracer</span> <span class="text-indigo-400 text-lg">Pro</span></h1>
+  <div class="space-y-8 max-w-5xl mx-auto">
+
+    <header class="flex justify-between items-end">
+      <div>
+        <h2 class="text-4xl font-black text-white italic tracking-tighter uppercase">Track<span
+            class="text-blue-500">Tracer</span> <span class="text-indigo-400 text-lg">Pro</span></h2>
+        <p class="text-slate-500 text-xs font-mono uppercase tracking-widest mt-1">Song Deconstruction & Forensic Lab
+        </p>
       </div>
-      <p class="text-slate-500 font-mono text-xs uppercase tracking-[0.3em]">Forensic Audio Analysis Suite • v2.0.0</p>
+      <div class="flex items-center gap-4">
+        <button
+          @click="openInfo( 'tracktracer' )"
+          class="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95"
+        >
+          Intelligence
+        </button>
+        <div
+          v-if=" result "
+          class="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest"
+        >
+          Scan Complete
+        </div>
+      </div>
     </header>
 
     <!-- Lab Interface -->
@@ -509,6 +529,7 @@ const exportAnalysis = () => {
               require a forensic proxy.</p>
           </div>
 
+          <!-- Remote Link Analysis (Primary) -->
         </div>
       </div>
 

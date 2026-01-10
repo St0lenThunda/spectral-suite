@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onUnmounted, computed } from 'vue'
-import { MetronomeEngine } from './engine/MetronomeEngine'
-import { TransientDetector } from './engine/TransientDetector'
+import { MetronomeEngine, TransientDetector } from '@spectralsuite/core'
 
 const metronome = new MetronomeEngine( 120 )
 const detector = new TransientDetector( 0.3 )

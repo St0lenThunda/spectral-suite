@@ -1,0 +1,25 @@
+:root {
+  /* Spectral Palette - Dark Mode Default */
+  --color-spectral-950: #020617; /* Deep Space Black */
+  --color-spectral-900: #0f172a; /* Slate 900 */
+  --color-spectral-800: #1e293b; /* Slate 800 */
+
+  /* Glass Effects */
+  --color-glass-surface: rgba(255, 255, 255, 0.05);
+  --color-glass-border: rgba(255, 255, 255, 0.05);
+  --color-glass-highlight: rgba(255, 255, 255, 0.1);
+
+  /* Accents (can be overridden by themes) */
+  --color-accent-primary: #f43f5e; /* Rose 500 */
+  --color-accent-secondary: #10b981; /* Emerald 500 */
+  --color-accent-tertiary: #6366f1; /* Indigo 500 */
+}
+
+/* Example Light Theme (Commented out for now, proves themability) */
+/*
+:root[data-theme="light"] {
+  --color-spectral-950: #ffffff;
+  --color-spectral-900: #f8fafc;
+  --color-glass-surface: rgba(0, 0, 0, 0.05);
+}
+*/

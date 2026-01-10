@@ -1,38 +1,89 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { useAudioEngine, MagnitudeSpectrum, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion } from '@spectralsuite/core';
+import { useToolInfo } from '../../composables/useToolInfo';
 
-// Standalone doesn't have useToolInfo yet, or different structure.
-// We'll keep it simple for now or adding a placeholder.
-const openInfo = ( id: string ) => {
-  console.log( 'Info requested:', id );
-  alert( 'Frequency Flow Pro: Analyzing spectral content.' );
-};
+const { openInfo } = useToolInfo();
+// We'll import the same visualizers. In a real monorepo we'd share them more cleanly, 
+// but for now I'll implement a slightly more compact version here or import if possible.
+// Actually, I'll just implement them here to ensure zero-dependency issues during integration.
 
-// MiniOsc and MiniSpec classes could be imported from core if extracted, 
-// or we can use the local ones if we want to mix and match.
-// But valid "Sync" implies using the PRO layout which uses specific canvases.
-// We'll reimplement simple visualizers for the secondary views to match Tonic's Pro aesthetic,
-// or use the local improved ones (Oscilloscope, Spectrogram) if they fit.
-// Tonic uses:
-// 1. Magnitude (Main) -> Core
-// 2. Osc (Mini) -> Local/Inline
-// 3. Spec (Mini) -> Local/Inline
-// 
-// We will use the local Oscilloscope/Spectrogram classes if possible, but they must accept the canvas size.
-// Our local Oscilloscope.ts is likely better than Tonic's MiniOsc.
-// Let's use local Visualizers for the secondary views!
+class MiniOsc {
+  canvas: HTMLCanvasElement;
+  analyser: AnalyserNode;
 
-import { Oscilloscope } from './visualizers/Oscilloscope';
-import { Spectrogram } from './visualizers/Spectrogram';
+  constructor( canvas: HTMLCanvasElement, analyser: AnalyserNode ) {
+    this.canvas = canvas;
+    this.analyser = analyser;
+  }
+
+  draw () {
+    const ctx = this.canvas.getContext( '2d' );
+    if ( !ctx ) return;
+    const data = new Float32Array( this.analyser.fftSize );
+    this.analyser.getFloatTimeDomainData( data );
+    ctx.clearRect( 0, 0, this.canvas.width, this.canvas.height );
+    ctx.strokeStyle = '#00f3ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    const sliceWidth = this.canvas.width / data.length;
+    let x = 0;
+    for ( let i = 0; i < data.length; i++ ) {
+      const v = data[i] ?? 0;
+      const y = ( v + 1 ) * this.canvas.height / 2;
+      if ( i === 0 ) ctx.moveTo( x, y ); else ctx.lineTo( x, y );
+      x += sliceWidth;
+    }
+    ctx.stroke();
+  }
+}
+
+class MiniSpec {
+  canvas: HTMLCanvasElement;
+  analyser: AnalyserNode;
+  temp: HTMLCanvasElement;
+
+  constructor( canvas: HTMLCanvasElement, analyser: AnalyserNode ) {
+    this.canvas = canvas;
+    this.analyser = analyser;
+    this.temp = document.createElement( 'canvas' );
+    this.temp.width = canvas.width;
+    this.temp.height = canvas.height;
+  }
+
+  draw () {
+    const ctx = this.canvas.getContext( '2d' );
+    const tCtx = this.temp.getContext( '2d' );
+    if ( !ctx || !tCtx ) return;
+    const data = new Uint8Array( this.analyser.frequencyBinCount );
+    this.analyser.getByteFrequencyData( data );
+    tCtx.drawImage( this.canvas, 0, 0 );
+    const imgData = ctx.createImageData( this.canvas.width, 1 );
+    for ( let x = 0; x < this.canvas.width; x++ ) {
+      const freqIdx = Math.floor( ( x / this.canvas.width ) * data.length * 0.5 );
+      const val = data[freqIdx] || 0;
+      const i = x * 4;
+      imgData.data[i] = val > 128 ? 255 : val * 2;
+      imgData.data[i + 1] = val > 128 ? ( val - 128 ) * 2 : 0;
+      imgData.data[i + 2] = val * 0.5;
+      imgData.data[i + 3] = 255;
+    }
+    ctx.drawImage( this.temp, 0, 1 );
+    ctx.putImageData( imgData, 0, 0 );
+  }
+}
+
+// MiniOsc and MiniSpec classes kept for now as they are simple and specific to this module's legacy view (if used)
+// or just as placeholders.
+// ... (MiniOsc and MiniSpec code remains) ...
 
 const { init, isInitialized, getAnalyser } = useAudioEngine();
 const oscCanvas = ref<HTMLCanvasElement | null>( null );
 const specCanvas = ref<HTMLCanvasElement | null>( null );
 const magCanvas = ref<HTMLCanvasElement | null>( null );
 
-let osc: Oscilloscope | null = null;
-let spec: Spectrogram | null = null;
+let osc: MiniOsc | null = null;
+let spec: MiniSpec | null = null;
 let mag: MagnitudeSpectrum | null = null;
 let animId: number | null = null;
 
@@ -49,6 +100,9 @@ const showInstrumentLabels = ref( true );
 const showHarmonics = ref( false );
 const peakHoldData = ref<Uint8Array | null>( null );
 const PEAK_DECAY_RATE = 0.98; // per frame
+
+// Instrument Frequency Ranges
+// instrumentRanges imported from core
 
 // EQ Suggestions (computed based on spectrum)
 const eqSuggestions = ref<EQSuggestion[]>( [] );
@@ -74,6 +128,8 @@ const toggleFreeze = () => {
   }
   isFrozen.value = !isFrozen.value;
 };
+
+// getNoteFromFreq imported from core
 
 const render = () => {
   if ( osc ) osc.draw();
@@ -123,6 +179,8 @@ const render = () => {
   animId = requestAnimationFrame( render );
 };
 
+// generateEqSuggestions imported from core
+
 const exportSpectrum = ( format: 'png' | 'json' ) => {
   const analyser = getAnalyser();
   if ( !analyser ) return;
@@ -159,8 +217,8 @@ onMounted( async () => {
   if ( analyser ) {
     updateEngine();
     await nextTick();
-    if ( oscCanvas.value ) osc = new Oscilloscope( oscCanvas.value, analyser );
-    if ( specCanvas.value ) spec = new Spectrogram( specCanvas.value, analyser );
+    if ( oscCanvas.value ) osc = new MiniOsc( oscCanvas.value, analyser );
+    if ( specCanvas.value ) spec = new MiniSpec( specCanvas.value, analyser );
     if ( magCanvas.value ) mag = new MagnitudeSpectrum( magCanvas.value, analyser );
     render();
   }
@@ -172,8 +230,8 @@ onUnmounted( () => {
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#0a0a0c] text-slate-200 overflow-hidden flex flex-col font-mono text-xs p-8">
-    <header class="flex justify-between items-end mb-8">
+  <div class="space-y-6">
+    <header class="flex justify-between items-end">
       <div>
         <h2 class="text-3xl font-bold text-white mb-2">Frequency <span class="text-sky-400">Flow</span> <span
             class="text-indigo-400 text-lg"
@@ -397,23 +455,18 @@ onUnmounted( () => {
             :key="i"
             class="p-4 rounded-2xl border border-white/5 bg-white/[0.02]"
           >
-            <div class="flex-1">
-              <div class="flex justify-between items-center mb-2">
-                <span class="text-amber-400 font-black text-sm">{{ suggestion.freq }}</span>
-                <span
-                  :class="suggestion.action.startsWith( 'Cut' ) ? 'text-rose-400' : 'text-emerald-400'"
-                  class="text-xs font-black uppercase"
-                >{{ suggestion.action }}</span>
-              </div>
-              <p class="text-slate-400 text-[10px]">{{ suggestion.reason }}</p>
+            <div class="flex justify-between items-center mb-2">
+              <span class="text-amber-400 font-black text-sm">{{ suggestion.freq }}</span>
+              <span
+                :class="suggestion.action.startsWith( 'Cut' ) ? 'text-rose-400' : 'text-emerald-400'"
+                class="text-xs font-black uppercase"
+              >{{ suggestion.action }}</span>
             </div>
+            <p class="text-slate-400 text-[10px]">{{ suggestion.reason }}</p>
           </div>
         </div>
       </div>
     </div>
+
   </div>
 </template>
-
-<style scoped>
-/* Scoped styles if needed */
-</style>

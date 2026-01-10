@@ -9,7 +9,7 @@
     "build": "npm run build --workspaces --if-present",
     "build:auratune": "npm run build --workspace apps/01-auratune",
     "build:chordcapture": "npm run build --workspace apps/02-chordcapture",
-    "build:director": "npm run build --workspace apps/director",
+    "build:tonic": "npm run build --workspace apps/tonic",
     "build:frequencyflow": "npm run build --workspace apps/03-frequencyflow",
     "build:pocketengine": "npm run build --workspace apps/07-pocket-engine",
     "build:scalesleuth": "npm run build --workspace apps/09-scalesleuth",
@@ -20,16 +20,21 @@
     "clean:modules": "rm -rf node_modules apps/*/node_modules packages/*/node_modules",
     "dev:all": "npm run dev --workspaces --if-present",
     "dev:chord": "npm run dev --workspace apps/02-chordcapture",
-    "dev:director": "npm run dev --workspace apps/director",
+    "dev:tonic": "npm run dev --workspace apps/tonic",
     "dev:sleuth": "npm run dev --workspace apps/09-scalesleuth",
     "dev:tuner": "npm run dev --workspace apps/01-auratune",
     "install:all": "npm install && npm install --workspaces",
     "preview:auratune": "npm run preview --workspace apps/01-auratune",
-    "preview:director": "npm run preview --workspace apps/director",
+    "preview:tonic": "npm run preview --workspace apps/tonic",
     "typecheck": "npm run type-check --workspaces --if-present",
-    "lint": "npm run type-check --workspaces --if-present"
+    "lint": "npm run type-check --workspaces --if-present",
+    "test": "vitest run"
   },
   "devDependencies": {
+    "@vitest/coverage-v8": "^4.0.16",
+    "@vue/test-utils": "^2.4.6",
+    "happy-dom": "^20.1.0",
+    "vitest": "^4.0.16",
     "vue-tsc": "3.1.4"
   },
   "overrides": {

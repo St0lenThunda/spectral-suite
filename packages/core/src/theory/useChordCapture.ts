@@ -13,8 +13,9 @@ const globalCurrentNote = ref<string | null>( null );
 // Buffer to store notes played to detect the chord (Hidden from UI)
 const noteBuffer = new Set<string>();
 let bufferTimeout: any = null;
+import { sensitivityThreshold } from '../config/sensitivity';
 const BUFFER_IDLE_TIME = 10000; // 10 seconds of silence to clear the *tray*, but keeps the *visual result*
-const NOISE_FLOOR = 0.02; // Slightly more aggressive gate to prevent ghost notes
+const NOISE_FLOOR = sensitivityThreshold.value; // Configurable noise floor
 
 // Initialize from localStorage if available
 if ( typeof window !== 'undefined' ) {

@@ -136,10 +136,11 @@ export function usePitch () {
         legacyDetector = new NativePitch( analyser.fftSize, context.sampleRate );
         legacyDetector.useLowPass = isLowPassEnabled.value;
         legacyDetector.downsample = downsample.value;
-        legacyBuffer = new Float32Array( analyser.fftSize );
+        // Fix for Netlify/TS: Explicitly use ArrayBuffer to satisfy strict Float32Array<ArrayBuffer> requirement
+        legacyBuffer = new Float32Array( new ArrayBuffer( analyser.fftSize * 4 ) );
       }
 
-      analyser.getFloatTimeDomainData( legacyBuffer! );
+      analyser.getFloatTimeDomainData( legacyBuffer as any );
       // Cast to any to avoid generic mismatch if Float32Array types differ in env
       const [p, c] = legacyDetector.findPitch( legacyBuffer as any, context.sampleRate );
 

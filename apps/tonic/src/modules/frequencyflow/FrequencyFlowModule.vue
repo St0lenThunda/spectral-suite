@@ -20,8 +20,9 @@ class MiniOsc {
   draw () {
     const ctx = this.canvas.getContext( '2d' );
     if ( !ctx ) return;
-    const data = new Float32Array( this.analyser.fftSize );
-    this.analyser.getFloatTimeDomainData( data );
+    // Fix for Netlify/TS: Explicitly use ArrayBuffer and cast to any
+    const data = new Float32Array( new ArrayBuffer( this.analyser.fftSize * 4 ) );
+    this.analyser.getFloatTimeDomainData( data as any );
     ctx.clearRect( 0, 0, this.canvas.width, this.canvas.height );
     ctx.strokeStyle = '#00f3ff';
     ctx.lineWidth = 2;

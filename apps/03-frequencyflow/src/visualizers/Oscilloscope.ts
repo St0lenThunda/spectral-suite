@@ -8,7 +8,7 @@ export class Oscilloscope {
     this.canvas = canvas;
     this.ctx = canvas.getContext( '2d' )!;
     this.analyser = analyser;
-    this.dataArray = new Float32Array( analyser.fftSize );
+    this.dataArray = new Float32Array( new ArrayBuffer( analyser.fftSize * 4 ) );
 
     // Set initial canvas size
     this.resize();

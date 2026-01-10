@@ -1,5 +1,6 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { Note, Interval } from 'tonal';
+import { PitchDetector } from 'pitchy';
 import { useAudioEngine } from './useAudioEngine';
 import processorUrl from './worklets/pitch-processor.ts?worker&url';
 
@@ -19,6 +20,10 @@ export function usePitch () {
   
   let workletNode: AudioWorkletNode | null = null;
   const HISTORY_MS = 5000;
+
+  // Legacy main-thread detector for fallback
+  let legacyDetector: PitchDetector<Float32Array> | null = null;
+  let legacyBuffer: Float32Array | null = null;
 
   const initWorklet = async () => {
     const context = getContext();
@@ -48,12 +53,7 @@ export function usePitch () {
         workletNode = new AudioWorkletNode( context, 'pitch-processor' );
         workletNode.port.onmessage = ( event ) => {
             const { pitch: p, clarity: c, volume: v } = event.data;
-            
-            pitch.value = p;
-            clarity.value = c;
-            volume.value = v;
-
-            processPitchResult( p, c );
+          updateState( p, c, v );
         };
 
         // Connect Source
@@ -82,41 +82,70 @@ export function usePitch () {
         }
 
     } catch ( e ) {
-        console.error( 'Failed to load PitchProcessor', e );
+      console.warn( 'AudioWorklet failed to load, falling back to Main Thread:', e );
+      startLegacyLoop();
     }
   };
 
-  const processPitchResult = ( p: number, c: number ) => {
-      // Original logic from updatePitch
+  const startLegacyLoop = () => {
+    const loop = () => {
+      if ( isCanceled.value ) return;
+      const analyser = getAnalyser();
+      const context = getContext();
+
+      if ( !analyser || !context ) {
+        requestAnimationFrame( loop );
+        return;
+      }
+
+      if ( !legacyDetector ) {
+        legacyDetector = PitchDetector.forFloat32Array( analyser.fftSize );
+        legacyBuffer = new Float32Array( analyser.fftSize );
+      }
+
+      analyser.getFloatTimeDomainData( legacyBuffer! );
+      const [p, c] = legacyDetector.findPitch( legacyBuffer as any, context.sampleRate );
+
+      // Volume calculation
+      let sumSquares = 0;
+      for ( let i = 0; i < legacyBuffer!.length; i++ ) {
+        sumSquares += legacyBuffer![i]! * legacyBuffer![i]!;
+      }
+      const v = Math.sqrt( sumSquares / legacyBuffer!.length );
+
+      updateState( p, c, v );
+      requestAnimationFrame( loop );
+    }
+    loop();
+  };
+
+  const updateState = ( p: number, c: number, v: number ) => {
+    pitch.value = p;
+    clarity.value = c;
+    volume.value = v;
+
       if ( p && c > 0.8 ) {
-      const calibratedFreq = p * ( 440 / concertA.value );
-      const rawNoteName = Note.fromFreq( calibratedFreq );
+        const calibratedFreq = p * ( 440 / concertA.value );
+        const rawNoteName = Note.fromFreq( calibratedFreq );
+        const displayNote = Note.transpose( rawNoteName, Interval.fromSemitones( transposition.value ) );
+        currentNote.value = displayNote;
 
-      // Apply transposition for display note
-      const displayNote = Note.transpose( rawNoteName, Interval.fromSemitones( transposition.value ) );
-      currentNote.value = displayNote;
-
-      const refFreq = Note.get( rawNoteName ).freq;
-      if ( refFreq ) {
-        // Cents calculation: 1200 * log2(f / f_ref)
-        cents.value = Math.round( 1200 * Math.log2( calibratedFreq / refFreq ) * 10 ) / 10;
-
-        // Add to history
-        const now = performance.now();
-        pitchHistory.value.push( { time: now, cents: cents.value } );
-
-        // Prune history older than 5s
-        while ( pitchHistory.value.length > 0 && ( now - ( pitchHistory.value[0]?.time ?? 0 ) ) > HISTORY_MS ) {
-          pitchHistory.value.shift();
+        const refFreq = Note.get( rawNoteName ).freq;
+        if ( refFreq ) {
+          cents.value = Math.round( 1200 * Math.log2( calibratedFreq / refFreq ) * 10 ) / 10;
+          const now = performance.now();
+          pitchHistory.value.push( { time: now, cents: cents.value } );
+          while ( pitchHistory.value.length > 0 && ( now - ( pitchHistory.value[0]?.time ?? 0 ) ) > HISTORY_MS ) {
+            pitchHistory.value.shift();
+          }
+        } else {
+          cents.value = 0;
         }
       } else {
+        currentNote.value = null;
         cents.value = 0;
       }
-    } else {
-      currentNote.value = null;
-      cents.value = 0;
-    }
-  };
+  }
 
   onMounted( () => {
     initWorklet();

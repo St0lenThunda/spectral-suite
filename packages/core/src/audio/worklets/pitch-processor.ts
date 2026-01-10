@@ -67,33 +67,53 @@ class PitchProcessor extends AudioWorkletProcessor {
   analyze() {
     let buffer = this._buffer;
 
-    // 1. Low Pass Filter for Analysis Snapshot
+    // 1. Low Pass Filter (The "Octave Killer")
+    // Physics: Bass instruments often have strong "harmonics" (multiples of the base frequency).
+    // Sometimes these harmonics are louder than the base note, confusing the detector (e.g., detecting E2 as E3).
+    // A Low Pass filter gently reduces volume of high frequencies, making the base note clearer.
     if ( this._useLowPass ) {
+      // Create a snapshot so we don't mess up the circular buffer for next frame
       const analysisBuffer = new Float32Array( this._bufferSize );
       analysisBuffer.set( buffer );
       buffer = analysisBuffer; 
 
+      // "Alpha" controls how heavy the filtering is.
+      // 0.15 is roughly a 1000Hz cutoff. Frequencies above this start getting quiet.
       const alpha = 0.15;
       let last = 0; 
+
       for ( let i = 0; i < buffer.length; i++ ) {
         const current = buffer[i]!;
+        // Simple One-Pole Filter Equation:
+        // flexible_value = previous_value + (difference * fraction)
+        // This visualizes "dragging" a value towards the target slowly, effectively smoothing it out.
         const val = last + alpha * ( current - last );
         buffer[i] = val;
         last = val;
       }
     }
 
-    // 2. Downsampling
+    // 2. Downsampling (The "Bass Mode" Performance Hack)
+    // Physics: To detect low frequencies (long waves), we need a "Longer Window" of time.
+    // Instead of analyzing 4096 samples at 44100Hz (~0.09 seconds),
+    // we can skip every 3 samples (take 1, skip 3).
+    // This makes our 4096 buffer represent ~0.37 seconds of audio!
+    // It's like "zooming out" on the waveform to see the big bass waves.
     let analysisBuffer = buffer;
     let analysisRate = this._sampleRate;
 
     if ( this._downsample > 1 ) {
       const newLen = Math.floor( buffer.length / this._downsample );
       const downsampled = new Float32Array( newLen );
+
+      // "Decimation": Taking every Nth sample
       for ( let i = 0; i < newLen; i++ ) {
         downsampled[i] = buffer[i * this._downsample]!;
       }
+
       analysisBuffer = downsampled;
+      // IMPORTANT: Since we skipped samples, the "effective" sample rate is lower.
+      // We must tell the pitch math that time is moving "slower" relative to our array indices.
       analysisRate = this._sampleRate / this._downsample;
     }
 

@@ -157,18 +157,25 @@ export function usePitch () {
   };
 
   const updateState = ( rawPitch: number | null, rawClarity: number, v: number ) => {
-    // Median Filter Logic
+    // 3. Jitter Killer (Median Smoothing)
+    // Physics: Pitch detectors sometimes make mistakes (glitches), jumping up or down for 1 frame.
+    // Instead of trusting the newest value immediately, we store the last 5 values.
+    // We then pick the "Median" (the middle value when sorted).
+    // Example: [440, 440, 880 (glitch), 441, 439] -> Sort -> [439, 440, 440, 441, 880] -> Middle is 440.
+    // The glitch (880) is ignored! A simple average would have been pulled up by the 880.
     let p = rawPitch;
 
     if ( rawPitch ) {
       medianBuffer.push( rawPitch );
+      // Keep buffer exactly MEDIAN_SIZE length (FIFO: First In, First Out)
       if ( medianBuffer.length > MEDIAN_SIZE ) medianBuffer.shift();
 
-      // Copy and sort to find median
+      // Find the Median
       const sorted = [...medianBuffer].sort( ( a, b ) => a - b );
       const mid = Math.floor( sorted.length / 2 );
       p = sorted[mid] || rawPitch;
     } else {
+      // If no pitch detected, clear history so we don't "remember" old notes when we start playing again.
       medianBuffer.length = 0;
     }
 

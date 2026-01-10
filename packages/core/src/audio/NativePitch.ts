@@ -8,9 +8,9 @@
  */
 export class NativePitch {
   private bufferSize: number;
-  private buffer: Float32Array;
+  // private buffer: Float32Array; // Removed unused buffer
   private sampleRate: number;
-  private cutoff: number = 0.93; // Standard MPM cutoff
+  private cutoff: number = 0.93; // Standard MPM cutoff allows for some imperfections
   public useLowPass: boolean = false;
   public downsample: number = 1;
   private lpfState: number = 0;
@@ -18,7 +18,6 @@ export class NativePitch {
   constructor( bufferSize: number = 4096, sampleRate: number = 44100 ) {
     this.bufferSize = bufferSize;
     this.sampleRate = sampleRate;
-    this.buffer = new Float32Array( bufferSize );
   }
 
   /**
@@ -27,7 +26,14 @@ export class NativePitch {
    * @param sampleRate The sample rate of the audio context
    * @returns [pitch (Hz), clarity (0-1)]
    */
-  findPitch ( audioBuffer: Float32Array, sampleRate: number ): [number | null, number] {
+  /**
+  * Finds the pitch of the provided audio buffer.
+  * 
+  * @param audioBuffer - The time-domain data (amplitude values over time)
+  * @param sampleRate - The speed of the audio (samples per second, e.g., 44100)
+  * @returns [pitch, clarity] - Pitch in Hz and a confidence score (0-1)
+  */
+  findPitch ( audioBuffer: Float32Array | any, sampleRate: number ): [number | null, number] {
     if ( sampleRate ) this.sampleRate = sampleRate;
 
     // Note: For main thread fallback, workingBuffer is usually a view/copy
@@ -36,14 +42,22 @@ export class NativePitch {
       workingBuffer = audioBuffer.subarray( 0, this.bufferSize );
     }
 
-    // 1. Low Pass Filter (Anti-aliasing / Octave Killer)
-    // Important: Run BEFORE downsampling to reduce aliasing if both are on
+    // 1. Low Pass Filter (The "Octave Killer")
+    // Physics: Bass instruments often have strong "harmonics" (multiples of the base frequency).
+    // Sometimes these harmonics are louder than the base note, confusing the detector (e.g., detecting E2 as E3).
+    // A Low Pass filter gently reduces volume of high frequencies, making the base note clearer.
     if ( this.useLowPass ) {
+      // "Alpha" controls how heavy the filtering is.
+      // 0.15 is roughly a 1000Hz cutoff. Frequencies above this start getting quiet.
       const alpha = 0.15; 
       let last = this.lpfState;
+
       // Mutating workingBuffer (assuming it's safe to mutate analysis buffer)
       for ( let i = 0; i < workingBuffer.length; i++ ) {
         const current = workingBuffer[i]!;
+        // Simple One-Pole Filter Equation:
+        // flexible_value = previous_value + (difference * fraction)
+        // This visualizes "dragging" a value towards the target slowly, effectively smoothing it out.
         const val = last + alpha * ( current - last );
         workingBuffer[i] = val;
         last = val;
@@ -51,7 +65,12 @@ export class NativePitch {
       this.lpfState = last;
     }
 
-    // 2. Downsampling (Decimation)
+    // 2. Downsampling (The "Bass Mode" Performance Hack)
+    // Physics: To detect low frequencies (long waves), we need a "Longer Window" of time.
+    // Instead of analyzing 4096 samples at 44100Hz (~0.09 seconds),
+    // we can skip every 3 samples (take 1, skip 3).
+    // This makes our 4096 buffer represent ~0.37 seconds of audio!
+    // It's like "zooming out" on the waveform to see the big bass waves.
     let analysisBuffer = workingBuffer;
     let analysisRate = this.sampleRate;
 
@@ -59,12 +78,14 @@ export class NativePitch {
       const newLen = Math.floor( workingBuffer.length / this.downsample );
       const downsampled = new Float32Array( newLen );
 
-      // Simple decimation (pick every Nth sample)
+      // "Decimation": Taking every Nth sample
       for ( let i = 0; i < newLen; i++ ) {
         downsampled[i] = workingBuffer[i * this.downsample]!;
       }
 
       analysisBuffer = downsampled;
+      // IMPORTANT: Since we skipped samples, the "effective" sample rate is lower.
+      // We must tell the pitch math that time is moving "slower" relative to our array indices.
       analysisRate = this.sampleRate / this.downsample;
     }
 

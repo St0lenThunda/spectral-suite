@@ -18,6 +18,8 @@ class PitchProcessor extends AudioWorkletProcessor {
   // MPM Constants
   private _cutoff: number = 0.93; // 0.93 is standard for MPM
   private _sampleRate: number;
+  private _useLowPass: boolean = false;
+  private _lpfState: number = 0;
 
   static get parameterDescriptors() {
     return [];
@@ -27,6 +29,14 @@ class PitchProcessor extends AudioWorkletProcessor {
     super();
     this._buffer = new Float32Array(this._bufferSize);
     this._sampleRate = typeof sampleRate !== 'undefined' ? sampleRate : 44100;
+
+    this.port.onmessage = ( e ) => {
+      if ( e.data && e.data.type === 'config' ) {
+        if ( typeof e.data.lowPass === 'boolean' ) {
+          this._useLowPass = e.data.lowPass;
+        }
+      }
+    }
   }
 
   process(inputs: Float32Array[][], outputs: Float32Array[][], parameters: Record<string, Float32Array>) {
@@ -51,7 +61,31 @@ class PitchProcessor extends AudioWorkletProcessor {
   }
 
   analyze() {
-    const buffer = this._buffer;
+    let buffer = this._buffer;
+
+    // Low Pass Filter for Analysis Snapshot
+    if ( this._useLowPass ) {
+      // Create a copy to avoid mutating the sliding window buffer improperly in place?
+      // Actually, if we mutate the buffer in place, the NEXT window will contain filtered data shifted left.
+      // This is effectively recursive filtering if we aren't careful.
+      // But for a simple pitch detector, filtering the input stream is conceptually what we want.
+      // However, we only filter the *snapshot* here.
+      // So we MUST copy it to a temp buffer.
+
+      const analysisBuffer = new Float32Array( this._bufferSize );
+      analysisBuffer.set( buffer );
+      buffer = analysisBuffer; // Re-assign local var to point to filtered copy
+
+      const alpha = 0.15;
+      let last = 0; // Reset for snapshot (approximation)
+      for ( let i = 0; i < buffer.length; i++ ) {
+        const current = buffer[i]!;
+        const val = last + alpha * ( current - last );
+        buffer[i] = val;
+        last = val;
+      }
+    }
+
     const nsdf = this.normalizedSquareDifference( buffer );
     const maxPositions = this.peakPicking( nsdf );
     

@@ -10,7 +10,8 @@ const {
   cents,
   concertA,
   transposition,
-  pitchHistory
+  pitchHistory,
+  isLowPassEnabled
 } = usePitch()
 
 const { init, isInitialized } = useAudioEngine()
@@ -204,6 +205,25 @@ const toneQualityLabel = computed(() => {
               v-model.number="droneVolume"
               class="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer"
             />
+          </div>
+
+          <!-- Algorithm Tuning (New) -->
+          <div class="space-y-4">
+            <div class="flex justify-between items-center">
+              <label class="text-[10px] font-black uppercase tracking-widest text-slate-500">Algorithm Tuning</label>
+              <span
+                class="text-[9px] font-mono text-sky-500 uppercase">{{ isLowPassEnabled ? 'Guitar/Bass' : 'Standard' }}</span>
+            </div>
+            <div class="flex items-center gap-2">
+              <button
+                @click="isLowPassEnabled = !isLowPassEnabled"
+                class="w-full py-2 rounded-lg font-black text-[10px] border transition-all uppercase tracking-widest"
+                :class="isLowPassEnabled ? 'bg-sky-500/20 border-sky-500/50 text-sky-400' : 'bg-slate-900 border-white/5 text-slate-500'"
+              >
+                {{ isLowPassEnabled ? 'Low-Pass Active' : 'Enable Low-Pass' }}
+              </button>
+            </div>
+            <p class="text-[9px] text-slate-600">Eliminates octave errors for bass/guitar sources.</p>
           </div>
         </div>
       </div>

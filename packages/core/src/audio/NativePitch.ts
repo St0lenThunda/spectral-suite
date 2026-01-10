@@ -11,6 +11,8 @@ export class NativePitch {
   private buffer: Float32Array;
   private sampleRate: number;
   private cutoff: number = 0.93; // Standard MPM cutoff
+  public useLowPass: boolean = false;
+  private lpfState: number = 0;
 
   constructor( bufferSize: number = 4096, sampleRate: number = 44100 ) {
     this.bufferSize = bufferSize;
@@ -34,6 +36,21 @@ export class NativePitch {
     let workingBuffer = audioBuffer;
     if ( audioBuffer.length > this.bufferSize ) {
       workingBuffer = audioBuffer.subarray( 0, this.bufferSize );
+    }
+
+    // Low Pass Filter (One-Pole, approx 1kHz cutoff)
+    if ( this.useLowPass ) {
+      const alpha = 0.15;
+      let last = this.lpfState;
+      // We process in place (assuming workingBuffer is a view we can mutate or is ephemeral)
+      // If audioBuffer is shared, this mutates it. Typically fine for analysis buffers.
+      for ( let i = 0; i < workingBuffer.length; i++ ) {
+        const current = workingBuffer[i]!;
+        const val = last + alpha * ( current - last );
+        workingBuffer[i] = val;
+        last = val;
+      }
+      this.lpfState = last;
     }
 
     const nsdf = this.normalizedSquareDifference( workingBuffer );

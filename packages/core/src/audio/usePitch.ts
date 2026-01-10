@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { Note, Interval } from 'tonal';
 import { NativePitch } from './NativePitch';
 import { useAudioEngine } from './useAudioEngine';
@@ -15,6 +15,19 @@ export function usePitch () {
   const transposition = ref<number>( 0 ); // semitones
   const pitchHistory = ref<Array<{ time: number, cents: number }>>( [] );
   const isCanceled = ref( false );
+  const isLowPassEnabled = ref( false );
+
+  // Watch for LPF toggle
+  watch( isLowPassEnabled, ( newVal ) => {
+    // Update Worklet
+    if ( workletNode ) {
+      workletNode.port.postMessage( { type: 'config', lowPass: newVal } );
+    }
+    // Update Legacy
+    if ( legacyDetector ) {
+      legacyDetector.useLowPass = newVal;
+    }
+  } );
 
   // AudioWorklet URL
   
@@ -24,6 +37,7 @@ export function usePitch () {
   // Legacy main-thread detector for fallback
   let legacyDetector: NativePitch | null = null;
   let legacyBuffer: Float32Array | null = null;
+
 
   const initWorklet = async () => {
     const context = getContext();
@@ -170,5 +184,6 @@ export function usePitch () {
     concertA,
     transposition,
     pitchHistory,
+    isLowPassEnabled,
   };
 }

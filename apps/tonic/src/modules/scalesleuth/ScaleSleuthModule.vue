@@ -29,7 +29,9 @@ const {
   potentialScales,
   isLocked,
   lockScale,
-  clearNotes
+  clearNotes,
+  isLowPassEnabled,
+  downsample
 } = useScaleSleuth();
 
 // initialization helpers for audio and info panels
@@ -273,15 +275,31 @@ onMounted( async () => {
           >Pro</span></h2>
         <p class="text-slate-400 text-sm">Play notes to identify the scale and see it on the fretboard.</p>
       </div>
-      <div class="flex items-center gap-4">
-        <button
-          @click="openInfo( 'scalesleuth' )"
-          class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95"
-        >Intelligence</button>
-        <button
-          @click="clearNotes"
-          class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-lg border border-slate-700 transition-all"
-        >Reset Detective</button>
+      <div class="flex flex-col items-end gap-2">
+        <div class="flex items-center gap-4">
+          <button
+            @click="openInfo( 'scalesleuth' )"
+            class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95"
+          >Intelligence</button>
+          <button
+            @click="clearNotes"
+            class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-lg border border-slate-700 transition-all"
+          >Reset Detective</button>
+        </div>
+        <!-- Quick Audio Settings -->
+        <div class="flex items-center gap-2">
+          <button
+            @click="isLowPassEnabled = !isLowPassEnabled"
+            class="px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest border transition-all"
+            :class="isLowPassEnabled ? 'bg-sky-500/20 border-sky-500/50 text-sky-400' : 'bg-slate-900 border-slate-700 text-slate-600'"
+          >{{ isLowPassEnabled ? 'LPF: ON' : 'LPF: OFF' }}</button>
+
+          <button
+            @click="downsample = downsample === 1 ? 4 : 1"
+            class="px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest border transition-all"
+            :class="downsample > 1 ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400' : 'bg-slate-900 border-slate-700 text-slate-600'"
+          >{{ downsample > 1 ? 'BASS: ON' : 'BASS: OFF' }}</button>
+        </div>
       </div>
     </header>
 

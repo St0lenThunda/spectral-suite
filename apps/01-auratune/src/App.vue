@@ -9,7 +9,9 @@ const {
   cents,
   concertA,
   transposition,
-  pitchHistory
+  pitchHistory,
+  isLowPassEnabled,
+  downsample
 } = usePitch()
 
 const { init, isInitialized, error } = useAudioEngine()
@@ -143,7 +145,7 @@ const toneQualityLabel = computed(() => {
       <!-- Advanced Settings -->
       <Transition name="drawer">
         <div v-if="isSettingsOpen" class="bg-slate-900/80 backdrop-blur-xl border border-white/5 p-10 rounded-[2.5rem] mb-12 overflow-hidden shadow-2xl">
-          <div class="grid grid-cols-1 md:grid-cols-3 gap-16">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div class="space-y-6">
               <div class="flex justify-between items-end">
                 <label class="text-[10px] font-black uppercase tracking-widest text-slate-500">Concert A Calibration</label>
@@ -175,6 +177,30 @@ const toneQualityLabel = computed(() => {
               </div>
               <input type="range" min="0" max="1" step="0.1" v-model.number="droneVolume" class="w-full h-1.5 bg-slate-800 rounded-full appearance-none cursor-pointer" />
               <p class="text-[9px] text-slate-600 italic">Play against a pure guide tone to master relative pitch.</p>
+            </div>
+
+            <!-- Algorithm Tuning -->
+            <div class="space-y-6">
+              <label class="text-[10px] font-black uppercase tracking-widest text-slate-500 block">Algorithm
+                Tuning</label>
+              <div class="flex flex-col gap-3">
+                <button
+                  @click="isLowPassEnabled = !isLowPassEnabled"
+                  class="px-4 py-3 rounded-xl font-black text-[10px] border transition-all text-left uppercase tracking-widest"
+                  :class="isLowPassEnabled ? 'bg-sky-500 border-sky-400 text-white' : 'bg-slate-950 border-white/5 text-slate-500'"
+                >
+                  {{ isLowPassEnabled ? 'Low-Pass Filter: ON' : 'Low-Pass Filter: OFF' }}
+                </button>
+                <button
+                  @click="downsample = downsample === 1 ? 4 : 1"
+                  class="px-4 py-3 rounded-xl font-black text-[10px] border transition-all text-left uppercase tracking-widest"
+                  :class="downsample > 1 ? 'bg-indigo-500 border-indigo-400 text-white' : 'bg-slate-950 border-white/5 text-slate-500'"
+                >
+                  {{ downsample > 1 ? 'Bass Mode: ON' : 'Bass Mode: OFF' }}
+                </button>
+              </div>
+              <p class="text-[9px] text-slate-600 italic">Optimize detection for Bass/Guitar (Low-Pass) or sub-bass
+                performance (Bass Mode).</p>
             </div>
           </div>
         </div>

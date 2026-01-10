@@ -27,6 +27,7 @@ build/
 *.sln
 *.sw?
 .DS_Store
+.agent/*
 
 # TypeScript
 *.tsbuildinfo

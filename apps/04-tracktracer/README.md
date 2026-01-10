@@ -1,20 +1,21 @@
-# Track Tracer
+# TrackTracer Pro 🧪
 
-Forensic audio analysis tool for extracting BPM, key, and structural DNA from audio files.
+Forensic audio analysis lab for extracting structural DNA, key, and tempo from any audio source.
 
 ## 🎯 Purpose
 
-Track Tracer is designed for DJs, producers, and music analysts who need to extract detailed information from audio files. Upload a track and get comprehensive analysis including tempo, key, time signature, and structural breakdowns.
+TrackTracer Pro is the ultimate forensic tool for DJs and producers. Beyond simple file analysis, it now offers real-time listening capabilities to analyze audio from your environment, making it perfect for identifying tracks on the fly.
 
-## ✨ Features
+## ✨ Pro Features
 
-- **BPM Detection** - Accurate tempo analysis using beat tracking algorithms
-- **Key Detection** - Identifies the musical key and scale
-- **Time Signature Analysis** - Detects meter (4/4, 3/4, 6/8, etc.)
-- **Structure Detection** - Identifies intro, verse, chorus, bridge, outro sections
-- **Waveform Display** - Visual representation of the track
-- **File Upload** - Supports MP3, WAV, FLAC, and other common formats
-- **Export Results** - Save analysis data as JSON
+- **🎤 Listen Mode** - Real-time analysis using microphone input with audio visualization
+- **📊 12-Bar Visualizer** - Frequency-reactive bars and level metering
+- **🎼 Camelot Wheel** - Harmonic mixing compatibility guide
+- **⚡ Energy Profiling** - Classification of track energy (Chill, High Energy, etc.)
+- **🧠 AI Observations** - Dynamic expert analysis of track characteristics
+- **⏱️ BPM & Key Detection** - High-precision tempo and harmonic analysis
+- **📂 Multi-Format Support** - Upload MP3, WAV, FLAC, or use verified specimens
+- **💾 Export Results** - Save analysis data as JSON
 
 ## 🚀 Getting Started
 

@@ -77,13 +77,29 @@ Creates beautiful Lissajous patterns based on phase relationships. Useful for:
 - Meyda - Feature extraction
 - Web Audio API - Analyser nodes
 
-## 📝 Use Cases
+## 📝 Professional Engineering Workflows
 
-- **Audio engineering** - Analyze mix frequency balance
-- **Sound design** - Explore synthesizer output characteristics
-- **Music production** - Identify problem frequencies
-- **Education** - Teach acoustics and wave physics
-- **Performance visuals** - Live reactive art displays
+FrequencyFlow Pro is designed to bridge the gap between "mixing by ear" and "verifying by physics." Here is how a professional engineer integrates it into their toolset:
+
+### 1. 🎯 Precision Spectral Slotting
+Use the **Instrument Range Overlay** to prevent frequency masking between competing elements like Kick and Bass.
+- **Engineering Move:** Identify the primary "thump" of the kick drum (e.g., 60Hz) and use a high-Q notch on the bass track at that exact frequency to create "space" without losing the bass's foundation.
+
+### 2. 🛡️ Dynamic Range Protection
+Use **Peak Hold & Decay** to monitor the relationship between transients and average signal levels.
+- **Engineering Move:** When setting a Master Limiter, monitor the gap between the peak hold and the RMS level. If the peaks are excessively high, apply serial compression before the limiter to achieve a louder, more stable master without digital clipping.
+
+### 3. 🕸️ Phase & Stereo Correlation
+Use the **Harmonograph** (Lissajous patterns) to audit your stereo image and mono compatibility.
+- **Engineering Move:** If the pattern flattens into a horizontal line, your signal is out-of-phase and will vanish on mono systems (phones, clubs). Aim for a balanced, vertical/circular distribution for a healthy stereo image.
+
+### 4. 🔦 Resonant Frequency Hunting
+Use the **Spectrogram waterfall view** to find persistent acoustic resonances in rooms or instruments.
+- **Engineering Move:** A ringing snare or a room mode will appear as a bright, steady vertical line on the spectrogram. Find the exact frequency (e.g., 1.2kHz) and apply a surgical cut to remove the "honk" or "ring" with minimal impact on the overall tone.
+
+### 5. 🧬 Forensic Fingerprinting
+Use **Export & Capture (JSON)** to create a spectral standard for your studio.
+- **Engineering Move:** Export the spectral data of a professional reference track and compare its JSON values against your own mix to identify specific imbalances in the low-end or high-shelf regions.
 
 ## 🔗 Related Tools
 

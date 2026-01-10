@@ -15,6 +15,7 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
   const tempo = ref( 120 );
   const subdivision = ref( 1 );
   const polySubdivision = ref( 0 );
+  const currentPulse = ref( 0 );
   const error = ref<string | null>( null );
 
   // Analysis State
@@ -43,7 +44,8 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
       await detector.init();
 
       // Hook up Metronome
-      metronome.onBeat( ( _pulse, time, isMainBeat ) => {
+      metronome.onBeat( ( pulse, time, isMainBeat ) => {
+        currentPulse.value = pulse;
         if ( isMainBeat ) {
           lastBeatTime.value = time;
 
@@ -146,6 +148,7 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
     isInitialized: readonly( isInitialized ),
     isPlaying: readonly( isPlaying ),
     tempo: readonly( tempo ),
+    currentPulse: readonly( currentPulse ),
     error: readonly( error ),
 
     // Analysis

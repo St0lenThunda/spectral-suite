@@ -1,8 +1,8 @@
 <script setup lang="ts">
 defineProps<{
   isPlaying: boolean
-  playColor?: string // e.g. 'bg-emerald-500 shadow-emerald-500/20'
-  stopColor?: string // e.g. 'bg-rose-500 shadow-rose-500/20'
+  playColor?: string
+  stopColor?: string
 }>()
 
 defineEmits(['click'])

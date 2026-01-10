@@ -6,7 +6,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build --workspaces --if-present",
+    "build": "npx vue-tsc -b &&npm run build --workspaces --if-present",
     "build:auratune": "npm run build --workspace apps/01-auratune",
     "build:chordcapture": "npm run build --workspace apps/02-chordcapture",
     "build:tonic": "npm run build --workspace apps/tonic",

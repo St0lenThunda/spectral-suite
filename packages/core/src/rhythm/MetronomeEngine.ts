@@ -55,12 +55,19 @@ export class MetronomeEngine {
   // Progression: Automatically speeding up over time.
   private progressionIncrement: number = 0 // How much to increase BPM
   private progressionInterval: number = 0 // How often (in bars)
+  private progressionGoal: number = 300   // Cap for the auto-increase
 
   // Stealth Mode: Muting specifically for N bars, then unmuting.
   // Example: 4 bars ON (click), 2 bars OFF (silence). Tests ability to hold tempo.
   private stealthBarsOn: number = 4
   private stealthBarsOff: number = 2
   private isStealthEnabled: boolean = false
+
+
+  // Accent Pattern: Defines the rhythm's "identity" (e.g., Downbeat vs Backbeat).
+  // 0 = Muted, 1 = Weak, 2 = Normal, 3 = Strong Accent.
+  // Default is a standard 4-beat pattern with a strong downbeat on "One".
+  private accentPattern: number[] = [3, 2, 2, 2]
 
 
   // --- Infrastructure State ---
@@ -146,6 +153,16 @@ export class MetronomeEngine {
     return this.subdivision
   }
 
+  /**
+   * Sets the accent pattern for the metronome.
+   * This determines the "voice" of each beat in a sequence.
+   * 
+   * @param pattern - Array of numbers (0-3) representing accent levels
+   */
+  public setAccentPattern ( pattern: number[] ) {
+    this.accentPattern = pattern
+  }
+
   public setPolySubdivision ( sub: number ) {
     this.polySubdivision = Math.max( 0, Math.min( 16, sub ) )
   }
@@ -158,9 +175,10 @@ export class MetronomeEngine {
     return this.muteProbability
   }
 
-  public setProgression ( increment: number, interval: number ) {
+  public setProgression ( increment: number, interval: number, goal: number = 300 ) {
     this.progressionIncrement = increment
     this.progressionInterval = interval
+    this.progressionGoal = Math.max( 40, Math.min( 300, goal ) )
   }
 
   public setStealthMode ( barsOn: number, barsOff: number, enabled: boolean ) {
@@ -253,26 +271,44 @@ export class MetronomeEngine {
     // The current logic mutes ANY beat except the First, based on probability.
     const isGapped = !isPoly && !isFirstBeatOfBar && Math.random() < this.muteProbability
 
+    // --- Accent Pattern Logic ---
+    // We determine the "Voice" level based on the current pulse's position in the pattern.
+    // If the pattern is missing or empty, we fallback to Level 2 (Normal).
+    const patternIndex = this.accentPattern.length > 0 ? ( pulseNumber % this.accentPattern.length ) : 0
+    const voiceLevel = isPoly ? 2 : ( this.accentPattern[patternIndex] ?? 2 )
+
     // If not muted by any logic, PLAY SOUND
-    if ( !isGapped && !isStealthMuted ) {
+    if ( !isGapped && !isStealthMuted && voiceLevel > 0 ) {
       const osc = this.context!.createOscillator()
       const gain = this.context!.createGain()
       osc.connect( gain )
       gain.connect( this.context!.destination )
 
-      // Sound Design:
+      /**
+       * Sound Design:
+       * We use frequency and volume to differentiate rhythmic importance.
+       * Level 3 (Strong): 1200Hz - High clarity for the anchor pulse.
+       * Level 2 (Normal): 900Hz  - Standard eighth notes or beats.
+       * Level 1 (Weak):   700Hz  - Lower volume "ghost" notes for syncopation.
+       */
       if ( isPoly ) {
-        osc.frequency.value = 600 // Deeper/Woody sound for poly
+        osc.frequency.value = 600 // Deeper/Woody sound for poly layer
         gain.gain.setValueAtTime( 0.2, time )
-      } else if ( isFirstBeatOfBar ) {
-        osc.frequency.value = 1200 // High beep for "One"
-        gain.gain.setValueAtTime( 0.4, time )
-      } else if ( isMainBeat ) {
-        osc.frequency.value = 900 // Medium beep for quarter notes
-        gain.gain.setValueAtTime( 0.3, time )
       } else {
-        osc.frequency.value = 700 // Low tick for subdivisions (8ths, 16ths)
-        gain.gain.setValueAtTime( 0.15, time )
+        switch ( voiceLevel ) {
+          case 3: // Strong Accent
+            osc.frequency.value = 1200
+            gain.gain.setValueAtTime( 0.4, time )
+            break
+          case 2: // Normal Beat
+            osc.frequency.value = 900
+            gain.gain.setValueAtTime( 0.3, time )
+            break
+          default: // Level 1: Weak/Ghost beat
+            osc.frequency.value = 700
+            gain.gain.setValueAtTime( 0.15, time )
+            break
+        }
       }
 
       // Envelope: Fast Attack, Fast Decay (Short "Click" sound)
@@ -292,7 +328,7 @@ export class MetronomeEngine {
       const barsElapsed = pulseNumber / pulsesPerBar
 
       if ( barsElapsed % this.progressionInterval === 0 ) {
-        const newTempo = Math.min( 300, this.tempo + this.progressionIncrement )
+        const newTempo = Math.min( this.progressionGoal, this.tempo + this.progressionIncrement )
         if ( newTempo !== this.tempo ) {
           this.setTempo( newTempo )
           // Notify UI that tempo changed

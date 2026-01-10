@@ -132,10 +132,12 @@ const isInsideRange = ( fret: number ) => {
       <div
         v-for=" fret in numFrets "
         :key="'fret-wire-' + fret"
-        class="absolute top-16 bottom-4 bg-slate-300/40 z-20"
+        class="absolute top-16 bottom-4 z-20"
         :style="{
           left: ( 16 + fret * 54 ) + 'px',
-  width: '2px'
+  width: '3px',
+  background: '#e2e8f0',
+  boxShadow: '0 0 4px rgba(255,255,255,0.2)'
         }"
       ></div>
 

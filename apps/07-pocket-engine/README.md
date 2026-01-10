@@ -15,6 +15,7 @@ PocketEngine Pro helps musicians develop rock-solid timing by providing precisio
 - **🪜 The Ladder** - Automated tempo progression for systematic speed-building.
 - **🕵️ Transient Detection** - Real-time audio onset tracking via microphone with forensic accuracy.
 - **🎯 Timing Offset Analysis** - Exact millisecond deviation tracking (e.g., +12ms rush, -5ms drag).
+- **🎼 Accent Programmer** - Visually sequence custom rhythmic patterns (Backbeats, Swing, Syncopation) with 4 levels of dynamics.
 - **🎨 Pocket Visualizer** - Color-coded "Pocket" indicators (Green=Perfect, Yellow=Drift, Red=Off).
 
 ## 🚀 Getting Started
@@ -81,13 +82,35 @@ Program custom emphasis patterns:
 - Custom transient detection algorithms
 - Web Audio API - Precise timing
 
-## 📝 Use Cases
+## 📝 Professional Practice Workflows
 
-- **Drumming practice** - Lock in your groove
-- **Click track training** - Play with a metronome comfortably
-- **Timing diagnosis** - Identify rushing or dragging tendencies
-- **Band practice** - Visual timing reference for ensemble playing
-- **Recording preparation** - Develop studio-ready timing
+PocketEngine Pro isn't just a metronome; it's a timing laboratory. Professionals use it to develop the "internal clock" required for high-stakes performances and studio sessions.
+
+### 1. 🧠 Internal Clock "Gap" Training
+Use **Gap Click Training** to remove your dependency on the metronome.
+- **Pocket Move:** Program the engine to play for 3 measures and mute for 1. If your first hit after the silence is within ±10ms (Green), your internal clock is stable. Gradually increase the gap to 4 or 8 measures.
+
+### 2. 🛶 "Ahead or Behind" the Beat
+Use **Timing Offset Analysis** to master micro-timing for different genres.
+- **Pocket Move:** Jazz and Neo-Soul often require playing "behind" the pulse (laid back), while Punk requires playing "ahead" (driving). Use the millisecond display to intentionally target a -10ms drag or a +10ms rush until you can hit those specific offsets consistently.
+
+### 3. 🪜 Speed Laddering
+Use **The Ladder** for systematic technique building.
+- **Pocket Move:** Set your goal tempo. The Ladder will automatically increase the BPM by 2 every 16 bars. This forces your nervous system to adapt to incremental changes without the mental friction of manually adjusting the slider.
+
+### 4. 🕵️ Forensic transient Check
+Use **Transient Detection** with the microphone to audit your physical technique.
+- **Pocket Move:** For drummers, use this to see if your kick and snare are landing exactly together. If the engine shows two distinct transients for one beat, your "four-way coordination" needs tightening.
+
+## 🔗 Suite Integration & Signal Chain
+
+PocketEngine serves as the **Rhythmic Foundation** of the Spectral Suite.
+
+### Position: The Pulse Source
+In a professional signal chain, Pocket Engine sits at the head. It generates the **Main Timing metadata** that other apps consume:
+- **Track Tracer Connection:** Use Pocket Engine to verify the BPM detected by Track Tracer. If a track is drifting, Pocket Engine's offset analyzer will show the exact drift per bar.
+- **AuraTune Integration:** Connect rhythmic exercises to pitch training. Use the Subdivision mode to practice scales (from **Scale Sleuth**) at specific 1/8 note or triplet pulses.
+- **Tonic Dashboard:** Pocket Engine provides the "Master BPM" across the monorepo, ensuring that visualizers in **Frequency Flow** can sync their refresh rates to the musical tempo for "Beat-synced" visuals.
 
 ## 🔗 Related Tools
 

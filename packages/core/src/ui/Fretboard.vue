@@ -1,6 +1,24 @@
 <script setup lang="ts">
+/**
+ * Fretboard Component
+ * 
+ * A high-precision visual representation of a guitar fretboard.
+ * It maps musical notes onto a 24-fret matrix and supports multilayered 
+ * highlighting for played notes, scale patterns, and audio playback.
+ */
 import { computed } from 'vue';
 import { Note } from 'tonal';
+
+/**
+ * Prop Definitions
+ * 
+ * @param activeNotes - Notes currently detected from the user's input (Sky Blue)
+ * @param highlightNotes - Theoretical notes from a selected scale/mode (Emerald)
+ * @param numFrets - The total number of frets to display (Standard Pro = 24)
+ * @param labels - Dictionary mapping notes to custom text (e.g., Roman Numerals)
+ * @param fretRange - [start, end] tuple to visually isolate a specific area (CAGED)
+ * @param playbackNote - The note currently being played by the SynthEngine (Amber)
+ */
 interface Props {
   activeNotes?: string[];
   highlightNotes?: string[];
@@ -17,37 +35,68 @@ const props = withDefaults( defineProps<Props>(), {
   labels: () => ( {} )
 } );
 
-// High E to Low E (top to bottom visually)
+// Standard 6-string guitar tuning in E Standard: E2, A2, D3, G3, B3, E4
 const strings = ['E', 'B', 'G', 'D', 'A', 'E'];
+
+// The chromatic sequence used to calculate notes along a string
 const noteOrder = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 
-// Fret markers (traditional positions)
+/**
+ * Fretboard Geography:
+ * Fret markers (the dots) are traditionally placed on odd frets,
+ * with double dots at the 12th and 24th frets (the octaves).
+ */
 const fretMarkers = [3, 5, 7, 9, 12, 15, 17, 19, 21, 23, 24];
 const doubleDotFrets = [12, 24];
 
+/**
+ * We use computed sets for "Chromas" (pitch classes 0-11).
+ * This ensures that "C#" and "Db" are treated as the same visual note
+ * on the fretboard (Enharmonic equivalence).
+ */
 const activeChromas = computed( () => new Set( props.activeNotes.map( n => Note.chroma( n ) ) ) );
 const highlightChromas = computed( () => new Set( props.highlightNotes.map( n => Note.chroma( n ) ) ) );
 
+// --- Helper Functions for Styling ---
+
 const isNoteActive = ( note: string ) => activeChromas.value.has( Note.chroma( note ) );
 const isNoteHighlighted = ( note: string ) => highlightChromas.value.has( Note.chroma( note ) );
+
+// PlaybackNote has the highest priority and uses the Amber glow
 const isPlaybackNote = ( note: string ) => props.playbackNote && Note.chroma( note ) === Note.chroma( props.playbackNote );
 
+// Special check for open strings (Fret 0)
 const isOpenActive = ( stringRoot: string ) => isNoteActive( getNoteAt( stringRoot, 0 ) );
 const isOpenHighlighted = ( stringRoot: string ) => isNoteHighlighted( getNoteAt( stringRoot, 0 ) );
 
+/**
+ * Resolves the text to display inside a note bubble.
+ * If a custom label (like a Roman Numeral) is provided, we use that.
+ */
 const getLabel = ( note: string ) => {
   const chroma = Note.chroma( note );
   const labelKey = Object.keys( props.labels ).find( k => Note.chroma( k ) === chroma );
   return ( labelKey && props.labels[labelKey] ) ? props.labels[labelKey] : note;
 };
+
+/**
+ * Calculates the note name for a specific fret on a specific string.
+ * @param stringRoot - The open note of the string (e.g., "E")
+ * @param fret - The fret number (0 to 24)
+ */
 const getNoteAt = ( stringRoot: string, fret: number ): string => {
   const rootIndex = noteOrder.indexOf( stringRoot );
   if ( rootIndex === -1 ) return '';
+  // Each fret is one semi-tone (one step in the noteOrder array)
   return noteOrder[( rootIndex + fret ) % 12]!;
 };
 
+/**
+ * Isolation Filter:
+ * Checks if a fret is within the active CAGED range.
+ */
 const isInsideRange = ( fret: number ) => {
-  if ( !props.fretRange ) return true;
+  if ( !props.fretRange ) return true; // No range = show everything
   const [min, max] = props.fretRange;
   return fret >= min && fret <= max;
 };

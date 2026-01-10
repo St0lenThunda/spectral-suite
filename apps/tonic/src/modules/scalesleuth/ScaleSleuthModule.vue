@@ -1,8 +1,25 @@
 <script setup lang="ts">
+/**
+ * ScaleSleuth Pro Module
+ * 
+ * This is the main interface for the Scale Detection engine.
+ * It combines real-time frequency analysis with music theory to suggest
+ * potential scales based on the notes a user plays.
+ */
 import { ref, computed, Transition, onMounted } from 'vue';
 import { useScaleSleuth, useAudioEngine, SynthEngine, Fretboard, Note } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
 
+/**
+ * Destructuring the ScaleSleuth Composable
+ * 
+ * @property pitch - The detected frequency in Hz
+ * @property currentNote - The letter name of the current note (e.g., "C#")
+ * @property detectedNotes - Array of all unique notes played in this session
+ * @property noteWeights - Map of how often each note has been played
+ * @property potentialScales - List of scale matches found by the engine
+ * @property lockScale - Function to focus detection on a specific scale
+ */
 const {
   pitch,
   clarity,
@@ -15,20 +32,36 @@ const {
   clearNotes
 } = useScaleSleuth();
 
+// initialization helpers for audio and info panels
 const { init, isInitialized } = useAudioEngine();
 const { openInfo } = useToolInfo();
 
+// --- UI / Interaction State ---
+
+// The scale currently focused by the user
 const selectedScale = ref<string | null>( null );
+
+// Toggles between showing Note Names (A, B, C) and Degrees (I, II, III)
 const showDegrees = ref( false );
+
+// Visibility toggles for different note layers on the fretboard
 const showPlayedNotes = ref( true );
 const showScaleNotes = ref( true );
+
+// CAGED positioning state
 const showCAGED = ref( false );
 const selectedCAGEDShape = ref<'C' | 'A' | 'G' | 'E' | 'D'>( 'E' );
+
+// Playback (Audio) state
 const playbackNote = ref<string | null>( null );
 const isPlaying = ref( false );
 const playingScaleName = ref<string | null>( null );
 let playbackAborted = false;
 
+/**
+ * Computed: scaleNotes
+ * Extracts the full note set for the currently selected or top-ranked scale.
+ */
 const scaleNotes = computed( () => {
   const targetName = effectiveScale.value;
   if ( !targetName ) return [];
@@ -36,11 +69,20 @@ const scaleNotes = computed( () => {
   return found ? found.notes : [];
 } );
 
+/**
+ * Computed: effectiveScale
+ * Returns the scale we are currently looking at. Fallback to the #1 match if none selected.
+ */
 const effectiveScale = computed( () => {
   if ( selectedScale.value ) return selectedScale.value;
   return potentialScales.value[0]?.name || null;
 } );
 
+/**
+ * Computed: degreeLabels
+ * Creates a mapping of chroma values (0-11) to Roman Numeral degrees (I, bII, etc.)
+ * This is used to display theoretical degrees on the fretboard bubbles.
+ */
 const degreeLabels = computed( () => {
   const targetName = effectiveScale.value;
   if ( !targetName ) return {};
@@ -49,24 +91,38 @@ const degreeLabels = computed( () => {
 
   const mapping: Record<number, string> = {};
   found.notes.forEach( ( note, i ) => {
+    // Note.chroma converts a note like "C#" to its index (1).
     const degree = found.romanIntervals?.[i];
     if ( degree ) mapping[Note.chroma( note ) || 0] = degree;
   } );
   return mapping;
 } );
 
+/**
+ * Computed: cagedRange
+ * Calculates the fret range [start, end] for visual isolation of CAGED shapes.
+ * It uses the root note of the active scale as the anchor.
+ */
 const cagedRange = computed( () => {
   if ( !showCAGED.value || !effectiveScale.value ) return undefined;
 
+  // Extract the root note from the scale name (e.g., "C Major" -> "C")
   const rootNote = effectiveScale.value.split( ' ' )[0];
   if ( !rootNote ) return undefined;
+
   const rootChroma = Note.chroma( rootNote );
   if ( rootChroma === undefined ) return undefined;
 
+  // Calculate offsets relative to the open strings (E=4, A=9)
+  // We use modulo 12 to wrap around the octave.
   const r6 = ( rootChroma - ( Note.chroma( 'E' ) || 0 ) + 12 ) % 12;
   const r5 = ( rootChroma - ( Note.chroma( 'A' ) || 0 ) + 12 ) % 12;
 
   let baseRange: [number, number];
+
+  // Standard CAGED geometry:
+  // E-Shape is centered on root on 6th string.
+  // A-Shape is centered on root on 5th string.
   switch ( selectedCAGEDShape.value ) {
     case 'E': baseRange = [r6, r6 + 3]; break;
     case 'A': baseRange = [r5, r5 + 3]; break;
@@ -76,6 +132,7 @@ const cagedRange = computed( () => {
     default: baseRange = [0, 24];
   }
 
+  // Ensure we aren't displaying negative fret numbers
   if ( baseRange[0] < 0 ) {
     baseRange[0] += 12;
     baseRange[1] += 12;
@@ -84,6 +141,11 @@ const cagedRange = computed( () => {
   return baseRange as [number, number];
 } );
 
+/**
+ * handleScaleClick
+ * When a user selects a scale match, we "Lock" the detection
+ * to focus solely on that scale's properties.
+ */
 const handleScaleClick = ( name: string ) => {
   selectedScale.value = name;
   const found = potentialScales.value.find( s => s.name === name );
@@ -93,6 +155,7 @@ const handleScaleClick = ( name: string ) => {
   }
 };
 
+// --- Notification Logic ---
 const toastVisible = ref( false );
 const toastMessage = ref( '' );
 let toastTimeout: any = null;
@@ -103,9 +166,13 @@ const showToast = ( msg: string ) => {
   if ( toastTimeout ) clearTimeout( toastTimeout );
   toastTimeout = setTimeout( () => {
     toastVisible.value = false;
-  }, 3500 );
+  }, 3500 ); // Display for 3.5 seconds
 };
 
+/**
+ * stopScale
+ * Aborts any ongoing audio playback and resets visual highlighting.
+ */
 const stopScale = () => {
   playbackAborted = true;
   isPlaying.value = false;
@@ -113,11 +180,17 @@ const stopScale = () => {
   playbackNote.value = null;
 };
 
+/**
+ * playScale
+ * A sequencer that walks through an array of notes and triggers the SynthEngine.
+ * It manages asynchronous timing to ensure notes play in order.
+ */
 const playScale = async ( notes: string[], name: string ) => {
+  // If already playing something else, stop it first.
   if ( isPlaying.value ) {
     const wasPlayingThis = playingScaleName.value === name;
     stopScale();
-    if ( wasPlayingThis ) return;
+    if ( wasPlayingThis ) return; // If same button was clicked, just stop.
     await new Promise( resolve => setTimeout( resolve, 50 ) );
   }
 
@@ -126,42 +199,64 @@ const playScale = async ( notes: string[], name: string ) => {
   playbackAborted = false;
 
   const synth = SynthEngine.getInstance();
+
+  // 400ms is a comfortable "educational" speed for hearing intervals.
   const interval = 400;
 
   for ( const note of notes ) {
     if ( playbackAborted ) break;
+
+    // Set the reactive playbackNote ref to trigger visual highlighting on the fretboard
     playbackNote.value = note;
+
+    // Try to get a frequency. Fallback to middle octaves if specific note info fails.
     const freq = Note.get( note ).freq || Note.freq( `${note}3` ) || Note.freq( `${note}4` ) || 440;
+
+    // Play the note slightly shorter than the interval to allow for a tail/gap.
     synth.playNote( freq, interval - 50 );
+
+    // Wait for the next beat in the sequence
     await new Promise( resolve => setTimeout( resolve, interval ) );
   }
 
-  if ( !playbackAborted ) {
+  // Final flourish: Play the root note an octave higher (octave 4) to "resolve" the scale.
+  if ( !playbackAborted && notes.length > 0 ) {
     playbackNote.value = notes[0]!;
     const freq = Note.freq( `${notes[0]}4` ) || 880;
     synth.playNote( freq, interval - 50 );
     await new Promise( resolve => setTimeout( resolve, interval ) );
   }
 
-  isPlaying.value = false;
-  playingScaleName.value = null;
-  playbackNote.value = null;
+  stopScale(); // Reset UI state
 };
 
+/**
+ * Computed: maxWeight
+ * Used for the "Heat Map" visualization - finds the most played note
+ * so we can scale the other note indicators relatively.
+ */
 const maxWeight = computed( () => {
   const weights = Object.values( noteWeights.value );
   if ( weights.length === 0 ) return 1;
   return Math.max( ...weights );
 } );
 
+/**
+ * getWeightColor
+ * Returns a CSS class based on how "Hot" a note is (how much it's been played).
+ * This helps users identify the Tonic (home) note visually.
+ */
 const getWeightColor = ( note: string ) => {
   const weight = noteWeights.value[note] || 0;
   const ratio = weight / ( maxWeight.value || 1 );
+
+  // If played > 80% as much as the top note, it's likely a primary tone (Emerald).
   if ( ratio > 0.8 ) return 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]';
   if ( ratio > 0.5 ) return 'bg-sky-400';
   return 'bg-slate-600';
 };
 
+// Ensure audio is ready on mount
 onMounted( async () => {
   if ( !isInitialized.value ) {
     await init();

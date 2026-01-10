@@ -1,8 +1,26 @@
 <script setup lang="ts">
-import { useChordCapture, useAudioEngine } from '@spectralsuite/core'
+import { computed } from 'vue'
+import { useChordCapture, useAudioEngine, ChordEngine, Fretboard } from '@spectralsuite/core'
 
-const { pitch, clarity, currentNote, capturedNotes, detectedChords, clearNotes } = useChordCapture()
+const { 
+  pitch, 
+  clarity, 
+  currentNote, 
+  capturedNotes, 
+  detectedChords, 
+  chordHistory,
+  keyCenter,
+  clearNotes,
+  captureChord,
+  clearHistory
+} = useChordCapture()
 const { init, isInitialized, error } = useAudioEngine()
+
+const suggestions = computed( () => {
+  const topChord = detectedChords.value[0];
+  if ( !topChord ) return [];
+  return ChordEngine.suggestNext( topChord.symbol, keyCenter.value );
+} );
 
 const start = () => {
   init()
@@ -22,16 +40,27 @@ const start = () => {
     </div>
 
     <!-- Main Content Container -->
-    <div class="relative z-10 max-w-4xl mx-auto px-6 py-12 md:py-20 flex flex-col items-center">
+    <div class="relative z-10 w-full max-w-6xl mx-auto px-6 py-12 md:py-20 flex flex-col items-center">
 
       <!-- Brand & Header -->
-      <header class="text-center mb-16 animate-fade-in">
+      <header class="text-center mb-16 animate-fade-in flex flex-col items-center">
         <h1 class="text-6xl md:text-7xl font-black tracking-tighter text-white uppercase font-outfit leading-none">
-          Chord<span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Capture</span>
+          Chord<span class="text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-cyan-400">Capture Pro</span>
         </h1>
         <p class="text-slate-500 font-mono text-[10px] uppercase tracking-[0.4em] font-bold mt-4">
-          Real-Time Harmonic Recognition
+          Forensic Harmonic Sequence Ledger
         </p>
+
+        <!-- Key Selection for analysis -->
+        <div class="mt-8 flex items-center gap-3 bg-white/5 px-6 py-3 rounded-2xl border border-white/5">
+          <span class="text-[9px] font-black uppercase tracking-[0.2em] text-slate-500">Analysis Key</span>
+          <select 
+              v-model="keyCenter" 
+              class="bg-transparent text-[11px] font-black text-indigo-400 px-2 focus:outline-none transition-all uppercase cursor-pointer"
+            >
+              <option v-for="k in ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']" :key="k" :value="k">{{ k }}</option>
+            </select>
+        </div>
       </header>
 
       <!-- Stage 0: Initialization -->
@@ -132,12 +161,16 @@ const start = () => {
             >
               <span
                 class="block text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em] md:tracking-[0.6em] text-indigo-400/40 mb-2"
-              >Live
-                Monitor</span>
-              <div
-                class="text-[8rem] sm:text-[10rem] md:text-[12rem] lg:text-[16rem] font-black text-white leading-none font-outfit drop-shadow-[0_0_30px_rgba(255,255,255,0.1)]"
               >
-                {{ currentNote || '--' }}
+                {{ detectedChords.length > 0 ? 'Harmonic Match' : 'Live Monitor' }}
+              </span>
+              <div
+                class="font-black text-white leading-none font-outfit drop-shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300"
+                :class="[
+                  detectedChords.length > 0 && detectedChords[0].symbol.length > 4 ? 'text-[5rem] sm:text-[7rem] md:text-[9rem] lg:text-[11rem]' : 'text-[8rem] sm:text-[10rem] md:text-[12rem] lg:text-[16rem]'
+                ]"
+              >
+                {{ detectedChords.length > 0 ? detectedChords[0].symbol : (currentNote || '--') }}
               </div>
               <div
                 class="mt-4 flex items-center justify-center gap-4 text-[10px] md:text-xs font-mono font-bold text-slate-500"
@@ -145,7 +178,7 @@ const start = () => {
                 <span :class="{ 'text-cyan-400': pitch }">{{ pitch ? pitch.toFixed( 1 ) : '000.0' }} Hz</span>
                 <span class="opacity-20">|</span>
                 <span
-                  :class="{ 'text-emerald-400': ( clarity || 0 ) > 0.9 }">{{ ( ( clarity || 0 ) * 100 ).toFixed( 0 ) }}%
+                  :class="{ 'text-emerald-400': ( clarity ?? 0 ) > 0.9 }">{{ ( ( clarity ?? 0 ) * 100 ).toFixed( 0 ) }}%
                   Clarity</span>
               </div>
             </div>
@@ -154,11 +187,11 @@ const start = () => {
             <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
               <div
                 class="ring-pulse ring-1"
-                :style="{ opacity: ( clarity || 0 ) * 0.3 }"
+                :style="{ opacity: ( clarity ?? 0 ) * 0.3 }"
               ></div>
               <div
                 class="ring-pulse ring-2"
-                :style="{ opacity: ( clarity || 0 ) * 0.1 }"
+                :style="{ opacity: ( clarity ?? 0 ) * 0.1 }"
               ></div>
             </div>
           </div>
@@ -201,38 +234,117 @@ const start = () => {
         </div>
 
         <!-- Final Result: Harmonic Matches -->
-        <div class="w-full max-w-3xl animate-slide-up">
+        <div class="w-full max-w-5xl animate-slide-up">
           <div
             v-if=" detectedChords.length > 0 "
             class="flex flex-col gap-6"
           >
             <div
-              v-for=" chord in detectedChords "
+              v-for=" chord in detectedChords.slice(0, 1) "
               :key="chord.symbol"
-              class="chord-hero px-8 py-12 md:p-16"
+              class="chord-hero overflow-hidden bg-gradient-to-br from-indigo-500/10 via-slate-900/50 to-transparent border border-white/10 p-12 md:p-20 rounded-[4rem]"
             >
-              <div class="flex flex-col items-center text-center">
-                <span
-                  class="text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em] md:tracking-[0.5em] text-indigo-400/60 mb-6"
-                >Identified
-                  Structure</span>
-                <div class="text-6xl md:text-8xl font-black text-white font-outfit mb-2 drop-shadow-xl">
-                  {{ chord.symbol }}
-                </div>
-                <div class="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-[0.2em] mb-8">
-                  {{ chord.name }}
+              <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+                <div class="flex flex-col items-center lg:items-start text-center lg:text-left">
+                  <span
+                    class="text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em] md:tracking-[0.5em] text-indigo-400/60 mb-6"
+                  >Top Harmonic Match</span>
+                  
+                  <div class="flex items-baseline gap-3 mb-2">
+                    <div class="text-7xl md:text-9xl font-black text-white font-outfit drop-shadow-2xl">
+                      {{ chord.symbol }}
+                    </div>
+                    <div class="text-3xl font-black text-indigo-400 italic">{{ chord.roman }}</div>
+                  </div>
+                  
+                  <div class="text-sm md:text-base font-bold text-slate-400 uppercase tracking-[0.2em] mb-10">
+                    {{ chord.name }}
+                  </div>
+
+                  <div class="flex flex-wrap gap-2 mb-12">
+                    <span
+                      v-for=" note in chord.notes "
+                      :key="note"
+                      class="pc-chip px-5 py-2 text-sm"
+                    >
+                      {{ note }}
+                    </span>
+                  </div>
+
+                  <button 
+                    @click="captureChord(chord)"
+                    class="px-10 py-4 bg-indigo-500 hover:bg-indigo-400 text-white rounded-2xl font-black text-xs uppercase tracking-[0.2em] transition-all shadow-2xl shadow-indigo-500/20 active:scale-95 flex items-center gap-3"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4" />
+                    </svg>
+                    Add to Ledger
+                  </button>
                 </div>
 
-                <div class="flex gap-2">
-                  <span
-                    v-for=" note in chord.notes "
-                    :key="note"
-                    class="pc-chip"
-                  >
-                    {{ note }}
-                  </span>
+                <!-- Interactive Fretboard Visualizer -->
+                <div class="flex flex-col gap-6 w-full">
+                  <div class="bg-black/30 rounded-3xl p-8 border border-white/5 backdrop-blur-md">
+                    <div class="flex justify-between items-center mb-6">
+                      <span class="text-[10px] font-black uppercase tracking-widest text-slate-500">Guitar Optimized Voicing</span>
+                      <span class="text-[10px] font-black uppercase tracking-widest text-indigo-400">Standard Tuning</span>
+                    </div>
+                    <Fretboard 
+                      :active-notes="chord.notes"
+                      :highlight-notes="chord.notes"
+                      :num-frets="12"
+                    />
+                  </div>
+
+                  <!-- Suggestions -->
+                  <div v-if="suggestions.length > 0" class="px-8 py-6 rounded-3xl bg-white/5 border border-white/5">
+                    <span class="text-[9px] font-black uppercase tracking-widest text-slate-500 mb-4 block">Recommended Transitions</span>
+                    <div class="flex flex-wrap gap-3">
+                      <div 
+                        v-for="s in suggestions" 
+                        :key="s"
+                        class="px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[11px] font-black text-indigo-300 uppercase tracking-tighter"
+                      >
+                        {{ s }}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Progression Ledger Section -->
+          <div class="mt-16 bg-white/[0.02] rounded-[4rem] p-12 border border-white/5 backdrop-blur-2xl">
+            <div class="flex justify-between items-end mb-12 px-4">
+              <div>
+                <h3 class="text-3xl font-black text-white italic uppercase tracking-tighter">Harmonic <span class="text-indigo-500">Ledger</span></h3>
+                <p class="text-[10px] text-slate-400 uppercase font-black tracking-[0.4em] mt-2">Historical Sequence Analysis</p>
+              </div>
+              <button 
+                v-if="chordHistory.length > 0"
+                @click="clearHistory"
+                class="px-6 py-2 text-[10px] font-black text-slate-500 hover:text-red-400 transition-colors uppercase tracking-widest border border-white/5 rounded-full"
+              >Clear Archive</button>
+            </div>
+
+            <div v-if="chordHistory.length > 0" class="flex flex-wrap gap-8 px-6">
+              <div 
+                v-for="(item, idx) in chordHistory" 
+                :key="idx"
+                class="flex items-center gap-8 group animate-pop-in"
+                :style="{ animationDelay: (idx * 0.1) + 's' }"
+              >
+                <div class="flex flex-col items-center">
+                  <div class="text-3xl font-black text-white font-outfit group-hover:text-indigo-400 transition-colors">{{ item.symbol }}</div>
+                  <div class="text-[11px] font-black text-indigo-500/70 uppercase tracking-tighter mt-1">{{ item.roman }}</div>
+                </div>
+                <div v-if="idx < chordHistory.length - 1" class="text-slate-800 font-extrabold text-2xl">→</div>
+              </div>
+            </div>
+            <div v-else class="py-20 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
+              <div class="text-4xl mb-6 opacity-20">📜</div>
+              <p class="text-slate-500 font-medium italic">Pluck chords and hit "Add to Ledger" to document your harmonic journey.</p>
             </div>
           </div>
         </div>
@@ -426,7 +538,7 @@ body {
 }
 
 .pc-chip {
-  @apply px-3 py-1.5 rounded-lg bg-black/40 border border-white/5 text-[11px] font-black text-indigo-300 font-mono tracking-tighter;
+  @apply px-3 py-1.5 rounded-lg bg-black/40 border border-white/10 text-[11px] font-black text-indigo-300 font-mono tracking-tighter;
 }
 
 /* Animations */

@@ -10,35 +10,35 @@ export interface ToolMetadata {
 export const TOOL_METADATA: Record<string, ToolMetadata> = {
   auratune: {
     id: 'auratune',
-    name: 'AuraTune',
-    whatAmISeeing: 'You are seeing a reactive particle field and live frequency distribution. The colors represent distinct pitch classes (C thru B), while the real-time pitch detector identifies the exact note name of the dominant signal.',
-    instructions: '1. Ensure your microphone is active.\n2. Play an instrument or sing into the mic.\n3. Observe the note name readout and watch how the "aura" pulses to your performance.',
-    practicalApplication: 'Identify the exact pitch you are singing or playing in real-time while using the visual aura as a high-end backdrop for live performance or studio mood-setting.',
-    howItWorks: 'AuraTune combines a Fast Fourier Transform (FFT) for visualization with a sophisticated autocorrelation algorithm (YIN) for precise pitch detection, mapping the results to a high-performance particle engine.'
+    name: 'AuraTune Pro',
+    whatAmISeeing: 'A high-precision Intonation Lab. You are seeing a dual-system tuner combining a sub-cent Strobe visualizer with an SVG-based Vibrato Diagnostic Graph. The side panel provides real-time "Tone Quality" scoring and historical A4 calibration data.',
+    instructions: '1. Click the Gear Icon ⚙️ to open the Advanced Settings Drawer.\n2. Set your Concert A (e.g., 432Hz) and your instrument\'s transposition key.\n3. Enable the "Practice Drone" to tune by ear against a guide tone.\n4. Observe the scrolling graph to analyze your vibrato shape and the strobe ring for sub-cent anchoring.',
+    practicalApplication: 'Professional intonation and vocal training. Use it to eliminate "pitch drift" in long notes, calibrate your performance to historical temperaments, and visualize the forensic details of your vibrato width and speed.',
+    howItWorks: 'AuraTune Pro utilizes a dual-engine architecture: a YIN-based autocorrelation for fundamental pitch detection and a custom forensic processor for sub-cent variance. The strobe renderer maps frequency deltas to angular velocity, while the stability engine prunes a 5-second circular buffer for real-time statistical charting.'
   },
   scalesleuth: {
     id: 'scalesleuth',
-    name: 'ScaleSleuth',
-    whatAmISeeing: 'A real-time list of potential musical scales. The engine matches the notes it hears against a database of thousands of world scales, highlighting the most likely candidates.',
-    instructions: '1. Play a melody or a series of notes.\n2. ScaleSleuth will lock onto the tonal center.\n3. View the matching modes and suggested related scales.',
-    practicalApplication: 'Identify the mode of a song you are listening to, or find exotic scales to spice up your own compositions when you feel stuck in a creative rut.',
-    howItWorks: 'The analysis engine extracts "pitch class profiles"—essentially a signature of which notes are present. It then calculates the mathematical distance between your input and known scale structures.'
+    name: 'ScaleSleuth Pro',
+    whatAmISeeing: 'A real-time Harmonic Forensic Lab. You are seeing potential scale matches ranked by accuracy, an interactive fretboard map, and a modal relationship engine that identifies parent scales and interval degrees.',
+    instructions: '1. Play a melody or a series of notes.\n2. Use the "Notes/Degrees" toggle to switch between letter names and intervals.\n3. Observe the color-coded "Heat Map" bars: Emerald indicates the most likely Tonic (home note), while Blue indicates supporting tones.\n4. Click a suggested scale to map the full pattern onto the fretboard.',
+    practicalApplication: 'Identify complex modes in real-time performance, master modal theory by seeing relationships between parallel keys, and bridge the gap between "ear" and "theory" using interval analysis.',
+    howItWorks: 'ScaleSleuth Pro uses a weighted pitch class profile. It calculates the mathematical distance between your input and thousands of scale structures, then performs a second-pass analysis to identify modal origins and relative scale degrees.'
   },
   chordcapture: {
     id: 'chordcapture',
-    name: 'ChordCapture',
-    whatAmISeeing: 'A log of harmonic events. As you play chords, the "Capture" engine identifies the voicing and freezes the signature on the screen for review.',
-    instructions: '1. Play a chord on your instrument.\n2. The detected chord name will appear in the main display.\n3. Click entries in the log to review past captures.',
-    practicalApplication: 'Perfect for transcribing complex jazz harmonies or verifying that you are playing a specific voicing correctly during practice.',
-    howItWorks: 'ChordCapture looks for harmonic intervals and stacks. It filters out noise and overtones to find the fundamental triads and extensions using musical set theory.'
+    name: 'ChordCapture Pro',
+    whatAmISeeing: 'A Forensic Harmonic Diarist. You are seeing real-time chord identification, a Progression Ledger for logging sequences, and a Roman Numeral analysis engine for functional theory.',
+    instructions: '1. Play a series of notes or a chord.\n2. Observe the identified structure and its Roman Numeral (relative to your chosen key).\n3. Click "Capture to Ledger" to permanently log a chord into your harmonic sequence.\n4. Use "Next-Step Suggestions" for creative inspiration and common functional transitions.',
+    practicalApplication: 'Transcribing complex songs, documenting harmonic ideas during composition, and mastering functional harmony (understanding I, IV, V relationships) through real-time feedback.',
+    howItWorks: 'ChordCapture Pro uses a multi-pass detection engine powered by Tonal.js. It extracts pitch classes, identifies best-fit chord symbols, and performs a secondary functional analysis to calculate Roman Numerals and suggested diatonic next-steps.'
   },
   pocketengine: {
     id: 'pocketengine',
-    name: 'Pocket Engine',
-    whatAmISeeing: 'A timing diagnostic dashboard. The central needle shows your deviation from the absolute "pocket" (the perfect timing of the internal clock).',
-    instructions: '1. Start the internal clock.\n2. Tap your keyboard or play a percussive note in time with the pulse.\n3. Watch the graph for "Late" or "Early" trends.',
-    practicalApplication: 'Use this for 10 minutes a day to calibrate your internal "clock" and fix rushing or dragging habits in your rhythm section playing.',
-    howItWorks: 'It compares the micro-timestamp of your input event against the High-Resolution Time API of the browser, calculating the exact millisecond delta from the beat.'
+    name: 'Pocket Engine Pro',
+    whatAmISeeing: 'A professional-grade timing diagnostic lab. The "Pocket" meter shows your millisecond offset against a high-precision audio clock. The new Polyrhythmic Grid (3:4, 5:4, 7:4) enables complex cross-rhythm training for advanced players.',
+    instructions: '1. Start the engine using the morphing Play button.\\n2. Select a rhythmic density (e.g., 1/8 or 1/12 triplets).\\n3. Enable a Polyrhythm (e.g., 3:4) for dual-clock layering.\\n4. Enable "Visual Flash" for high-contrast optical feedback.\\n5. Play a percussive note in time with the pulse and analyze the offset.',
+    practicalApplication: 'Train your internal "clock" with polyrhythms like 3 over 4. Use the Gap Click feature to practice maintaining tempo without external cues. Track your Rushing/Dragging tendency with pinpoint accuracy.',
+    howItWorks: 'Uses a dual-clock lookahead Web Audio scheduler. The main clock handles base tempo while a parallel poly-clock triggers a secondary pulse. The engine calculates the delta between hardware-synced transient detection and scheduled beat time.'
   },
   frequencyflow: {
     id: 'frequencyflow',

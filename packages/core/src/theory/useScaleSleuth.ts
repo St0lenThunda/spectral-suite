@@ -8,6 +8,7 @@ export function useScaleSleuth () {
   const detectedNotes = ref<string[]>( [] );
   const potentialScales = ref<ScaleMatch[]>( [] );
   const currentNote = ref<string | null>( null );
+  const noteWeights = ref<Record<string, number>>( {} );
 
   // Buffer to store notes played recently to detect the scale
   const noteBuffer = new Set<string>();
@@ -25,6 +26,9 @@ export function useScaleSleuth () {
       currentNote.value = pc;
       noteBuffer.add( pc );
 
+      // Update weights
+      noteWeights.value[pc] = ( noteWeights.value[pc] || 0 ) + 1;
+
       // Update detected notes array
       detectedNotes.value = Array.from( noteBuffer );
 
@@ -38,6 +42,7 @@ export function useScaleSleuth () {
     detectedNotes.value = [];
     potentialScales.value = [];
     currentNote.value = null;
+    noteWeights.value = {};
   };
 
   return {
@@ -45,6 +50,7 @@ export function useScaleSleuth () {
     clarity,
     currentNote,
     detectedNotes,
+    noteWeights,
     potentialScales,
     clearNotes
   };

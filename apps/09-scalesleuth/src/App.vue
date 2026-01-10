@@ -7,6 +7,7 @@ const {
   clarity,
   currentNote,
   detectedNotes,
+  noteWeights,
   potentialScales,
   clearNotes
 } = useScaleSleuth()
@@ -14,6 +15,7 @@ const {
 const { init, isInitialized, error } = useAudioEngine()
 
 const selectedScale = ref<string | null>( null )
+const showDegrees = ref( false )
 
 const scaleNotes = computed( () => {
   if ( !selectedScale.value ) return []
@@ -28,6 +30,20 @@ const start = () => {
 const handleScaleClick = ( name: string ) => {
   selectedScale.value = name
 }
+
+const maxWeight = computed( () => {
+  const weights = Object.values( noteWeights.value );
+  if ( weights.length === 0 ) return 1;
+  return Math.max( ...weights );
+} );
+
+const getWeightColor = ( note: string ) => {
+  const weight = noteWeights.value[note] || 0;
+  const ratio = weight / ( maxWeight.value || 1 );
+  if ( ratio > 0.8 ) return 'bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.5)]';
+  if ( ratio > 0.5 ) return 'bg-sky-400';
+  return 'bg-slate-600';
+};
 </script>
 
 <template>
@@ -36,41 +52,44 @@ const handleScaleClick = ( name: string ) => {
       <header class="flex justify-between items-center mb-12">
         <div class="flex items-center gap-6">
           <div>
-            <h1 class="text-4xl font-black tracking-tighter text-white uppercase">Scale <span
-                class="text-sky-400">Sleuth</span>
+            <h1 class="text-4xl font-black tracking-tighter text-white uppercase font-outfit">Scale <span
+                class="text-sky-400">Sleuth Pro</span>
             </h1>
-            <p class="text-slate-500 font-mono text-xs uppercase tracking-widest mt-1">Standalone Mode · v1.0</p>
+            <p class="text-slate-500 font-mono text-xs uppercase tracking-widest mt-1">Standalone Mode · Harmonic Forensic</p>
           </div>
-          <InfoPanel title="How to use ScaleSleuth">
-            <h4>1. Detection</h4>
-            <p>Play at least 3 distinct notes. The app listens for stable pitches and adds them to your session buffer.
-            </p>
-            <h4>2. Identification</h4>
-            <p>The "Scale Suggestions" list updates in real-time. A 100% score means all your played notes fit that
-              scale perfectly.</p>
-            <h4>3. Visualization</h4>
-            <p>Select a scale to see its full pattern on the fretboard. Active notes (those you played) are highlighted
-              in blue.</p>
-            <h4>4. Reset</h4>
-            <p>Use the Reset button to clear the buffer when switching to a new song or key.</p>
-          </InfoPanel>
         </div>
 
-        <div v-if=" !isInitialized ">
+        <div class="flex items-center gap-4">
+          <!-- Degrees Toggle -->
+          <div class="flex bg-slate-900 p-1 rounded-xl border border-white/5 mr-4">
+            <button 
+              @click="showDegrees = false"
+              class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all"
+              :class="!showDegrees ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/20' : 'text-slate-500 hover:text-slate-300'"
+            >Notes</button>
+            <button 
+              @click="showDegrees = true"
+              class="px-3 py-1.5 rounded-lg text-[10px] font-black uppercase transition-all"
+              :class="showDegrees ? 'bg-sky-500 text-white shadow-lg shadow-sky-500/20' : 'text-slate-500 hover:text-slate-300'"
+            >Degrees</button>
+          </div>
+
+          <div v-if=" !isInitialized ">
+            <button
+              @click="start"
+              class="bg-sky-500 hover:bg-sky-600 px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-sky-500/20"
+            >
+              Enable Microphone
+            </button>
+          </div>
           <button
-            @click="start"
-            class="bg-sky-500 hover:bg-sky-600 px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-sky-500/20"
+            v-else
+            @click="clearNotes"
+            class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-lg border border-slate-700 transition-all"
           >
-            Enable Microphone
+            Reset Detective
           </button>
         </div>
-        <button
-          v-else
-          @click="clearNotes"
-          class="text-xs font-bold uppercase tracking-widest text-slate-500 hover:text-white transition-colors"
-        >
-          Reset Session
-        </button>
       </header>
 
       <div
@@ -98,13 +117,19 @@ const handleScaleClick = ( name: string ) => {
             <span class="text-[10px] uppercase font-bold tracking-widest text-slate-500 block mb-6">Notes in
               Buffer</span>
             <div class="flex flex-wrap gap-3">
-              <div
-                v-for=" note in detectedNotes "
-                :key="note"
-                class="w-12 h-12 rounded-2xl bg-slate-950 border border-sky-500/20 flex items-center justify-center font-bold text-sky-400 text-xl"
-              >
-                {{ note }}
-              </div>
+                <div
+                  v-for=" note in detectedNotes "
+                  :key="note"
+                  class="relative w-12 h-12 rounded-2xl bg-slate-950 border border-sky-500/20 flex items-center justify-center font-bold text-sky-400 text-xl overflow-hidden"
+                >
+                  {{ note }}
+                  <!-- Weight indicator -->
+                  <div 
+                    class="absolute bottom-0 left-0 h-1 transition-all duration-500"
+                    :class="getWeightColor(note)"
+                    :style="{ width: Math.min((noteWeights[note] || 0) * 10, 100) + '%' }"
+                  ></div>
+                </div>
               <div
                 v-if=" detectedNotes.length === 0 "
                 class="text-slate-700 italic text-sm"
@@ -141,8 +166,15 @@ const handleScaleClick = ( name: string ) => {
                 :class="selectedScale === scale.name ? 'bg-sky-500/10 border-sky-500' : 'bg-slate-950 border-transparent hover:border-slate-800'"
               >
                 <div class="text-left">
-                  <div class="font-bold text-white">{{ scale.name }}</div>
-                  <div class="text-[10px] text-slate-500 font-mono">{{ scale.notes.join( ' ' ) }}</div>
+                  <div class="font-bold text-white group-hover:text-sky-400 transition-colors">{{ scale.name }}</div>
+                  <div class="text-[10px] text-slate-500 font-mono uppercase tracking-tight mt-0.5">
+                    <span v-if="!showDegrees">{{ scale.notes.join( ' · ' ) }}</span>
+                    <span v-else class="text-sky-400/80">{{ scale.intervals.join( ' · ' ) }}</span>
+                  </div>
+                  <!-- Modal info placeholder -->
+                  <div v-if="scale.type.includes('Dorian') || scale.type.includes('Phrygian') || scale.type.includes('Lydian') || scale.type.includes('Mixolydian') || scale.type.includes('Aeolian') || scale.type.includes('Locrian')" class="text-[8px] text-slate-600 font-bold uppercase tracking-tighter mt-1">
+                    Theory: Modal of {{ scale.name.split(' ')[1] }} Major
+                  </div>
                 </div>
                 <div class="text-sky-400 font-black text-xs">{{ Math.round( scale.score * 100 ) }}%</div>
               </button>

@@ -1,11 +1,29 @@
 <script setup lang="ts">
-import { useChordCapture, useAudioEngine } from '@spectralsuite/core'
+import { computed } from 'vue'
+import { useChordCapture, useAudioEngine, ChordEngine, Fretboard } from '@spectralsuite/core'
 import { useToolInfo } from '../../composables/useToolInfo';
 
 const { openInfo } = useToolInfo();
 
-const { pitch, clarity, currentNote, capturedNotes, detectedChords, clearNotes } = useChordCapture()
+const { 
+  pitch, 
+  clarity, 
+  currentNote, 
+  capturedNotes, 
+  detectedChords, 
+  chordHistory,
+  keyCenter,
+  clearNotes,
+  captureChord,
+  clearHistory
+} = useChordCapture()
 const { init, isInitialized, error } = useAudioEngine()
+
+const suggestions = computed( () => {
+  const topChord = detectedChords.value[0];
+  if ( !topChord ) return [];
+  return ChordEngine.suggestNext( topChord.symbol, keyCenter.value );
+} );
 
 const start = () => {
   init()
@@ -71,15 +89,27 @@ const start = () => {
       <!-- Standard Module Header -->
       <header class="w-full max-w-3xl flex justify-between items-end px-4">
         <div>
-          <h2 class="text-3xl font-bold text-white mb-2">Chord <span class="text-indigo-400">Capture</span></h2>
-          <p class="text-slate-400 text-sm italic">Harmonic recognition and sequence building.</p>
+          <h2 class="text-3xl font-bold text-white mb-2">Chord <span class="text-indigo-400">Capture Pro</span></h2>
+          <p class="text-slate-400 text-sm italic">Harmonic recognition, Roman Numerals & Sequence Ledger.</p>
         </div>
-        <button
-          @click="openInfo( 'chordcapture' )"
-          class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
-        >
-          Intelligence
-        </button>
+        <div class="flex items-center gap-4">
+          <!-- Key Selection for Roman Numerals -->
+          <div class="flex flex-col items-end gap-1">
+            <span class="text-[8px] font-black uppercase text-slate-500 tracking-widest mr-2">Analysis Key</span>
+            <select 
+              v-model="keyCenter" 
+              class="bg-slate-900 border border-white/10 rounded-lg text-[10px] font-black text-indigo-400 px-3 py-1.5 focus:outline-none focus:border-indigo-500 transition-all uppercase"
+            >
+              <option v-for="k in ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']" :key="k" :value="k">{{ k }}</option>
+            </select>
+          </div>
+          <button
+            @click="openInfo( 'chordcapture' )"
+            class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
+          >
+            Intelligence
+          </button>
+        </div>
       </header>
 
       <!-- Step Indicator / Instructions -->
@@ -132,12 +162,16 @@ const start = () => {
           >
             <span
               class="block text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em] md:tracking-[0.6em] text-indigo-400/40 mb-2"
-            >Live
-              Monitor</span>
-            <div
-              class="text-[8rem] sm:text-[10rem] md:text-[12rem] lg:text-[16rem] font-black text-white leading-none font-outfit drop-shadow-[0_0_30px_rgba(255,255,255,0.1)]"
             >
-              {{ currentNote || '--' }}
+              {{ detectedChords.length > 0 ? 'Harmonic Match' : 'Live Monitor' }}
+            </span>
+            <div
+              class="font-black text-white leading-none font-outfit drop-shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300"
+              :class="[
+                detectedChords.length > 0 && detectedChords[0].symbol.length > 4 ? 'text-[5rem] sm:text-[7rem] md:text-[9rem] lg:text-[11rem]' : 'text-[8rem] sm:text-[10rem] md:text-[12rem] lg:text-[16rem]'
+              ]"
+            >
+              {{ detectedChords.length > 0 ? detectedChords[0].symbol : (currentNote || '--') }}
             </div>
             <div
               class="mt-4 flex items-center justify-center gap-4 text-[10px] md:text-xs font-mono font-bold text-slate-500"
@@ -207,31 +241,104 @@ const start = () => {
           class="flex flex-col gap-6"
         >
           <div
-            v-for=" chord in detectedChords "
+            v-for=" chord in detectedChords.slice(0, 1) "
             :key="chord.symbol"
-            class="chord-hero px-8 py-12 md:p-16"
+            class="chord-hero overflow-hidden"
           >
-            <div class="flex flex-col items-center text-center">
-              <span
-                class="text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em] md:tracking-[0.5em] text-indigo-400/60 mb-6"
-              >Identified
-                Structure</span>
-              <div class="text-6xl md:text-8xl font-black text-white font-outfit mb-2 drop-shadow-xl">
-                {{ chord.symbol }}
-              </div>
-              <div class="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-[0.2em] mb-8">
-                {{ chord.name }}
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+              <div class="flex flex-col items-center text-center">
+                <span
+                  class="text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em] md:tracking-[0.5em] text-indigo-400/60 mb-6"
+                >Current Detection</span>
+                <div class="flex items-baseline gap-2">
+                  <div class="text-7xl md:text-8xl font-black text-white font-outfit drop-shadow-xl">
+                    {{ chord.symbol }}
+                  </div>
+                  <div class="text-2xl font-black text-indigo-400 italic">{{ chord.roman }}</div>
+                </div>
+                <div class="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-[0.2em] mb-8">
+                  {{ chord.name }}
+                </div>
+
+                <div class="flex gap-2 mb-10">
+                  <span
+                    v-for=" note in chord.notes "
+                    :key="note"
+                    class="pc-chip"
+                  >
+                    {{ note }}
+                  </span>
+                </div>
+
+                <button 
+                  @click="captureChord(chord)"
+                  class="px-8 py-3 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 active:scale-95 flex items-center gap-2"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Capture to Ledger
+                </button>
               </div>
 
-              <div class="flex gap-2">
-                <span
-                  v-for=" note in chord.notes "
-                  :key="note"
-                  class="pc-chip"
-                >
-                  {{ note }}
-                </span>
+              <!-- Chord Voicing Map -->
+              <div class="bg-black/20 rounded-3xl p-6 border border-white/5">
+                <div class="flex justify-between mb-4">
+                  <span class="text-[8px] font-black uppercase tracking-widest text-slate-500">Guitar Voicing Map</span>
+                  <span class="text-[8px] font-black uppercase tracking-widest text-indigo-400">{{ chord.symbol }}</span>
+                </div>
+                <Fretboard 
+                  :active-notes="chord.notes"
+                  :highlight-notes="chord.notes"
+                  :num-frets="12"
+                />
+
+                <!-- Harmonic Suggestions -->
+                <div v-if="suggestions.length > 0" class="mt-8 pt-8 border-t border-white/5">
+                  <span class="text-[8px] font-black uppercase tracking-widest text-slate-500 block mb-4">Suggested Next Steps</span>
+                  <div class="flex flex-wrap gap-2">
+                    <div 
+                      v-for="s in suggestions" 
+                      :key="s"
+                      class="px-4 py-2 rounded-lg bg-indigo-500/5 border border-indigo-500/20 text-[10px] font-black text-indigo-300 uppercase tracking-tighter"
+                    >
+                      {{ s }}
+                    </div>
+                  </div>
+                </div>
               </div>
+            </div>
+          </div>
+
+          <!-- Progression Ledger -->
+          <div class="mt-12 bg-slate-900/40 rounded-[3rem] p-10 border border-white/5 backdrop-blur-3xl">
+            <div class="flex justify-between items-center mb-10 px-4">
+               <div>
+                  <h3 class="text-xl font-black text-white italic uppercase tracking-tighter">Progression <span class="text-indigo-500">Ledger</span></h3>
+                  <p class="text-[9px] text-slate-500 uppercase font-bold tracking-widest mt-1">Stored Harmonic Flow</p>
+               </div>
+               <button 
+                v-if="chordHistory.length > 0"
+                @click="clearHistory"
+                class="px-4 py-2 text-[9px] font-black text-slate-600 hover:text-red-400 transition-colors uppercase tracking-widest"
+               >Clear All</button>
+            </div>
+            
+            <div v-if="chordHistory.length > 0" class="flex flex-wrap gap-6 px-4">
+              <div 
+                v-for="(item, idx) in chordHistory" 
+                :key="idx"
+                class="flex items-center gap-6 group"
+              >
+                <div class="flex flex-col items-center">
+                  <div class="text-2xl font-black text-white font-outfit group-hover:text-indigo-400 transition-colors">{{ item.symbol }}</div>
+                  <div class="text-[10px] font-black text-indigo-500/60 uppercase tracking-tighter">{{ item.roman }}</div>
+                </div>
+                <div v-if="idx < chordHistory.length - 1" class="text-slate-800 font-black text-xl">→</div>
+              </div>
+            </div>
+            <div v-else class="py-12 text-center opacity-20 italic text-sm">
+              Your captured progression will appear here.
             </div>
           </div>
         </div>

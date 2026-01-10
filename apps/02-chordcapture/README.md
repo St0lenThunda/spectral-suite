@@ -1,19 +1,28 @@
-# ChordCapture
+# ChordCapture Pro Suite 🎹📜✨
 
-Real-time harmonic recognition engine that captures and analyzes chord progressions as you play.
+Professional-grade harmonic forensic diarist for transcribing and composing complex progressions.
 
 ## 🎯 Purpose
 
-ChordCapture helps musicians understand and document chord progressions by detecting and analyzing the notes you play in real-time. Perfect for transcription, learning songs by ear, or developing harmonic awareness.
+ChordCapture Pro is a clinical tool for musicians and composers to document harmonic ideas in real-time. By bridging chord identification with Roman Numeral analysis and a permanent ledger, it allows you to capture the "magic" of a performance and understand its functional structure instantly.
 
-## ✨ Features
+## ✨ Pro Features
 
-- **Note sequence capture** - Records notes as you play them
-- **Chord recognition** - Automatically identifies chords (major, minor, diminished, augmented, 7ths, etc.)
-- **Multi-voice detection** - Captures polyphonic input (multiple notes simultaneously)
-- **Chord history** - Tracks the progression of detected chords
-- **Clear function** - Reset and start fresh anytime
-- **Visual feedback** - Color-coded note display with clarity indicators
+- **🎹 Progression Ledger (The Harmonic Diary)** - Permanently log detected chords into a scrolling sequence. Perfect for capturing song structures as you play them.
+- **📐 Functional Roman Numerals** - See chords as I, IV, V, vii° etc., relative to your chosen key center for deep theoretical insight.
+- **🎸 Integrated Voicing Maps** - Real-time guitar fretboard diagrams for every detected chord, helping you master new voicings.
+- **🧠 Harmonic Next-Step Suggestions** - Intelligent AI-driven suggestions for the next chord based on functional harmony and common cadences (ii-V-I).
+- **🎯 Multi-Pass Forensic Engine** - High-precision detection that recognizes extensions (9ths, 11ths, 13ths) and identifies the most likely harmonic intent.
+
+## 📊 Competitive Edge
+
+| Feature | ChordCapture Pro | Basic Detectors | Chordify / Static Apps |
+| :--- | :---: | :---: | :---: |
+| **Direct Analysis** | **Forensic Tonal.js** | Simple Match | AI (Lossy) |
+| **Progression Log** | **Yes (Ledger)** | List Only | Timeline Only |
+| **Functional ID** | **Yes (Romans)** | None | None |
+| **Voicing Help** | **Fretboard Map** | None | Static Images |
+| **Suggestions** | **Functional AI** | None | Generic |
 
 ## 🚀 Getting Started
 

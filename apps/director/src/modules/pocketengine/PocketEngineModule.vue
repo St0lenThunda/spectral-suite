@@ -10,6 +10,16 @@ const metronome = new MetronomeEngine( 120 )
 const detector = new TransientDetector( 0.3 )
 
 const tempo = ref( 120 )
+const subdivision = ref( 1 )
+const polySubdivision = ref( 0 ) // 0 = off, 3 = 3 over 4, 5 = 5 over 4, etc.
+const isFlashEnabled = ref( true )
+const isFlashing = ref( false )
+const gapIntensity = ref( 0 )
+const isSettingsOpen = ref( false )
+
+const isLadderEnabled = ref( false )
+const ladderIncrement = ref( 5 )
+const ladderInterval = ref( 4 )
 const isPlaying = ref( false )
 const isInitialized = ref( false )
 const error = ref<string | null>( null )
@@ -32,13 +42,35 @@ const perfectCount = ref( 0 )
 const tendency = ref( 'No data yet' )
 const avgOffset = ref( 0 )
 
+// Radial Groove Map (Pro Phase 2)
+const grooveHistory = ref<Array<{ offset: number, time: number }>>( [] )
+const MAX_GROOVE_DOTS = 32
+
+// Stealth Training (Pro Phase 3)
+const stealthBarsOn = ref( 4 )
+const stealthBarsOff = ref( 2 )
+const isStealthEnabled = ref( false )
+
 const init = async () => {
   try {
     metronome.init()
     await detector.init()
 
-    metronome.onBeat( ( _beat, time ) => {
-      lastBeatTime.value = time
+    metronome.onBeat( ( _pulse, time, isMainBeat ) => {
+      if ( isMainBeat ) {
+        lastBeatTime.value = time
+
+        // Trigger visual flash if enabled
+        if ( isFlashEnabled.value ) {
+          const delay = ( time - metronome.getCurrentTime() ) * 1000
+          setTimeout( () => {
+            isFlashing.value = true
+            setTimeout( () => {
+              isFlashing.value = false
+            }, 100 )
+          }, delay )
+        }
+      }
     } )
 
     detector.onTransient( ( time, _energy ) => {
@@ -66,6 +98,12 @@ const init = async () => {
 
           pocketPosition.value = Math.max( 0, Math.min( 100, ( ( offset + 200 ) / 400 ) * 100 ) )
 
+          // Add to Groove History for Radial Map
+          grooveHistory.value.push( { offset, time: performance.now() } )
+          if ( grooveHistory.value.length > MAX_GROOVE_DOTS ) {
+            grooveHistory.value.shift()
+          }
+
           // Update statistics
           const total = rushCount.value + dragCount.value + perfectCount.value
           if ( rushCount.value > dragCount.value * 1.5 ) {
@@ -82,6 +120,10 @@ const init = async () => {
           }
         }
       }
+    } )
+
+    metronome.onTempoChange( ( newTempo ) => {
+      tempo.value = newTempo
     } )
 
     isInitialized.value = true
@@ -113,6 +155,33 @@ const updateTempo = ( value: number ) => {
   metronome.setTempo( value )
 }
 
+const updateSubdivision = ( value: number ) => {
+  subdivision.value = value
+  metronome.setSubdivision( value )
+}
+
+const updatePolyrhythm = ( value: number ) => {
+  polySubdivision.value = value
+  metronome.setPolySubdivision( value )
+}
+
+const updateGapIntensity = ( value: number ) => {
+  gapIntensity.value = value
+  metronome.setMuteProbability( value / 100 )
+}
+
+const updateLadder = () => {
+  if ( isLadderEnabled.value ) {
+    metronome.setProgression( ladderIncrement.value, ladderInterval.value )
+  } else {
+    metronome.setProgression( 0, 0 )
+  }
+}
+
+const updateStealth = () => {
+  metronome.setStealthMode( stealthBarsOn.value, stealthBarsOff.value, isStealthEnabled.value )
+}
+
 const reset = () => {
   timingHistory.value = []
   timingOffset.value = 0
@@ -122,6 +191,7 @@ const reset = () => {
   pocketPosition.value = 50
   tendency.value = 'No data yet'
   avgOffset.value = 0
+  grooveHistory.value = []
 }
 
 onUnmounted( () => {
@@ -188,7 +258,7 @@ onUnmounted( () => {
         <div>
           <h2 class="text-3xl font-black text-white italic uppercase tracking-tighter">Pocket <span
               class="text-rose-500"
-            >Engine</span></h2>
+            >Engine</span> <span class="text-indigo-400 text-lg">Pro</span></h2>
           <p class="text-slate-500 text-xs font-mono uppercase tracking-widest mt-1">Rhythm & Timing Diagnostic</p>
         </div>
         <button
@@ -201,41 +271,305 @@ onUnmounted( () => {
 
       <!-- Control Panel -->
       <div class="glass-card p-8 rounded-[3rem]">
-        <div class="flex flex-col md:flex-row items-center gap-8">
-          <div class="flex-1 w-full">
-            <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 block mb-4">
-              Tempo (BPM)
-            </label>
-            <div class="flex items-center gap-4">
-              <input
-                type="range"
-                min="40"
-                max="300"
-                :value="tempo"
-                @input="updateTempo( parseInt( ( $event.target as HTMLInputElement ).value ) )"
-                class="flex-1 h-2 bg-slate-800 rounded-full appearance-none cursor-pointer"
-              />
-              <span class="text-4xl font-black font-mono text-white w-24 text-right">{{ tempo }}</span>
+        <div class="flex flex-col md:flex-row items-center gap-12">
+          <!-- Tempo Control -->
+          <!-- Tempo Control (Main Panel) -->
+          <div class="flex-1 w-full space-y-8">
+            <div>
+              <div class="flex items-center justify-between mb-4">
+                <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 block">
+                  Tempo (BPM)
+                </label>
+                <button
+                  @click="isSettingsOpen = !isSettingsOpen"
+                  class="p-2 -mr-2 text-slate-500 hover:text-white transition-all transform"
+                  :class="{ 'rotate-90 text-indigo-400': isSettingsOpen }"
+                  title="Advanced Configuration"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2.5"
+                      d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                    />
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2.5"
+                      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <div class="flex items-center gap-6">
+                <input
+                  type="range"
+                  min="40"
+                  max="300"
+                  :value="tempo"
+                  @input="updateTempo( parseInt( ( $event.target as HTMLInputElement ).value ) )"
+                  class="flex-1 h-2 bg-slate-800 rounded-full appearance-none cursor-pointer"
+                />
+                <span class="text-4xl font-black font-mono text-white w-20 text-right">{{ tempo }}</span>
+              </div>
             </div>
+
+            <!-- Advanced Configuration Drawer -->
+            <Transition name="drawer">
+              <div
+                v-if=" isSettingsOpen "
+                class="space-y-8 pt-8 border-t border-white/5 overflow-hidden"
+              >
+                <div class="flex flex-wrap items-center gap-10">
+                  <!-- Subdivision Control -->
+                  <div class="space-y-4">
+                    <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 block">
+                      Subdivision
+                    </label>
+                    <div class="flex items-center gap-2">
+                      <button
+                        v-for=" ( label, s ) in { 1: '1/4', 2: '1/8', 3: '1/12', 4: '1/16' } "
+                        :key="s"
+                        @click="updateSubdivision( Math.floor( Number( s ) ) )"
+                        class="px-3 h-10 rounded-lg font-black transition-all text-[10px]"
+                        :class="subdivision === Math.floor( Number( s ) ) ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'bg-slate-800 text-slate-500 hover:text-white'"
+                      >
+                        {{ label }}
+                      </button>
+                    </div>
+                  </div>
+
+                  <!-- Visual Flash Toggle -->
+                  <div class="space-y-4">
+                    <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 block">
+                      Visual Flash
+                    </label>
+                    <button
+                      @click="isFlashEnabled = !isFlashEnabled"
+                      class="h-10 px-6 rounded-lg font-black transition-all flex items-center gap-3"
+                      :class="isFlashEnabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-800 text-slate-500'"
+                    >
+                      <div
+                        class="w-2 h-2 rounded-full"
+                        :class="isFlashEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'"
+                      ></div>
+                      {{ isFlashEnabled ? 'ENABLED' : 'DISABLED' }}
+                    </button>
+                  </div>
+
+                  <!-- Polyrhythm Control -->
+                  <div class="space-y-4">
+                    <label class="text-[10px] font-black uppercase tracking-[0.3em] text-indigo-400 block">
+                      Polyrhythm (X over 4)
+                    </label>
+                    <div class="flex items-center gap-2">
+                      <button
+                        v-for=" val in [0, 3, 5, 7] "
+                        :key="val"
+                        @click="updatePolyrhythm( val )"
+                        class="px-3 h-10 rounded-lg font-black transition-all text-[10px]"
+                        :class="polySubdivision === val ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-800 text-slate-500 hover:text-white'"
+                      >
+                        {{ val === 0 ? 'OFF' : `${val}:4` }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Stability Training (Gap Click) -->
+                <div class="pt-6 border-t border-white/5">
+                  <div class="flex items-center justify-between mb-4">
+                    <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                      Stability Training (Gap Click)
+                    </label>
+                    <span
+                      class="text-xs font-black px-2 py-0.5 rounded border transition-colors"
+                      :class="gapIntensity > 0 ? 'text-rose-500 border-rose-500/20 bg-rose-500/5' : 'text-slate-600 border-white/5'"
+                    >
+                      {{ gapIntensity > 0 ? `${gapIntensity}% GAP` : 'OFF' }}
+                    </span>
+                  </div>
+                  <div class="flex items-center gap-6">
+                    <div class="flex-1 relative flex items-center">
+                      <div
+                        class="absolute h-1 bg-gradient-to-r from-emerald-500 to-rose-500 rounded-full opacity-20"
+                        :style="{ width: '100%' }"
+                      ></div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="90"
+                        step="5"
+                        :value="gapIntensity"
+                        @input="updateGapIntensity( parseInt( ( $event.target as HTMLInputElement ).value ) )"
+                        class="relative w-full h-8 bg-transparent appearance-none cursor-pointer z-10"
+                      />
+                    </div>
+                    <div class="w-12 text-right">
+                      <span class="text-[10px] font-black font-mono text-slate-400">INTENSITY</span>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Speed Building (The Ladder) -->
+                <div class="pt-6 border-t border-white/5">
+                  <div class="flex items-center justify-between mb-6">
+                    <div class="space-y-1">
+                      <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500">
+                        Speed Building (The Ladder)
+                      </label>
+                      <p class="text-[9px] text-slate-500 italic">Automatically increments BPM every few bars.</p>
+                    </div>
+                    <button
+                      @click="isLadderEnabled = !isLadderEnabled; updateLadder()"
+                      class="h-8 px-4 rounded-full font-black text-[9px] transition-all border"
+                      :class="isLadderEnabled ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' : 'bg-slate-800 text-slate-500 border-transparent'"
+                    >
+                      {{ isLadderEnabled ? 'ACTIVE' : 'INACTIVE' }}
+                    </button>
+                  </div>
+
+                  <div
+                    class="flex items-center gap-8 transition-opacity"
+                    :class="{ 'opacity-50 pointer-events-none': !isLadderEnabled }"
+                  >
+                    <!-- Increment -->
+                    <div class="flex-1 space-y-3">
+                      <div class="flex justify-between">
+                        <span class="text-[8px] font-bold text-slate-600 uppercase tracking-widest">BPM Increment</span>
+                        <span class="text-[10px] font-black text-white">+{{ ladderIncrement }}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="20"
+                        :value="ladderIncrement"
+                        @input="ladderIncrement = parseInt( ( $event.target as HTMLInputElement ).value ); updateLadder()"
+                        class="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer"
+                      />
+                    </div>
+
+                    <!-- Interval -->
+                    <div class="flex-1 space-y-3">
+                      <div class="flex justify-between">
+                        <span class="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Bar Interval</span>
+                        <span class="text-[10px] font-black text-white">{{ ladderInterval }} BARS</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="16"
+                        :value="ladderInterval"
+                        @input="ladderInterval = parseInt( ( $event.target as HTMLInputElement ).value ); updateLadder()"
+                        class="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Stealth Training (Cognitive Mode - Pro Phase 3) -->
+                <div class="pt-6 border-t border-white/5">
+                  <div class="flex items-center justify-between mb-6">
+                    <div class="space-y-1">
+                      <label class="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-400">
+                        Stealth Training (Cognitive Mode)
+                      </label>
+                      <p class="text-[9px] text-slate-500 italic">Metronome disappears for X bars, forcing you to
+                        maintain internal time.</p>
+                    </div>
+                    <button
+                      @click="isStealthEnabled = !isStealthEnabled; updateStealth()"
+                      class="h-8 px-4 rounded-full font-black text-[9px] transition-all border"
+                      :class="isStealthEnabled ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-slate-800 text-slate-500 border-transparent'"
+                    >
+                      {{ isStealthEnabled ? 'ACTIVE' : 'INACTIVE' }}
+                    </button>
+                  </div>
+
+                  <div
+                    class="flex items-center gap-8 transition-opacity"
+                    :class="{ 'opacity-50 pointer-events-none': !isStealthEnabled }"
+                  >
+                    <!-- Bars On -->
+                    <div class="flex-1 space-y-3">
+                      <div class="flex justify-between">
+                        <span class="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Bars ON</span>
+                        <span class="text-[10px] font-black text-white">{{ stealthBarsOn }} BARS</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="8"
+                        :value="stealthBarsOn"
+                        @input="stealthBarsOn = parseInt( ( $event.target as HTMLInputElement ).value ); updateStealth()"
+                        class="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer"
+                      />
+                    </div>
+
+                    <!-- Bars Off (Silent) -->
+                    <div class="flex-1 space-y-3">
+                      <div class="flex justify-between">
+                        <span class="text-[8px] font-bold text-slate-600 uppercase tracking-widest">Bars OFF
+                          (Silent)</span>
+                        <span class="text-[10px] font-black text-cyan-400">{{ stealthBarsOff }} BARS</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1"
+                        max="8"
+                        :value="stealthBarsOff"
+                        @input="stealthBarsOff = parseInt( ( $event.target as HTMLInputElement ).value ); updateStealth()"
+                        class="w-full h-1 bg-slate-800 rounded-full appearance-none cursor-pointer"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Transition>
           </div>
 
+          <!-- Play/Stop Button -->
           <button
             @click="togglePlay"
-            class="w-32 h-32 rounded-full transition-all shadow-2xl flex items-center justify-center"
-            :class="isPlaying ? 'bg-rose-500 hover:bg-rose-600' : 'bg-emerald-500 hover:bg-emerald-600'"
+            class="w-32 h-32 transition-all duration-500 shadow-2xl flex items-center justify-center group shrink-0 overflow-hidden relative"
+            :class="[
+              isPlaying
+                ? 'bg-rose-500 shadow-rose-500/20 rounded-2xl scale-95'
+                : 'bg-emerald-500 shadow-emerald-500/20 rounded-full'
+            ]"
           >
-            <div class="text-4xl">{{ isPlaying ? '⏸' : '▶' }}</div>
+            <Transition name="icon-morph">
+              <div
+                :key="isPlaying ? 'stop' : 'play'"
+                class="absolute inset-0 flex items-center justify-center text-4xl transform transition-transform group-active:scale-90"
+              >
+                {{ isPlaying ? '⏹' : '▶' }}
+              </div>
+            </Transition>
           </button>
         </div>
       </div>
 
       <!-- Pocket Visualizer -->
-      <div class="glass-card p-12 rounded-[3rem]">
+      <div
+        class="glass-card p-12 rounded-[3rem] transition-colors duration-100"
+        :class="{ 'bg-white/10': isFlashing }"
+      >
         <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 mb-8 text-center">
           The Pocket
         </h3>
 
-        <div class="relative w-full h-32 bg-slate-900/50 rounded-3xl overflow-hidden border border-white/5">
+        <div
+          class="relative w-full h-32 bg-slate-900/50 rounded-3xl overflow-hidden border border-white/5 transition-all"
+          :class="{ 'ring-4 ring-white/20': isFlashing }"
+        >
           <div
             class="absolute left-1/2 top-0 bottom-0 w-24 -translate-x-1/2 bg-emerald-500/20 border-x-2 border-emerald-500/40"
           ></div>
@@ -256,6 +590,56 @@ onUnmounted( () => {
           </div>
           <p class="text-sm text-slate-500 mt-2">Timing Offset</p>
         </div>
+      </div>
+
+      <!-- Radial Groove Map (Pro Phase 2) -->
+      <div class="glass-card p-8 rounded-[3rem]">
+        <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400 mb-6 text-center">
+          Groove Map
+        </h3>
+        <div class="flex justify-center">
+          <svg
+            viewBox="0 0 200 200"
+            class="w-64 h-64"
+          >
+            <!-- Background Circle -->
+            <circle
+              cx="100"
+              cy="100"
+              r="90"
+              fill="none"
+              stroke="rgba(255,255,255,0.05)"
+              stroke-width="2"
+            />
+            <!-- Perfect Zone (inner ring) -->
+            <circle
+              cx="100"
+              cy="100"
+              r="30"
+              fill="rgba(52, 211, 153, 0.1)"
+              stroke="rgba(52, 211, 153, 0.3)"
+              stroke-width="1"
+            />
+            <!-- Center Dot -->
+            <circle
+              cx="100"
+              cy="100"
+              r="4"
+              fill="rgba(255,255,255,0.3)"
+            />
+            <!-- Hit Dots -->
+            <circle
+              v-for=" ( hit, i ) in grooveHistory "
+              :key="i"
+              :cx="100 + Math.cos( ( i / grooveHistory.length ) * Math.PI * 2 - Math.PI / 2 ) * ( 30 + Math.min( 60, Math.abs( hit.offset ) / 200 * 60 ) )"
+              :cy="100 + Math.sin( ( i / grooveHistory.length ) * Math.PI * 2 - Math.PI / 2 ) * ( 30 + Math.min( 60, Math.abs( hit.offset ) / 200 * 60 ) )"
+              r="4"
+              :fill="Math.abs( hit.offset ) < 30 ? '#34d399' : hit.offset > 0 ? '#fb923c' : '#f43f5e'"
+              :opacity="0.5 + ( i / grooveHistory.length ) * 0.5"
+            />
+          </svg>
+        </div>
+        <p class="text-center text-slate-500 text-[10px] mt-4">Hits closer to the center are more accurate.</p>
       </div>
 
       <!-- Statistics Dashboard -->
@@ -350,5 +734,34 @@ input[type="range"]::-moz-range-thumb {
   cursor: pointer;
   box-shadow: 0 10px 15px -3px rgba(244, 63, 94, 0.5);
   border: none;
+}
+/* Drawer Transition */
+.drawer-enter-active,
+.drawer-leave-active {
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 800px;
+}
+
+.drawer-enter-from,
+.drawer-leave-to {
+  opacity: 0;
+  max-height: 0;
+  transform: translateY(-10px);
+}
+
+/* Icon Morph Transition */
+.icon-morph-enter-active,
+.icon-morph-leave-active {
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.icon-morph-enter-from {
+  opacity: 0;
+  transform: scale(0.3) rotate(-90deg);
+}
+
+.icon-morph-leave-to {
+  opacity: 0;
+  transform: scale(0.3) rotate(90deg);
 }
 </style>

@@ -8,13 +8,15 @@ Pocket Engine helps musicians develop rock-solid timing by providing precision m
 
 ## ✨ Features
 
-- **Precision Metronome** - Adjustable BPM from 40 to 300
-- **Transient Detection** - Real-time beat onset tracking
-- **Timing Offset Analysis** - Measures how early or late you play
-- **Visual Feedback** - Color-coded timing indicators
-- **Subdivision Options** - Quarter notes, eighth notes, triplets, sixteenths
-- **Tap Tempo** - Set BPM by tapping
-- **Accent Patterns** - Customizable emphasis on specific beats
+- **Advanced Configuration** - Smooth slidedown drawer for professional training tools
+- **Rhythmic Subdivisions** - Support for 1/4, 1/8, 1/12 (triplets), and 1/16 divisions
+- **Visual "Flash" Mode** - High-contrast optical pulse syncing for better visual feedback
+- **Stability Training** - Gap Click mode to build internal time by randomly muting clicks
+- **The Ladder** - Automated tempo progression for systematic speed-building
+- **Transient Detection** - Real-time audio onset tracking via microphone
+- **Timing Offset Analysis** - Forensic millisecond deviation tracking
+- **Visual Feedback** - Color-coded "Pocket" indicators (Rush vs. Drag)
+- **Morphing UI** - Dynamic transition between playback states
 
 ## 🚀 Getting Started
 
@@ -61,10 +63,10 @@ Practice maintaining steady tempo in common time signatures:
 
 ### Subdivision Practice
 Develop precision with different note values:
-- Quarter notes (1, 2, 3, 4)
-- Eighth notes (1-and-2-and-3-and-4-and)
-- Triplets (1-trip-let, 2-trip-let)
-- Sixteenth notes (rapid subdivision)
+- **1/4** (Quarter notes): The root pulse (1, 2, 3, 4)
+- **1/8** (Eighth notes): 2 pulses per beat (1-and, 2-and)
+- **1/12** (Triplets): 3 pulses per beat (1-trip-let, 2-trip-let)
+- **1/16** (Sixteenth notes): 4 pulses per beat (rapid rhythmic density)
 
 ### Accent Exercises
 Program custom emphasis patterns:

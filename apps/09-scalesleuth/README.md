@@ -1,20 +1,28 @@
-# ScaleSleuth
+# ScaleSleuth Pro Suite 🕵️‍♂️📈
 
-Deep scale analysis engine for identifying modes and melodic structures.
+Professional-grade harmonic forensic lab for identifying modes, scale degrees, and tonal centers.
 
 ## 🎯 Purpose
 
-ScaleSleuth is the musician's companion for understanding scales, modes, and melodic relationships. Play notes and watch as the app identifies what scale you're playing, shows it on a fretboard, and suggests related modes.
+ScaleSleuth Pro is a clinical music theory tool designed to bridge the gap between performance and analysis. By tracking note weights and identifying modal relationships, it provides deep insight into the "home" of a melody, helping musicians understand *why* certain notes work and how they relate to parent keys.
 
-## ✨ Features
+## ✨ Pro Features
 
-- **Scale Detection** - Identifies scales from played notes
-- **Mode Recognition** - Detects Ionian, Dorian, Phrygian, Lydian, Mixolydian, Aeolian, Locrian
-- **Interactive Fretboard** - Visual display of scale patterns
-- **Note Highlighting** - See which notes belong to the detected scale
-- **Scale Suggestions** - Recommends similar or related scales
-- **Root Note Detection** - Identifies the tonal center
-- **Scale Library** - Browse 100+ documented scales
+- **🎹 Weighted Tonic Detection** - Track note frequency (heat map) to mathematically identify the actual tonal center (e.g., C Phrygian vs Ab Major).
+- **📐 Scale Degree HUD** - Toggle between note names and intervals (1, 2, b3, #4) to analyze scale function.
+- **🔗 Modal Relationship Engine** - Instant identification of parent scales (e.g., "D Dorian is the 2nd mode of C Major").
+- **🎸 Advanced Fretboard Map** - Visual mapping of detected notes vs. optimized scale patterns across 15 frets.
+- **🎯 Dynamic Ranking** - Scales are ranked using a multi-pass heuristic that considers note set match, interval priority, and weighting.
+
+## 📊 Competitive Edge
+
+| Feature | ScaleSleuth Pro | Basic Detectors | Theory Handbooks |
+| :--- | :---: | :---: | :---: |
+| **Real-time Map** | **Yes (Fretboard)** | List Only | Static Image |
+| **Scale Degrees** | **Yes (1/b3/#4)** | None | Complex Charts |
+| **Modal Links** | **Yes (Parent Keys)** | None | Passive Text |
+| **Weighting** | **Tonic Heat Map** | Equal Weight | Manual Only |
+| **Engine** | **Tonal.js + Forensics** | Pattern Lookups | Memory |
 
 ## 🚀 Getting Started
 

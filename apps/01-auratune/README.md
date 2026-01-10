@@ -1,18 +1,29 @@
-# AuraTune
+# AuraTune Pro Suite 🌀
 
-Real-time pitch detection and visualization tool with immersive reactive displays.
+Professional-grade intonation diagnostic lab and high-precision tuning suite.
 
 ## 🎯 Purpose
 
-AuraTune is designed for musicians who want immediate visual feedback on their pitch accuracy. Whether you're practicing vocals, tuning an instrument, or exploring melodic phrasing, AuraTune provides crystal-clear pitch detection with visual performance indicators.
+AuraTune Pro is a forensic intonation tool designed for professional musicians, vocalists, and educators. It goes beyond simple pitch detection by providing real-time visual diagnostics for stability, vibrato, and harmonic richness, allowing for sub-cent tuning precision and specialized practice workflows.
 
-## ✨ Features
+## ✨ Pro Features
 
-- **Real-time pitch detection** - Instant frequency analysis using advanced FFT algorithms
-- **Note name display** - Shows the detected note (e.g., A, C#, Bb) with cent deviation
-- **Visual tuner** - Color-coded feedback for pitch accuracy
-- **Clarity meter** - Signal strength indicator to show detection confidence
-- **Cent offset display** - Shows how many cents sharp or flat you are
+- **🌀 Sub-Cent Strobe Visualizer** - A high-speed Canvas-based strobe ring that tracks micro-deviations. Clockwise rotation indicates sharp, counter-clockwise indicates flat.
+- **📈 Vibrato & Stability Graph** - Real-time SVG charting of pitch variance over the last 5 seconds. Perfect for analyzing the speed and width of your vibrato.
+- **⚙️ Advanced Calibration** - Adjust your reference A4 from 390Hz to 490Hz. Supporting historical performance (415Hz) and scientific (432Hz) standards.
+- **🎺 Instrument Transposition** - Instant key shifting for Bb, Eb, and F instruments. See the notes in your instrument's native key.
+- **💎 Practice Drone Generator** - Play against a continuous guide tone (triangle/sine) to master relative intonation and ear training.
+- **🧠 Tone Quality Scoring** - Real-time analysis of harmonic richness and signal clarity, providing a percentage score for your "purity" of tone.
+
+## 📊 Competitive Edge
+
+| Feature | AuraTune Pro | Standard Apps | Mechanical Strobes |
+| :--- | :---: | :---: | :---: |
+| **Precision** | **0.1 Cents** | ~1 Cent | 0.1 Cents |
+| **Diagnostics** | **Vibrato + Stability** | Basic Cent Dial | None |
+| **Visuals** | **High-Speed Strobe** | Needle | Rotating Disc |
+| **Training** | **Practice Drone** | None | None |
+| **Tone Profiling** | **Harmonic Score** | None | None |
 
 ## 🚀 Getting Started
 

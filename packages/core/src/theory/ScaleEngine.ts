@@ -5,6 +5,8 @@ export interface ScaleMatch {
   notes: string[];
   type: string;
   score: number; // Percentage of played notes that fit this scale
+  intervals: string[]; // Degrees e.g. ["1", "2", "b3"]
+  parentScale?: string; // e.g. "C Major" if this is D Dorian
 }
 
 export class ScaleEngine {
@@ -61,7 +63,8 @@ export class ScaleEngine {
             name: scale.name,
             notes: scaleNotes,
             type: st.name,
-            score
+            score,
+            intervals: scale.intervals,
           } );
         }
       }

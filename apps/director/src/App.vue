@@ -139,9 +139,11 @@ const handleGainChange = ( event: Event ) => {
         class="flex items-center gap-3 cursor-pointer"
         @click="currentModule = 'dashboard'"
       >
-        <div
-          class="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-sky-500 flex items-center justify-center font-black text-white italic shadow-lg shadow-indigo-500/20"
-        >SS</div>
+        <img
+          src="/favicon.webp"
+          alt="Spectral Suite Logo"
+          class="w-8 h-8 rounded-lg shadow-lg shadow-indigo-500/20"
+        />
         <h1 class="font-bold text-xl tracking-tighter text-white uppercase">SPECTRAL <span
             class="text-indigo-400 font-black"
           >SUITE</span></h1>

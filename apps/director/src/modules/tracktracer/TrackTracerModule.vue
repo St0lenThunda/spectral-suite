@@ -12,6 +12,17 @@ const result = ref<AnalysisResult | null>( null );
 const error = ref<string | null>( null );
 const showSpecimens = ref( false );
 
+// Microphone Listening Mode
+const isListening = ref( false );
+const listeningDuration = ref( 0 );
+const audioLevel = ref( 0 );
+let mediaRecorder: MediaRecorder | null = null;
+let recordedChunks: Blob[] = [];
+let listeningInterval: number | null = null;
+let audioLevelInterval: number | null = null;
+let listeningAnalyser: AnalyserNode | null = null;
+let listeningAudioCtx: AudioContext | null = null;
+
 const analyzeFile = async ( event: Event ) => {
   const input = event.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -62,12 +73,90 @@ const clearUrl = () => {
   urlInput.value = "";
 };
 
+const startListening = async () => {
+  try {
+    error.value = null;
+    const stream = await navigator.mediaDevices.getUserMedia( { audio: true } );
+
+    // Set up audio level monitoring
+    listeningAudioCtx = new AudioContext();
+    const source = listeningAudioCtx.createMediaStreamSource( stream );
+    listeningAnalyser = listeningAudioCtx.createAnalyser();
+    listeningAnalyser.fftSize = 256;
+    source.connect( listeningAnalyser );
+
+    const dataArray = new Uint8Array( listeningAnalyser.frequencyBinCount );
+    const updateLevel = () => {
+      if ( !listeningAnalyser || !isListening.value ) return;
+      listeningAnalyser.getByteFrequencyData( dataArray );
+      const avg = dataArray.reduce( ( a, b ) => a + b, 0 ) / dataArray.length;
+      audioLevel.value = Math.min( 100, avg * 1.5 );
+      audioLevelInterval = requestAnimationFrame( updateLevel );
+    };
+    updateLevel();
+
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder( stream, { mimeType: 'audio/webm' } );
+
+    mediaRecorder.ondataavailable = ( e ) => {
+      if ( e.data.size > 0 ) recordedChunks.push( e.data );
+    };
+
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach( t => t.stop() );
+      if ( listeningAudioCtx ) {
+        listeningAudioCtx.close();
+        listeningAudioCtx = null;
+      }
+
+      if ( recordedChunks.length > 0 ) {
+        const blob = new Blob( recordedChunks, { type: 'audio/webm' } );
+        const file = new File( [blob], `recording-${Date.now()}.webm`, { type: 'audio/webm' } );
+
+        isAnalyzing.value = true;
+        try {
+          result.value = await TrackAnalyzer.analyze( file );
+        } catch ( err: any ) {
+          error.value = "Analysis failed: " + err.message;
+        } finally {
+          isAnalyzing.value = false;
+        }
+      }
+    };
+
+    mediaRecorder.start();
+    isListening.value = true;
+    listeningDuration.value = 0;
+    audioLevel.value = 0;
+
+    listeningInterval = window.setInterval( () => {
+      listeningDuration.value++;
+    }, 1000 );
+
+  } catch ( err: any ) {
+    error.value = "Microphone access denied: " + err.message;
+  }
+};
+
+const stopListening = () => {
+  if ( mediaRecorder && mediaRecorder.state !== 'inactive' ) {
+    mediaRecorder.stop();
+  }
+  isListening.value = false;
+  audioLevel.value = 0;
+  if ( listeningInterval ) {
+    clearInterval( listeningInterval );
+    listeningInterval = null;
+  }
+  if ( audioLevelInterval ) {
+    cancelAnimationFrame( audioLevelInterval );
+    audioLevelInterval = null;
+  }
+};
+
 const SPECIMENS = [
-  { name: "EDM Analysis", type: "Quantized Pulse", url: "https://raw.githubusercontent.com/mdn/webaudio-examples/master/audio-analyser/viper.mp3" },
-  { name: "Ambient Track", type: "Wide Dynamics", url: "https://raw.githubusercontent.com/mdn/webaudio-examples/master/spatial-panning-api/outfoxing.mp3" },
-  { name: "Viper (Alt)", type: "Dense Mix", url: "https://raw.githubusercontent.com/mdn/webaudio-examples/main/audio-analyser/viper.mp3" },
-  { name: "Stereo Test", type: "Spatial Profile", url: "https://raw.githubusercontent.com/mdn/webaudio-examples/main/stereo-panner-node/viper.mp3" },
-  { name: "Multi-track", type: "Layered Stems", url: "https://raw.githubusercontent.com/mdn/webaudio-examples/main/audio-basics/outfoxing.mp3" }
+  { name: "Viper (EDM)", type: "Quantized Pulse", url: "https://raw.githubusercontent.com/mdn/webaudio-examples/main/audio-analyser/viper.mp3" },
+  { name: "Outfoxing", type: "Orchestral", url: "https://raw.githubusercontent.com/mdn/webaudio-examples/main/audio-basics/outfoxing.mp3" }
 ];
 
 const loadSpecimen = ( url: string ) => {
@@ -185,6 +274,114 @@ const formatDuration = ( seconds: number ) => {
   const secs = Math.floor( seconds % 60 );
   return `${mins}:${secs.toString().padStart( 2, '0' )}`;
 };
+
+// Camelot Wheel Mapping
+const CAMELOT_MAP: Record<string, string> = {
+  'C major': '8B', 'A minor': '8A',
+  'G major': '9B', 'E minor': '9A',
+  'D major': '10B', 'B minor': '10A',
+  'A major': '11B', 'F# minor': '11A',
+  'E major': '12B', 'C# minor': '12A',
+  'B major': '1B', 'G# minor': '1A',
+  'F# major': '2B', 'D# minor': '2A',
+  'Db major': '3B', 'Bb minor': '3A',
+  'Ab major': '4B', 'F minor': '4A',
+  'Eb major': '5B', 'C minor': '5A',
+  'Bb major': '6B', 'G minor': '6A',
+  'F major': '7B', 'D minor': '7A',
+};
+
+const getCamelotCode = ( key: string ): string => {
+  return CAMELOT_MAP[key] || '?';
+};
+
+const getCompatibleKeys = ( key: string ): string[] => {
+  const camelot = CAMELOT_MAP[key];
+  if ( !camelot ) return [];
+
+  const num = parseInt( camelot.slice( 0, -1 ) );
+  const letter = camelot.slice( -1 );
+
+  const compatible: string[] = [];
+  // Same position (different mode)
+  const samePos = `${num}${letter === 'A' ? 'B' : 'A'}`;
+  // +1 and -1 on wheel
+  const plus1 = `${num === 12 ? 1 : num + 1}${letter}`;
+  const minus1 = `${num === 1 ? 12 : num - 1}${letter}`;
+
+  // Find key names for these Camelot codes
+  for ( const [keyName, code] of Object.entries( CAMELOT_MAP ) ) {
+    if ( code === samePos || code === plus1 || code === minus1 ) {
+      compatible.push( `${keyName} (${code})` );
+    }
+  }
+  return compatible.slice( 0, 4 );
+};
+
+const getEnergyProfile = ( energyMap: number[] ): { label: string, color: string } => {
+  if ( !energyMap || energyMap.length === 0 ) return { label: 'Unknown', color: 'text-slate-400' };
+
+  const avg = energyMap.reduce( ( a, b ) => a + b, 0 ) / energyMap.length;
+  const max = Math.max( ...energyMap );
+  const start = energyMap.slice( 0, Math.floor( energyMap.length * 0.2 ) );
+  const end = energyMap.slice( Math.floor( energyMap.length * 0.8 ) );
+  const startAvg = start.reduce( ( a, b ) => a + b, 0 ) / start.length;
+  const endAvg = end.reduce( ( a, b ) => a + b, 0 ) / end.length;
+
+  if ( avg > 0.6 && max > 0.9 ) return { label: 'High Energy', color: 'text-rose-400' };
+  if ( avg < 0.3 ) return { label: 'Chill / Ambient', color: 'text-cyan-400' };
+  if ( endAvg > startAvg * 1.5 ) return { label: 'Building', color: 'text-amber-400' };
+  if ( startAvg > endAvg * 1.5 ) return { label: 'Fading', color: 'text-purple-400' };
+  return { label: 'Balanced', color: 'text-emerald-400' };
+};
+
+const generateObservations = (): string[] => {
+  if ( !result.value ) return [];
+  const obs: string[] = [];
+
+  // Tempo observation
+  if ( result.value.bpm < 90 ) obs.push( '• Slow tempo suggests ballad, ambient, or downtempo genre.' );
+  else if ( result.value.bpm > 140 ) obs.push( '• Fast tempo indicates dance, drum & bass, or uptempo pop.' );
+  else obs.push( '• Mid-tempo range is common for pop, hip-hop, and R&B.' );
+
+  // Key observation
+  if ( result.value.key.includes( 'minor' ) ) obs.push( '• Minor key suggests emotional, melancholic, or introspective mood.' );
+  else obs.push( '• Major key indicates uplifting, bright, or celebratory character.' );
+
+  // Section observation
+  if ( result.value.sections.length > 4 ) obs.push( '• Complex arrangement with multiple distinct sections detected.' );
+  else obs.push( '• Simple structure with minimal section changes.' );
+
+  // Energy observation
+  const energy = getEnergyProfile( result.value.energyMap );
+  obs.push( `• Energy profile: ${energy.label} — suitable for ${energy.label === 'High Energy' ? 'peak-time DJ sets' : 'warm-up or cool-down'}. ` );
+
+  return obs;
+};
+
+const exportAnalysis = () => {
+  if ( !result.value ) return;
+
+  const analysis = {
+    fileName: result.value.fileName,
+    bpm: result.value.bpm,
+    key: result.value.key,
+    camelot: getCamelotCode( result.value.key ),
+    compatibleKeys: getCompatibleKeys( result.value.key ),
+    duration: result.value.duration,
+    durationFormatted: formatDuration( result.value.duration ),
+    energyProfile: getEnergyProfile( result.value.energyMap ).label,
+    sections: result.value.sections,
+    observations: generateObservations(),
+    exportedAt: new Date().toISOString()
+  };
+
+  const blob = new Blob( [JSON.stringify( analysis, null, 2 )], { type: 'application/json' } );
+  const link = document.createElement( 'a' );
+  link.download = `tracktracer-${result.value.fileName.replace( /[^a-z0-9]/gi, '_' )}.json`;
+  link.href = URL.createObjectURL( blob );
+  link.click();
+};
 </script>
 
 <template>
@@ -193,7 +390,7 @@ const formatDuration = ( seconds: number ) => {
     <header class="flex justify-between items-end">
       <div>
         <h2 class="text-4xl font-black text-white italic tracking-tighter uppercase">Track<span
-            class="text-blue-500">Tracer</span></h2>
+            class="text-blue-500">Tracer</span> <span class="text-indigo-400 text-lg">Pro</span></h2>
         <p class="text-slate-500 text-xs font-mono uppercase tracking-widest mt-1">Song Deconstruction & Forensic Lab
         </p>
       </div>
@@ -221,26 +418,81 @@ const formatDuration = ( seconds: number ) => {
         v-if=" !result && !isAnalyzing "
         class="lg:col-span-12 space-y-8"
       >
-        <div
-          class="relative group cursor-pointer h-64 rounded-[3rem] bg-white/5 border border-white/5 backdrop-blur-xl border-dashed hover:border-blue-500/50 transition-all flex flex-col items-center justify-center p-12 overflow-hidden"
-          @click="fileInput?.click()"
-        >
-          <input
-            type="file"
-            ref="fileInput"
-            class="hidden"
-            accept="audio/*"
-            @change="analyzeFile"
+        <!-- Input Methods Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <!-- Listen Mode (Rose Theme) -->
+          <div
+            v-if=" !isListening "
+            class="relative group cursor-pointer h-48 rounded-[2.5rem] bg-rose-500/5 border border-rose-500/20 backdrop-blur-xl hover:border-rose-500/50 transition-all flex flex-col items-center justify-center p-8 overflow-hidden"
+            @click="startListening"
           >
+            <div class="flex flex-col items-center">
+              <div class="text-3xl mb-3 group-hover:scale-110 transition-transform">🎤</div>
+              <h3 class="text-lg font-bold text-rose-400 mb-1 uppercase tracking-tight">Listen Mode</h3>
+              <p class="text-slate-500 text-[9px] font-mono uppercase tracking-[0.2em]">Record from Microphone</p>
+            </div>
+          </div>
 
-          <div class="flex flex-col items-center">
-            <div class="text-4xl mb-4 group-hover:scale-110 transition-transform">🧪</div>
-            <h3 class="text-xl font-bold text-white mb-1 uppercase tracking-tight">Drop Sonic Evidence</h3>
-            <p class="text-slate-500 text-[10px] font-mono uppercase tracking-[0.3em]">Click to Browse Files</p>
+          <!-- Listening State with Audio Level Visualizer -->
+          <div
+            v-else
+            class="relative h-48 rounded-[2.5rem] bg-rose-500/10 border border-rose-500/50 backdrop-blur-xl flex flex-col items-center justify-center p-6 overflow-hidden"
+          >
+            <!-- Audio Level Bars (FrequencyFlow-style) -->
+            <div class="flex items-end gap-1 h-12 mb-4">
+              <div
+                v-for=" i in 12 "
+                :key="i"
+                class="w-2 rounded-full transition-all duration-75"
+                :class="audioLevel > ( i * 8 ) ? 'bg-rose-400' : 'bg-rose-500/20'"
+                :style="{ height: Math.max( 8, Math.min( 48, audioLevel * 0.5 + Math.random() * 8 ) ) + 'px' }"
+              ></div>
+            </div>
+
+            <div class="flex items-center gap-4 mb-3">
+              <div class="w-3 h-3 rounded-full bg-rose-500 animate-pulse"></div>
+              <h3 class="text-lg font-bold text-rose-400 uppercase tracking-tight">Listening</h3>
+              <span
+                class="text-white font-mono text-lg font-black">{{ Math.floor( listeningDuration / 60 ) }}:{{ ( listeningDuration % 60 ).toString().padStart( 2, '0' ) }}</span>
+            </div>
+
+            <!-- Level Indicator -->
+            <div class="w-full max-w-[200px] h-2 bg-white/10 rounded-full overflow-hidden mb-4">
+              <div
+                class="h-full bg-gradient-to-r from-rose-500 to-amber-400 transition-all duration-75"
+                :style="{ width: audioLevel + '%' }"
+              ></div>
+            </div>
+
+            <button
+              @click="stopListening"
+              class="px-6 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-black uppercase tracking-widest text-[10px] transition-all active:scale-95"
+            >
+              Stop & Analyze
+            </button>
+          </div>
+
+          <!-- File Upload (Blue Theme) -->
+          <div
+            class="relative group cursor-pointer h-48 rounded-[2.5rem] bg-blue-500/5 border border-blue-500/20 backdrop-blur-xl border-dashed hover:border-blue-500/50 transition-all flex flex-col items-center justify-center p-8 overflow-hidden"
+            @click="fileInput?.click()"
+          >
+            <input
+              type="file"
+              ref="fileInput"
+              class="hidden"
+              accept="audio/*"
+              @change="analyzeFile"
+            >
+            <div class="flex flex-col items-center">
+              <div class="text-3xl mb-3 group-hover:scale-110 transition-transform">📁</div>
+              <h3 class="text-lg font-bold text-blue-400 mb-1 uppercase tracking-tight">Upload File</h3>
+              <p class="text-slate-500 text-[9px] font-mono uppercase tracking-[0.2em]">MP3, WAV, FLAC, etc.</p>
+            </div>
           </div>
         </div>
 
-        <!-- URL & Gallery Section -->
+        <!-- URL & Gallery Section (Cyan Theme) -->
         <div class="flex flex-col md:flex-row gap-6 items-stretch">
           <div :class="[
             'glass-container transition-all duration-500 overflow-hidden flex flex-col',
@@ -365,13 +617,39 @@ const formatDuration = ( seconds: number ) => {
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-[10px] text-slate-500 uppercase tracking-widest">Musical Key</span>
-                <span class="text-lg font-black text-cyan-400 italic">{{ result!.key }}</span>
+                <div class="text-right">
+
+                  <span class="text-lg font-black text-cyan-400 italic">{{ result!.key }}</span>
+
+                  <span class="ml-2 text-sm font-black text-amber-400">{{ getCamelotCode( result!.key ) }}</span>
+                </div>
+              </div>
+              <div class="flex justify-between items-center">
+                <span class="text-[10px] text-slate-500 uppercase tracking-widest">Energy</span>
+                <span
+                  :class="getEnergyProfile( result!.energyMap ).color"
+                  class="text-sm font-black italic"
+                >{{ getEnergyProfile( result!.energyMap ).label }}</span>
+
               </div>
               <div class="flex justify-between items-center">
                 <span class="text-[10px] text-slate-500 uppercase tracking-widest">Runtime</span>
                 <span class="text-base font-mono font-bold text-white">{{ formatDuration( result!.duration ) }}</span>
               </div>
             </div>
+
+            <!-- Compatible Keys (Pro Feature) -->
+            <div class="pt-4 border-t border-white/5">
+              <p class="text-[8px] font-black text-indigo-400 uppercase tracking-[0.3em] mb-3">Harmonic Mix Keys</p>
+              <div class="flex flex-wrap gap-2">
+                <span
+                  v-for=" compatKey in getCompatibleKeys( result!.key ) "
+                  :key="compatKey"
+                  class="text-[9px] px-2 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-indigo-300"
+                >{{ compatKey }}</span>
+              </div>
+            </div>
+
 
             <div class="flex flex-col gap-2">
               <button
@@ -390,6 +668,14 @@ const formatDuration = ( seconds: number ) => {
               >
                 Destroy Findings & Reset
               </button>
+
+              <button
+                @click="exportAnalysis"
+                class="w-full py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-[9px] font-black uppercase tracking-widest text-emerald-400 transition-all flex items-center justify-center gap-2"
+              >
+                <span>💾</span> Export Analysis (JSON)
+              </button>
+
             </div>
           </div>
         </div>
@@ -445,12 +731,15 @@ const formatDuration = ( seconds: number ) => {
           </div>
 
           <div class="p-10 rounded-[2.5rem] bg-white/5 border border-white/5 backdrop-blur-xl">
-            <h4 class="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500 mb-6">Expert Observations</h4>
-            <div class="grid grid-cols-2 gap-8 text-[11px] text-slate-400 leading-relaxed italic">
-              <p>• The rhythmic signature is highly consistent, indicating a potential drum machine or quantized
-                percussion track.</p>
-              <p>• Harmonic distribution suggests a strong tonal center with minimal dissonance in the spectral
-                mid-range.</p>
+            <h4 class="text-[10px] font-black uppercase tracking-[0.3em] text-blue-500 mb-6">Expert Observations <span
+                class="text-indigo-400"
+              >(Pro AI)</span></h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-[11px] text-slate-400 leading-relaxed italic">
+              <p
+                v-for=" ( obs, i ) in generateObservations() "
+                :key="i"
+              >{{ obs }}</p>
+
             </div>
           </div>
         </div>

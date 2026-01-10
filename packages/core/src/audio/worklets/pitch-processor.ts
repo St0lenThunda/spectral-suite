@@ -1,5 +1,6 @@
 
-import { PitchDetector } from 'pitchy';
+// AudioWorkletProcessor for Pitch Detection using McLeod Pitch Method (MPM)
+// Re-implemented to avoid external dependencies and bundling issues.
 
 // Stub types for AudioWorklet scope
 declare class AudioWorkletProcessor {
@@ -7,13 +8,16 @@ declare class AudioWorkletProcessor {
   process(inputs: Float32Array[][], outputs: Float32Array[][], parameters: Record<string, Float32Array>): boolean;
 }
 declare function registerProcessor(name: string, processorCtor: new () => AudioWorkletProcessor): void;
-declare const sampleRate: number; // Global in AudioWorkletScope
+declare const sampleRate: number; 
 
 class PitchProcessor extends AudioWorkletProcessor {
-  private _bufferSize: number = 4096; // 4096 samples typically good for bass ~10Hz resolution
+  private _bufferSize: number = 4096;
   private _buffer: Float32Array;
   private _bufferIndex: number = 0;
-  private _detector: PitchDetector<Float32Array>;
+
+  // MPM Constants
+  private _cutoff: number = 0.93; // 0.93 is standard for MPM
+  private _sampleRate: number;
 
   static get parameterDescriptors() {
     return [];
@@ -22,8 +26,7 @@ class PitchProcessor extends AudioWorkletProcessor {
   constructor() {
     super();
     this._buffer = new Float32Array(this._bufferSize);
-    // Initialize pitchy detector
-    this._detector = PitchDetector.forFloat32Array(this._bufferSize);
+    this._sampleRate = typeof sampleRate !== 'undefined' ? sampleRate : 44100;
   }
 
   process(inputs: Float32Array[][], outputs: Float32Array[][], parameters: Record<string, Float32Array>) {
@@ -33,54 +36,12 @@ class PitchProcessor extends AudioWorkletProcessor {
     const channelData = input[0];
     const length = channelData.length;
 
-    // Circular buffer fill? 
-    // Ideally we want overlapping windows or just contiguous chunks.
-    // For simplicity/perf, let's just fill the buffer, process, then reset (contiguous).
-    // Or simpler: Sliding window? Sliding window is expensive to copy.
-    // Let's use: Fill buffer, Process, Shift half? (Overlap 50%).
-    // For now: Contiguous chunks to ensure 1:1 speed.
-    
-    // Actually, filling buffer contiguous results in updates every (4096 / 44100) = ~92ms. 
-    // That's ~10fps. A bit slow for UI.
-    // We want 60fps? ~735 samples per frame.
-    // We should maintain a rolling buffer.
-
-    // Rolling Buffer Implementation:
-    // 1. Shift existing data back by 'length'.
-    // 2. Append new data at end.
-    // 3. Process every X frames (to save CPU) or every frame?
-    // Processing 4096-sample FFT every 128 samples is VERY HEAVY.
-    // Let's target ~30fps - 60fps updates.
-    // 128 samples @ 44.1k = 2.9ms.
-    // Update every ~16ms (approx 5-6 blocks).
-
-    // Optimization: Write to ring buffer position.
-    
-    // Copy new data into buffer
-    // To implement a simple sliding window without massive copying:
-    // We can just keep a pointer? But Pitchy expects a contiguous Float32Array.
-    // So distinct copy is needed.
-    
-    // Let's do a shift-and-append approach but only process every N blocks.
-    
-    // Optimization: Just copy the new 128 samples into a 'staging' buffer.
-    // When enough staged, shift the main buffer?
-    
-    // Simple approach:
-    // this._buffer.copyWithin(0, length); // Shift left by length (expensive for 4096?)
-    // Actually `copyWithin` is fast.
-    
-    // But verify: copyWithin(target, start, end).
-    // We want to move (length...end) to (0...end-length).
-    // this._buffer.copyWithin(0, length);
-    // Then set (buffer.length - length) with new data.
-    
+    // Sliding window buffer
     this._buffer.copyWithin(0, length);
     this._buffer.set(channelData, this._bufferSize - length);
-    
-    this._bufferIndex += length; // Count samples processed since last emit
+    this._bufferIndex += length;
 
-    // Decimation/Throttling: Process update every ~1024 samples (approx 23ms / 43fps)
+    // Process every ~1024 samples (approx 23ms) to balance CPU load vs responsiveness
     if (this._bufferIndex >= 1024) {
         this.analyze();
         this._bufferIndex = 0;
@@ -90,13 +51,28 @@ class PitchProcessor extends AudioWorkletProcessor {
   }
 
   analyze() {
-    // Current sampleRate is available globally in AudioWorkletScope
-    const [pitch, clarity] = this._detector.findPitch(this._buffer, sampleRate);
+    const buffer = this._buffer;
+    const nsdf = this.normalizedSquareDifference( buffer );
+    const maxPositions = this.peakPicking( nsdf );
     
-    // RMS Calculation (Volume)
+    let pitch: number | null = null;
+    let clarity: number = 0;
+
+    if ( maxPositions.length > 0 ) {
+      // Pick the highest quality peak
+      const bestPeakIndex = maxPositions[0]!; // MPM usually picks the first major peak
+
+      // Parabolic interpolation for better precision
+      const refinedLag = this.parabolicInterpolation( nsdf, bestPeakIndex );
+
+      pitch = this._sampleRate / refinedLag;
+      clarity = nsdf[bestPeakIndex]!;
+    }
+
+    // Volume (RMS)
     let sumSquares = 0;
     for (let i = 0; i < this._bufferSize; i++) {
-        sumSquares += this._buffer[i]! * this._buffer[i]!;
+      sumSquares += buffer[i]! * buffer[i]!;
     }
     const volume = Math.sqrt(sumSquares / this._bufferSize);
 
@@ -105,6 +81,111 @@ class PitchProcessor extends AudioWorkletProcessor {
         clarity,
         volume
     });
+  }
+
+  // --- McLeod Pitch Method Implementation ---
+
+  private normalizedSquareDifference ( audioBuffer: Float32Array ): Float32Array {
+    const len = audioBuffer.length;
+    const nsdf = new Float32Array( len );
+
+    // We search for lags up to half the buffer size (detect down to ~10Hz with 4096 buffer)
+    // Optimization: No need to calculate full lag if we only care about reasonable pitch range.
+    // But for completeness, we do standard MPM window.
+
+    // Calculate 'm' terms (sum of squares)
+    // This is a simplified, non-FFT implementation. 
+    // For 4096 samples, O(N^2) might be slow in JS (16M ops).
+    // However, typical MPM implementations use FFT for correlation.
+    // Since this is AudioWorklet, verified O(N^2) on 4096 might be too heavy for 128-sample blocks?
+    // No, we run it every 1024 samples. But still heavy.
+    // Let's implement the O(N) optimizations or keep lag window small.
+
+    // Optimization: Only compute lags relevant for pitch (e.g., 20Hz+).
+    // Max lag for 20Hz @ 44.1k = 2205 samples.
+    const maxLag = Math.floor( len / 2 );
+
+    for ( let tau = 0; tau < maxLag; tau++ ) {
+      let acf = 0;
+      let divisorM = 0;
+
+      // Autocorrelation at lag tau
+      for ( let i = 0; i < len - tau; i++ ) {
+        acf += audioBuffer[i]! * audioBuffer[i + tau]!;
+        divisorM += audioBuffer[i]! * audioBuffer[i]! + audioBuffer[i + tau]! * audioBuffer[i + tau]!;
+      }
+
+      nsdf[tau] = 2 * acf / divisorM;
+    }
+
+    return nsdf;
+  }
+
+  private peakPicking ( nsdf: Float32Array ): number[] {
+    const maxPositions: number[] = [];
+    let pos = 0;
+    let curMaxPos = 0;
+    const len = nsdf.length;
+
+    // 1. Find all peaks > 0
+    // 2. Filter by threshold
+
+    // Iterate to find peaks
+    while ( pos < len - 1 && nsdf[pos]! > 0 ) {
+      pos++; // Skip initial positive slope
+    }
+
+    while ( pos < len - 1 && nsdf[pos]! <= 0 ) {
+      pos++; // Skip negative section
+    }
+
+    if ( pos === 0 ) pos = 1;
+
+    while ( pos < len - 1 ) {
+      // Identify peak: slope changes from positive to negative
+      if ( nsdf[pos]! > nsdf[pos - 1]! && nsdf[pos]! >= nsdf[pos + 1]! ) {
+        if ( curMaxPos === 0 ) {
+          curMaxPos = pos;
+        } else if ( nsdf[pos]! > nsdf[curMaxPos]! ) {
+          curMaxPos = pos;
+        }
+      }
+
+      pos++;
+
+      // Once we cross zero (or dip significantly), we found a 'lobe'
+      if ( pos < len - 1 && nsdf[pos]! <= 0 ) {
+        // Finish this lobe
+        if ( curMaxPos > 0 && nsdf[curMaxPos]! >= this._cutoff ) {
+          maxPositions.push( curMaxPos );
+        }
+        curMaxPos = 0;
+      }
+    }
+
+    // If we found NO peaks above high cutoff, try lower
+    // (Simplified: just stick to high cutoff for now to avoid false positives)
+
+    // Note: MPM logic usually requires finding the *first* peak that is within a factor k of the overall max.
+    // Here we just take all peaks > cutoff.
+
+    return maxPositions;
+  }
+
+  private parabolicInterpolation ( nsdf: Float32Array, peakIndex: number ): number {
+    const x1 = peakIndex - 1;
+    const x2 = peakIndex;
+    const x3 = peakIndex + 1;
+
+    const y1 = nsdf[x1]!;
+    const y2 = nsdf[x2]!;
+    const y3 = nsdf[x3]!;
+
+    const denominator = 2 * ( 2 * y2 - y1 - y3 );
+    if ( denominator === 0 ) return peakIndex;
+
+    const delta = ( y1 - y3 ) / denominator;
+    return peakIndex + delta;
   }
 }
 

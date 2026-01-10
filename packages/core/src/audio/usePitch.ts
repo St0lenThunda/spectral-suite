@@ -1,6 +1,6 @@
 import { ref, onMounted, onUnmounted } from 'vue';
 import { Note, Interval } from 'tonal';
-import { PitchDetector } from 'pitchy';
+import { NativePitch } from './NativePitch';
 import { useAudioEngine } from './useAudioEngine';
 import processorUrl from './worklets/pitch-processor.ts?worker&url';
 
@@ -16,13 +16,13 @@ export function usePitch () {
   const pitchHistory = ref<Array<{ time: number, cents: number }>>( [] );
   const isCanceled = ref( false );
 
-  // Refs existing...
+  // AudioWorklet URL
   
   let workletNode: AudioWorkletNode | null = null;
   const HISTORY_MS = 5000;
 
   // Legacy main-thread detector for fallback
-  let legacyDetector: PitchDetector<Float32Array> | null = null;
+  let legacyDetector: NativePitch | null = null;
   let legacyBuffer: Float32Array | null = null;
 
   const initWorklet = async () => {
@@ -82,7 +82,7 @@ export function usePitch () {
         }
 
     } catch ( e ) {
-      console.warn( 'AudioWorklet failed to load, falling back to Main Thread:', e );
+      console.warn( 'AudioWorklet failed to load, falling back to Native Main Thread:', e );
       startLegacyLoop();
     }
   };
@@ -99,11 +99,12 @@ export function usePitch () {
       }
 
       if ( !legacyDetector ) {
-        legacyDetector = PitchDetector.forFloat32Array( analyser.fftSize );
+        legacyDetector = new NativePitch( analyser.fftSize, context.sampleRate );
         legacyBuffer = new Float32Array( analyser.fftSize );
       }
 
       analyser.getFloatTimeDomainData( legacyBuffer! );
+      // Cast to any to avoid generic mismatch if Float32Array types differ in env
       const [p, c] = legacyDetector.findPitch( legacyBuffer as any, context.sampleRate );
 
       // Volume calculation
@@ -119,7 +120,7 @@ export function usePitch () {
     loop();
   };
 
-  const updateState = ( p: number, c: number, v: number ) => {
+  const updateState = ( p: number | null, c: number, v: number ) => {
     pitch.value = p;
     clarity.value = c;
     volume.value = v;

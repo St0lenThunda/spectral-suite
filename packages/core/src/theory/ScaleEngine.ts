@@ -5,9 +5,30 @@ export interface ScaleMatch {
   notes: string[];
   type: string;
   score: number; // Percentage of played notes that fit this scale
-  intervals: string[]; // Degrees e.g. ["1", "2", "b3"]
+  intervals: string[]; // Degrees e.g. ["1P", "2M", "3M"]
+  romanIntervals?: string[]; // e.g. ["I", "II", "III"]
   parentScale?: string; // e.g. "C Major" if this is D Dorian
 }
+
+const INTERVAL_TO_ROMAN: Record<string, string> = {
+  '1P': 'I',
+  '2m': 'bII',
+  '2M': 'II',
+  '2A': '#II',
+  '3m': 'bIII',
+  '3M': 'III',
+  '4P': 'IV',
+  '4A': '#IV',
+  '5d': 'bV',
+  '5P': 'V',
+  '5A': '#V',
+  '6m': 'bVI',
+  '6M': 'VI',
+  '6A': '#VI',
+  '7m': 'bVII',
+  '7M': 'VII',
+  '7d': 'bbVII'
+};
 
 export class ScaleEngine {
   /**
@@ -65,6 +86,7 @@ export class ScaleEngine {
             type: st.name,
             score,
             intervals: scale.intervals,
+            romanIntervals: scale.intervals.map( i => INTERVAL_TO_ROMAN[i] || i )
           } );
         }
       }

@@ -1,14 +1,19 @@
 <script setup lang="ts">
+import { computed } from 'vue';
+import { Note } from 'tonal';
 interface Props {
   activeNotes?: string[];
   highlightNotes?: string[];
   numFrets?: number;
+  labels?: Record<string, string>;
+  fretRange?: [number, number];
 }
 
 const props = withDefaults( defineProps<Props>(), {
   activeNotes: () => [],
   highlightNotes: () => [],
-  numFrets: 12
+  numFrets: 24,
+  labels: () => ( {} )
 } );
 
 // High E to Low E (top to bottom visually)
@@ -16,59 +21,70 @@ const strings = ['E', 'B', 'G', 'D', 'A', 'E'];
 const noteOrder = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
 
 // Fret markers (traditional positions)
-const fretMarkers = [3, 5, 7, 9, 12];
-const doubleDotFrets = [12];
+const fretMarkers = [3, 5, 7, 9, 12, 15, 17, 19, 21, 23, 24];
+const doubleDotFrets = [12, 24];
 
+const activeChromas = computed( () => new Set( props.activeNotes.map( n => Note.chroma( n ) ) ) );
+const highlightChromas = computed( () => new Set( props.highlightNotes.map( n => Note.chroma( n ) ) ) );
+
+const isNoteActive = ( note: string ) => activeChromas.value.has( Note.chroma( note ) );
+const isNoteHighlighted = ( note: string ) => highlightChromas.value.has( Note.chroma( note ) );
+
+const isOpenActive = ( stringRoot: string ) => isNoteActive( getNoteAt( stringRoot, 0 ) );
+const isOpenHighlighted = ( stringRoot: string ) => isNoteHighlighted( getNoteAt( stringRoot, 0 ) );
+
+const getLabel = ( note: string ) => {
+  const chroma = Note.chroma( note );
+  const labelKey = Object.keys( props.labels ).find( k => Note.chroma( k ) === chroma );
+  return ( labelKey && props.labels[labelKey] ) ? props.labels[labelKey] : note;
+};
 const getNoteAt = ( stringRoot: string, fret: number ): string => {
   const rootIndex = noteOrder.indexOf( stringRoot );
   if ( rootIndex === -1 ) return '';
   return noteOrder[( rootIndex + fret ) % 12]!;
 };
 
-const isNoteActive = ( note: string ) => props.activeNotes.includes( note );
-const isNoteHighlighted = ( note: string ) => props.highlightNotes.includes( note );
+const isInsideRange = ( fret: number ) => {
+  if ( !props.fretRange ) return true;
+  const [min, max] = props.fretRange;
+  return fret >= min && fret <= max;
+};
 </script>
 
 <template>
-  <div class="bg-slate-900 p-8 rounded-2xl border border-slate-700 overflow-x-auto">
-    <!-- Fret numbers row -->
-    <div class="flex mb-3 ml-2">
-      <div
-        class="text-center text-sm text-slate-300 font-mono font-bold"
-        style="width: 64px;"
-      ></div>
-      <div
-        v-for=" fret in numFrets "
-        :key="'fret-num-' + fret"
-        class="text-center text-sm font-mono font-bold"
-        :class="[3, 5, 9, 12].includes( fret ) ? 'text-slate-400' : 'text-transparent'"
-        style="width: 54px;"
-      >
-        {{ fret }}
-      </div>
-    </div>
-
-    <!-- Fretboard -->
+  <div class="bg-slate-900 p-12 rounded-2xl border border-slate-700 overflow-x-auto overflow-y-hidden">
+    <!-- Fretboard Container -->
     <div
       class="relative inline-block bg-slate-800 rounded-lg p-4 border-2 border-slate-700"
-      :style="{ width: ( numFrets * 54 + 80 ) + 'px', minHeight: '300px' }"
+      :style="{ width: ( numFrets * 54 + 40 ) + 'px', minHeight: '340px' }"
     >
+      <!-- Fret numbers row - NOW INSIDE THE BOARD -->
+      <div class="flex mb-4 relative z-40">
+        <div
+          v-for=" fret in numFrets "
+          :key="'fret-num-' + fret"
+          class="text-center text-[10px] font-mono font-black"
+          :class="fretMarkers.includes( fret ) ? 'text-sky-400' : 'text-slate-600'"
+          style="width: 54px;"
+        >
+          {{ fret }}
+        </div>
+      </div>
 
-      <!-- Nut (left edge) - VERY VISIBLE -->
+      <!-- Nut (left edge) - Aligned to padding -->
       <div
-        class="absolute top-4 bottom-4 bg-slate-100 rounded-sm z-30"
-        style="left: 8px; width: 4px; box-shadow: 0 0 10px rgba(255,255,255,0.5);"
+        class="absolute top-16 bottom-4 bg-slate-100 rounded-sm z-30"
+        style="left: 16px; width: 4px; box-shadow: 0 0 10px rgba(255,255,255,0.5);"
       ></div>
 
-      <!-- Fret wires (vertical) - VERY VISIBLE -->
+      <!-- Fret wires (vertical) -->
       <div
         v-for=" fret in numFrets "
         :key="'fret-wire-' + fret"
-        class="absolute top-4 bottom-4 bg-slate-300 z-20"
+        class="absolute top-16 bottom-4 bg-slate-300/40 z-20"
         :style="{
           left: ( 16 + fret * 54 ) + 'px',
-          width: '3px',
-          boxShadow: '0 0 5px rgba(255,255,255,0.3)'
+  width: '2px'
         }"
       ></div>
 
@@ -77,8 +93,8 @@ const isNoteHighlighted = ( note: string ) => props.highlightNotes.includes( not
         <div
           v-for=" fret in numFrets "
           :key="'marker-' + fret"
-          class="absolute flex items-center justify-center"
-          :style="{ left: ( -24 + fret * 54 ) + 'px', width: '54px' }"
+          class="absolute flex items-center justify-center h-full"
+          :style="{ left: ( 16 + ( fret - 1 ) * 54 ) + 'px', width: '54px' }"
         >
           <!-- Single dot -->
           <div v-if=" fretMarkers.includes( fret ) && !doubleDotFrets.includes( fret ) ">
@@ -95,19 +111,26 @@ const isNoteHighlighted = ( note: string ) => props.highlightNotes.includes( not
         </div>
       </div>
 
-      <!-- Strings (horizontal) - VERY VISIBLE -->
-      <div class="relative space-y-8 py-6">
+      <!-- Strings (horizontal) -->
+      <div class="relative space-y-8 pb-6 pt-4">
         <div
           v-for=" ( stringRoot, sIdx ) in strings "
           :key="'string-' + sIdx"
           class="relative flex items-center h-6"
         >
-          <!-- String label - IN ITS OWN COLUMN ALIGNED WITH NUT -->
+          <!-- String label - Now with 'Pro Selected' state -->
           <div
-            class="absolute text-base font-mono font-bold text-slate-200"
-            style="left: -56px; width: 48px; text-align: center;"
+            class="absolute text-sm font-mono font-black transition-all duration-300 px-2 py-1 rounded-md z-30 flex items-center justify-center"
+            :class="[
+              isOpenActive( stringRoot )
+                ? 'bg-sky-500 text-white shadow-[0_0_20px_rgba(56,189,248,0.8)] ring-2 ring-sky-300 scale-110'
+                : isOpenHighlighted( stringRoot )
+                  ? 'bg-emerald-600/40 text-emerald-100 border border-emerald-400/50 scale-105 backdrop-blur-sm'
+                  : 'bg-slate-900/40 text-slate-500 border border-slate-700/50'
+            ]"
+            style="left: -58px; min-width: 44px; transform-origin: center;"
           >
-            {{ stringRoot }}
+            {{ getLabel( getNoteAt( stringRoot, 0 ) ) }}
           </div>
 
           <!-- String line (horizontal) - SOLID, THICK, HIGH CONTRAST -->
@@ -125,25 +148,7 @@ const isNoteHighlighted = ( note: string ) => props.highlightNotes.includes( not
 
           <!-- Note positions along this string -->
           <div class="relative flex w-full z-20">
-            <!-- Open note position (at nut) -->
-            <div class="w-16 flex items-center justify-center">
-              <div
-                class="rounded-full flex items-center justify-center text-xs font-black transition-all duration-200 cursor-pointer"
-                :class="[
-                  isNoteActive( getNoteAt( stringRoot, 0 ) )
-                    ? 'w-8 h-8 bg-sky-500 text-white shadow-[0_0_20px_rgba(56,189,248,1)] border-2 border-sky-200'
-                    : isNoteHighlighted( getNoteAt( stringRoot, 0 ) )
-                      ? 'w-7 h-7 bg-emerald-600 text-white border-2 border-emerald-400 hover:scale-110'
-                      : 'w-5 h-5 opacity-0 hover:opacity-50 hover:bg-slate-500'
-                ]"
-              >
-                <span
-                  v-if=" isNoteActive( getNoteAt( stringRoot, 0 ) ) || isNoteHighlighted( getNoteAt( stringRoot, 0 ) ) "
-                >
-                  {{ getNoteAt( stringRoot, 0 ) }}
-                </span>
-              </div>
-            </div>
+            <!-- Fretted positions (Fret 0 shifted to the label) -->
 
             <!-- Fretted positions -->
             <div
@@ -155,17 +160,17 @@ const isNoteHighlighted = ( note: string ) => props.highlightNotes.includes( not
               <div
                 class="rounded-full flex items-center justify-center text-xs font-black transition-all duration-200 cursor-pointer"
                 :class="[
-                  isNoteActive( getNoteAt( stringRoot, fret ) )
+  isNoteActive( getNoteAt( stringRoot, fret ) ) && isInsideRange( fret )
                     ? 'w-8 h-8 bg-sky-500 text-white shadow-[0_0_20px_rgba(56,189,248,1)] border-2 border-sky-200'
-                    : isNoteHighlighted( getNoteAt( stringRoot, fret ) )
+    : isNoteHighlighted( getNoteAt( stringRoot, fret ) ) && isInsideRange( fret )
                       ? 'w-7 h-7 bg-emerald-600 text-white border-2 border-emerald-400 hover:scale-110'
                       : 'w-5 h-5 opacity-0 hover:opacity-50 hover:bg-slate-500'
                 ]"
               >
                 <span
-                  v-if=" isNoteActive( getNoteAt( stringRoot, fret ) ) || isNoteHighlighted( getNoteAt( stringRoot, fret ) ) "
+                  v-if=" ( isNoteActive( getNoteAt( stringRoot, fret ) ) || isNoteHighlighted( getNoteAt( stringRoot, fret ) ) ) && isInsideRange( fret ) "
                 >
-                  {{ getNoteAt( stringRoot, fret ) }}
+                  {{ getLabel( getNoteAt( stringRoot, fret ) ) }}
                 </span>
               </div>
             </div>

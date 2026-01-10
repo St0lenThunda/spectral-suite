@@ -290,7 +290,7 @@ const start = () => {
                 <Fretboard 
                   :active-notes="chord.notes"
                   :highlight-notes="chord.notes"
-                  :num-frets="12"
+                  :num-frets="24"
                 />
 
                 <!-- Harmonic Suggestions -->

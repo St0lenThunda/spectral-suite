@@ -325,9 +325,10 @@ const handleGainChange = ( event: Event ) => {
     >
       <div
         v-if=" activeLesson "
-        class="fixed top-16 bottom-16 left-0 z-[60] w-full max-w-md shadow-2xl border-r border-white/10 bg-slate-900"
+        class="fixed inset-0 pointer-events-none z-[60]"
       >
         <LessonRunner
+          class="pointer-events-auto"
           :lesson="activeLesson"
           @complete="activeLesson = null; currentModule = 'academy'"
           @tool-change="( toolId ) => currentModule = toolId"

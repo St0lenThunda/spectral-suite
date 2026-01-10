@@ -2,6 +2,8 @@
 import { ref, computed, watch } from 'vue';
 import { type Lesson } from './lessons';
 import { usePitch, useChordCapture, useRhythmStore, useScaleSleuth, Note, Chord } from '@spectralsuite/core';
+import { TOOL_METADATA } from '../../data/toolMetadata';
+import MorphContainer from '../../components/MorphContainer.vue';
 
 const props = defineProps<{ lesson: Lesson; }>();
 
@@ -9,11 +11,12 @@ const emit = defineEmits<{ ( e: 'complete' ): void; ( e: 'tool-change', tool: st
 
 const currentStepIndex = ref( 0 );
 const currentStep = computed( () => props.lesson.steps[currentStepIndex.value] );
+const isMorphed = ref( false );
 
 // Intelligence Hooks
 const { currentNote, cents } = usePitch();
 const { detectedChords, capturedNotes } = useChordCapture();
-const { potentialScales, detectedNotes: scaleNotes, clearNotes: clearScale } = useScaleSleuth();
+const { potentialScales, clearNotes: clearScale } = useScaleSleuth();
 
 const rhythmStore = useRhythmStore();
 const { stats: rhythmStats } = rhythmStore;
@@ -21,20 +24,22 @@ const { resetStats: resetRhythm } = rhythmStore;
 
 const isStepComplete = ref( false );
 
+const currentToolInfo = computed( () => {
+  if ( !currentStep.value ) return null;
+  return TOOL_METADATA[currentStep.value.targetTool];
+} );
+
 watch( [currentNote, cents, detectedChords, () => rhythmStats.perfect], ( [newNote] ) => {
   if ( isStepComplete.value ) return;
   if ( !currentStep.value ) return;
   const criteria = currentStep.value.validationCriteria;
 
   if ( !criteria ) {
-    // No validation needed for this step, just reading
     isStepComplete.value = true;
     return;
   }
 
   if ( criteria.type === 'pitch' ) {
-    // If the tuner says it's the right note (ignoring octave), that's good enough!
-    // e.g. 'A2' matches target 'A'
     if ( newNote && typeof newNote === 'string' ) {
       const noteName = newNote.replace( /[0-9]/g, '' );
       if ( noteName === criteria.target ) {
@@ -44,7 +49,6 @@ watch( [currentNote, cents, detectedChords, () => rhythmStats.perfect], ( [newNo
   }
 
   if ( criteria.type === 'chord' ) {
-    // Strategy 1: exact symbol match (already handled slash chords)
     const match = detectedChords.value.some( ch => {
       const baseSymbol = ch.symbol.split( '/' )[0];
       return baseSymbol === criteria.target || ch.name === criteria.target;
@@ -55,21 +59,16 @@ watch( [currentNote, cents, detectedChords, () => rhythmStats.perfect], ( [newNo
       return;
     }
 
-    // Strategy 2: Constituent Note Check (Robust for guitar/noise)
-    // If target is "C", we need [C, E, G] in the buffer. Extras allowed.
     if ( typeof criteria.target === 'string' ) {
       try {
         const targetChord = Chord.get( criteria.target );
-        const requiredNotes = targetChord.notes.map( n => Note.get( n ).pc ); // ['C', 'E', 'G']
-
-        // Check if ALL required notes are in the captured buffer
+        const requiredNotes = targetChord.notes.map( n => Note.get( n ).pc );
         const hasAllNotes = requiredNotes.every( req => capturedNotes.value.includes( req ) );
-
         if ( hasAllNotes && requiredNotes.length > 0 ) {
           isStepComplete.value = true;
         }
       } catch ( e ) {
-        // invalid chord target, ignore
+        // invalid chord target
       }
     }
   }
@@ -89,20 +88,11 @@ watch( [currentNote, cents, detectedChords, () => rhythmStats.perfect], ( [newNo
 
 watch( currentStep, ( newStep ) => {
   if ( !newStep ) return;
-
-  if ( newStep.validationCriteria?.type === 'rhythm' ) {
-    resetRhythm();
-  }
-
-  if ( newStep.validationCriteria?.type === 'scale' ) {
-    clearScale();
-  }
-
-  isStepComplete.value = !newStep.validationCriteria; // Auto-complete if no validation
+  if ( newStep.validationCriteria?.type === 'rhythm' ) resetRhythm();
+  if ( newStep.validationCriteria?.type === 'scale' ) clearScale();
+  isStepComplete.value = !newStep.validationCriteria;
   emit( 'tool-change', newStep.targetTool );
 }, { immediate: true } );
-
-
 
 function nextStep () {
   if ( currentStepIndex.value < props.lesson.steps.length - 1 ) {
@@ -113,32 +103,65 @@ function nextStep () {
 </script>
 
 <template>
-  <div class="h-full flex flex-col bg-slate-900 border-r border-slate-700 w-full max-w-md shadow-2xl z-10">
-    <!-- Header -->
-    <div class="p-6 border-b border-slate-800 bg-slate-800/50">
-      <div class="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-2">Spectral Academy</div>
-      <h2 class="text-2xl font-black text-white font-outfit">{{ lesson.title }}</h2>
-      <div class="flex gap-1 mt-4">
-        <div
-          v-for=" ( step, i ) in lesson.steps "
-          :key="step.id"
-          class="h-1 flex-1 rounded-full transition-all duration-300"
-          :class="i <= currentStepIndex ? 'bg-emerald-500' : 'bg-slate-700'"
-        ></div>
+  <MorphContainer v-model:isMorphed="isMorphed">
+    <!-- FAB Morph -->
+    <template #collapsed>
+      <div class="relative">
+        <span class="text-2xl transform group-hover/runner:scale-125 transition-transform duration-300">🎓</span>
+        <div class="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full animate-pulse border-2 border-emerald-600">
+        </div>
       </div>
-    </div>
+    </template>
+
+    <!-- Header -->
+    <template #header>
+      <div
+        class="p-3 border-b border-white/5 bg-white/5 hover:bg-white/10 transition-colors relative group/header"
+        title="Minimize Lesson"
+      >
+        <div class="flex items-center justify-between pointer-events-none">
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-1">
+              <div class="text-[9px] font-black text-emerald-400 uppercase tracking-[0.3em] opacity-80">Spectral Academy
+              </div>
+              <span
+                class="text-[8px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-black uppercase tracking-widest border border-emerald-500/20"
+              >
+                {{ currentToolInfo?.name || 'Lab' }}
+              </span>
+            </div>
+            <h2 class="text-lg font-black text-white font-outfit leading-none">{{ lesson.title }}</h2>
+          </div>
+
+          <div class="flex items-center gap-3 pointer-events-auto">
+            <div
+              class="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-slate-500 group-hover/header:bg-white/10 group-hover/header:text-white transition-all transform hover:scale-110"
+            >
+              <span class="text-[10px]">−</span>
+            </div>
+          </div>
+        </div>
+        <div class="flex gap-1 mt-3">
+          <div
+            v-for=" ( step, i ) in lesson.steps "
+            :key="step.id"
+            class="h-1 flex-1 rounded-full transition-all duration-500"
+            :class="[i < currentStepIndex ? 'bg-emerald-500' : i === currentStepIndex ? 'bg-emerald-400 animate-pulse' : 'bg-white/10']"
+          ></div>
+        </div>
+      </div>
+    </template>
 
     <!-- Content -->
     <div
       v-if=" currentStep "
-      class="flex-1 p-8 overflow-y-auto"
+      class="h-full p-8 overflow-y-auto custom-scrollbar"
     >
       <h3 class="text-xl font-bold text-white mb-4">{{ currentStep.title }}</h3>
       <div class="prose prose-invert prose-emerald leading-relaxed text-slate-300">
         <p>{{ currentStep.content }}</p>
       </div>
 
-      <!-- Challenge Status -->
       <div
         v-if=" currentStep.validationCriteria "
         class="mt-8 p-4 rounded-xl border-2 transition-all duration-300"
@@ -148,113 +171,120 @@ function nextStep () {
           <div
             class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-lg"
             :class="isStepComplete ? 'bg-emerald-500 text-white' : 'bg-slate-700 text-slate-400'"
-          >
-            {{ isStepComplete ? '✓' : '?' }}
-          </div>
-          <div>
+          >{{ isStepComplete ? '✓' : '?' }}</div>
+          <div class="flex-1">
             <div class="text-sm font-bold text-white">Challenge</div>
             <div class="text-xs text-slate-400">
-              {{ isStepComplete ? 'Target Acquired!' : `Find note: ${currentStep.validationCriteria.target}` }}
+              {{ isStepComplete ? 'Target Acquired!' : `Find: ${currentStep.validationCriteria.target}` }}
             </div>
-            <!-- Live Feedback -->
+
             <div
               v-if=" !isStepComplete "
-              class="mt-2 text-[10px] font-mono p-1 bg-black/30 rounded text-slate-400"
+              class="mt-3 flex flex-col gap-2"
             >
-              <span v-if=" currentNote ">Live: <span class="text-white">{{ currentNote }}</span>
-                ({{ cents > 0 ? '+' : '' }}{{ Math.round( cents ) }}¢)</span>
-              <span
-                v-else
-                class="opacity-50"
-              >Waiting for input...</span>
-            </div>
+              <!-- Live Pitch Feedback -->
+              <div
+                v-if=" currentStep.validationCriteria.type === 'pitch' || currentStep.validationCriteria.type === 'chord' "
+                class="text-[10px] font-mono p-2 bg-black/30 rounded text-slate-400"
+              >
+                <div
+                  v-if=" currentNote "
+                  class="flex justify-between items-center"
+                >
+                  <span>Live: <span class="text-white">{{ currentNote }}</span></span>
+                  <span class="text-[8px]">{{ cents > 0 ? '+' : '' }}{{ Math.round( cents ) }}¢</span>
+                </div>
+                <span
+                  v-else
+                  class="opacity-50"
+                >Waiting for input...</span>
+              </div>
 
-            <div
-              v-if=" !isStepComplete && currentStep.validationCriteria?.type === 'chord' "
-              class="mt-2 text-[10px] font-mono p-1 bg-black/30 rounded text-slate-400"
-            >
-              <span v-if=" detectedChords.length > 0 ">
-                Chord: <span class="text-emerald-400 font-bold">{{ detectedChords[0]?.symbol }}</span>
-                ({{ detectedChords[0]?.name }})
-              </span>
-              <span
-                v-else
-                class="opacity-50"
-              >Play notes to detect chord...</span>
-            </div>
-
-            <!-- Debug: Captured Notes -->
-            <div
-              v-if=" !isStepComplete && currentStep.validationCriteria?.type === 'chord' "
-              class="mt-2 text-[10px] font-mono text-slate-500"
-            >
-              Notes: {{ capturedNotes.join( ', ' ) || '(none)' }}
-            </div>
-
-            <div
-              v-if=" !isStepComplete && currentStep.validationCriteria?.type === 'scale' "
-              class="mt-2 text-[10px] font-mono p-1 bg-black/30 rounded text-slate-400"
-            >
-              <span v-if=" potentialScales.length > 0 ">
-                Scale: <span class="text-emerald-400 font-bold">{{ potentialScales[0]?.name }}</span>
-              </span>
-              <span
-                v-else
-                class="opacity-50"
-              >Play 5+ notes to detect...</span>
-              <div class="mt-1 text-slate-500">
-                Notes: {{ scaleNotes.join( ', ' ) || '...' }}
+              <!-- Chord Roman Numeral Feedback -->
+              <div
+                v-if=" currentStep.validationCriteria.type === 'chord' && detectedChords.length > 0 "
+                class="p-2 bg-indigo-500/10 rounded border border-indigo-500/20 flex items-center justify-between"
+              >
+                <span class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Detected</span>
+                <div class="flex items-baseline gap-2">
+                  <span class="text-sm font-black text-white">{{ detectedChords[0]?.symbol }}</span>
+                  <span class="text-[10px] font-black text-indigo-400 italic">{{ detectedChords[0]?.roman }}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Rhythm Feedback -->
-    <div
-      v-if=" !isStepComplete && currentStep?.validationCriteria?.type === 'rhythm' "
-      class="mt-8 p-4 rounded-xl border-2 border-slate-700 bg-slate-800/50"
-    >
-      <div class="flex items-center gap-3">
-        <div class="text-3xl">🥁</div>
-        <div>
-          <div class="text-sm font-bold text-white">Rhythm Challenge</div>
-          <div class="text-xs text-slate-400">
-            Get <span class="text-white font-bold">{{ currentStep?.validationCriteria?.target }}</span> perfect hits in
-            a
-            row.
-          </div>
-          <div class="mt-2 text-[10px] font-mono p-1 bg-black/30 rounded text-slate-400">
-            Current: <span class="text-emerald-400 font-bold">{{ rhythmStats.perfect }}</span> /
-            {{ currentStep?.validationCriteria?.target }}
-            <br>
-            <span
-              v-if=" rhythmStats.rush > 0 "
-              class="text-rose-400"
-            >Rush: {{ rhythmStats.rush }}</span>
-            <span
-              v-if=" rhythmStats.drag > 0 "
-              class="ml-2 text-orange-400"
-            >Drag: {{ rhythmStats.drag }}</span>
+      <!-- Rhythm Feedback -->
+      <div
+        v-if=" !isStepComplete && currentStep?.validationCriteria?.type === 'rhythm' "
+        class="mt-8 p-4 rounded-xl border-2 border-slate-700 bg-slate-800/50"
+      >
+        <div class="flex items-center gap-3">
+          <div class="text-3xl">🥁</div>
+          <div>
+            <div class="text-sm font-bold text-white">Rhythm Challenge</div>
+            <div class="text-xs text-slate-400">Get <span
+                class="text-white font-bold">{{ currentStep?.validationCriteria?.target }}</span> perfect hits in a row.
+            </div>
+            <div class="mt-2 text-[10px] font-mono p-1 bg-black/30 rounded text-slate-400">
+              Current: <span class="text-emerald-400 font-bold">{{ rhythmStats.perfect }}</span> /
+              {{ currentStep?.validationCriteria?.target }}
+            </div>
           </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Footer -->
-  <div class="p-6 border-t border-slate-800">
-    <button
-      @click="nextStep"
-      :disabled="!isStepComplete"
-      class="w-full py-4 rounded-xl font-bold text-lg transition-all duration-300 flex items-center justify-center gap-2"
-      :class="isStepComplete
-        ? 'bg-emerald-500 hover:bg-emerald-400 text-white shadow-lg shadow-emerald-500/20'
-        : 'bg-slate-800 text-slate-500 cursor-not-allowed'"
-    >
-      <span>{{ currentStepIndex === lesson.steps.length - 1 ? 'Finish Lesson' : 'Next Step' }}</span>
-      <span v-if=" isStepComplete ">→</span>
-    </button>
-  </div>
+    <!-- Footer -->
+    <template #footer>
+      <div class="p-4 border-t border-white/5 bg-white/5">
+        <button
+          @click="nextStep"
+          :disabled="!isStepComplete"
+          class="w-full h-8 rounded-xl font-black text-[10px] uppercase tracking-[0.2em] transition-all duration-500 border relative overflow-hidden group/btn"
+          :class="isStepComplete ? 'bg-emerald-500 border-emerald-400 text-white shadow-xl shadow-emerald-500/20 hover:scale-[1.02] active:scale-95' : 'bg-white/5 border-white/5 text-slate-600 cursor-not-allowed'"
+        >
+          <span
+            class="relative z-10">{{ currentStepIndex === lesson.steps.length - 1 ? 'Archive Lesson (Finish)' : 'Sequence Next Step →' }}</span>
+        </button>
+      </div>
+    </template>
+  </MorphContainer>
 </template>
+
+<style scoped>
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .5;
+  }
+}
+</style>

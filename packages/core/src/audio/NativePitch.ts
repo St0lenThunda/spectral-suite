@@ -12,6 +12,7 @@ export class NativePitch {
   private sampleRate: number;
   private cutoff: number = 0.93; // Standard MPM cutoff
   public useLowPass: boolean = false;
+  public downsample: number = 1;
   private lpfState: number = 0;
 
   constructor( bufferSize: number = 4096, sampleRate: number = 44100 ) {
@@ -29,21 +30,18 @@ export class NativePitch {
   findPitch ( audioBuffer: Float32Array, sampleRate: number ): [number | null, number] {
     if ( sampleRate ) this.sampleRate = sampleRate;
 
-    // Note: For main thread fallback, we often get the buffer passed directly.
-    // If the buffer passed is smaller/larger, we might need to handle it.
-    // Assuming the consumer passes the correct buffer size or we just slice it.
-
+    // Note: For main thread fallback, workingBuffer is usually a view/copy
     let workingBuffer = audioBuffer;
     if ( audioBuffer.length > this.bufferSize ) {
       workingBuffer = audioBuffer.subarray( 0, this.bufferSize );
     }
 
-    // Low Pass Filter (One-Pole, approx 1kHz cutoff)
+    // 1. Low Pass Filter (Anti-aliasing / Octave Killer)
+    // Important: Run BEFORE downsampling to reduce aliasing if both are on
     if ( this.useLowPass ) {
-      const alpha = 0.15;
+      const alpha = 0.15; 
       let last = this.lpfState;
-      // We process in place (assuming workingBuffer is a view we can mutate or is ephemeral)
-      // If audioBuffer is shared, this mutates it. Typically fine for analysis buffers.
+      // Mutating workingBuffer (assuming it's safe to mutate analysis buffer)
       for ( let i = 0; i < workingBuffer.length; i++ ) {
         const current = workingBuffer[i]!;
         const val = last + alpha * ( current - last );
@@ -53,7 +51,24 @@ export class NativePitch {
       this.lpfState = last;
     }
 
-    const nsdf = this.normalizedSquareDifference( workingBuffer );
+    // 2. Downsampling (Decimation)
+    let analysisBuffer = workingBuffer;
+    let analysisRate = this.sampleRate;
+
+    if ( this.downsample > 1 ) {
+      const newLen = Math.floor( workingBuffer.length / this.downsample );
+      const downsampled = new Float32Array( newLen );
+
+      // Simple decimation (pick every Nth sample)
+      for ( let i = 0; i < newLen; i++ ) {
+        downsampled[i] = workingBuffer[i * this.downsample]!;
+      }
+
+      analysisBuffer = downsampled;
+      analysisRate = this.sampleRate / this.downsample;
+    }
+
+    const nsdf = this.normalizedSquareDifference( analysisBuffer );
     const maxPositions = this.peakPicking( nsdf );
 
     let pitch: number | null = null;
@@ -63,7 +78,7 @@ export class NativePitch {
       const bestPeakIndex = maxPositions[0]!;
       const refinedLag = this.parabolicInterpolation( nsdf, bestPeakIndex );
 
-      pitch = this.sampleRate / refinedLag;
+      pitch = analysisRate / refinedLag;
       clarity = nsdf[bestPeakIndex]!;
     }
 

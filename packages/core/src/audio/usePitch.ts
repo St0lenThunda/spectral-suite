@@ -16,16 +16,29 @@ export function usePitch () {
   const pitchHistory = ref<Array<{ time: number, cents: number }>>( [] );
   const isCanceled = ref( false );
   const isLowPassEnabled = ref( false );
+  const downsample = ref( 1 );
+
+  // Median Filter State
+  const medianBuffer: number[] = [];
+  const MEDIAN_SIZE = 5;
 
   // Watch for LPF toggle
-  watch( isLowPassEnabled, ( newVal ) => {
+  // Watch for configuration changes
+  watch( [isLowPassEnabled, downsample], () => {
+    const config = {
+      type: 'config',
+      lowPass: isLowPassEnabled.value,
+      downsample: downsample.value
+    };
+
     // Update Worklet
     if ( workletNode ) {
-      workletNode.port.postMessage( { type: 'config', lowPass: newVal } );
+      workletNode.port.postMessage( config );
     }
     // Update Legacy
     if ( legacyDetector ) {
-      legacyDetector.useLowPass = newVal;
+      legacyDetector.useLowPass = isLowPassEnabled.value;
+      legacyDetector.downsample = downsample.value;
     }
   } );
 
@@ -69,6 +82,13 @@ export function usePitch () {
             const { pitch: p, clarity: c, volume: v } = event.data;
           updateState( p, c, v );
         };
+
+      // Init config
+      workletNode.port.postMessage( {
+        type: 'config',
+        lowPass: isLowPassEnabled.value,
+        downsample: downsample.value
+      } );
 
         // Connect Source
         // We need a source from AudioEngine.
@@ -114,6 +134,8 @@ export function usePitch () {
 
       if ( !legacyDetector ) {
         legacyDetector = new NativePitch( analyser.fftSize, context.sampleRate );
+        legacyDetector.useLowPass = isLowPassEnabled.value;
+        legacyDetector.downsample = downsample.value;
         legacyBuffer = new Float32Array( analyser.fftSize );
       }
 
@@ -134,12 +156,27 @@ export function usePitch () {
     loop();
   };
 
-  const updateState = ( p: number | null, c: number, v: number ) => {
+  const updateState = ( rawPitch: number | null, rawClarity: number, v: number ) => {
+    // Median Filter Logic
+    let p = rawPitch;
+
+    if ( rawPitch ) {
+      medianBuffer.push( rawPitch );
+      if ( medianBuffer.length > MEDIAN_SIZE ) medianBuffer.shift();
+
+      // Copy and sort to find median
+      const sorted = [...medianBuffer].sort( ( a, b ) => a - b );
+      const mid = Math.floor( sorted.length / 2 );
+      p = sorted[mid] || rawPitch;
+    } else {
+      medianBuffer.length = 0;
+    }
+
     pitch.value = p;
-    clarity.value = c;
+    clarity.value = rawClarity;
     volume.value = v;
 
-      if ( p && c > 0.8 ) {
+    if ( p && rawClarity > 0.8 ) {
         const calibratedFreq = p * ( 440 / concertA.value );
         const rawNoteName = Note.fromFreq( calibratedFreq );
         const displayNote = Note.transpose( rawNoteName, Interval.fromSemitones( transposition.value ) );
@@ -185,5 +222,6 @@ export function usePitch () {
     transposition,
     pitchHistory,
     isLowPassEnabled,
+    downsample,
   };
 }

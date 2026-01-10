@@ -19,6 +19,7 @@ class PitchProcessor extends AudioWorkletProcessor {
   private _cutoff: number = 0.93; // 0.93 is standard for MPM
   private _sampleRate: number;
   private _useLowPass: boolean = false;
+  private _downsample: number = 1;
   private _lpfState: number = 0;
 
   static get parameterDescriptors() {
@@ -35,7 +36,10 @@ class PitchProcessor extends AudioWorkletProcessor {
         if ( typeof e.data.lowPass === 'boolean' ) {
           this._useLowPass = e.data.lowPass;
         }
-      }
+          if ( typeof e.data.downsample === 'number' ) {
+            this._downsample = e.data.downsample;
+          }
+        }
     }
   }
 
@@ -63,21 +67,14 @@ class PitchProcessor extends AudioWorkletProcessor {
   analyze() {
     let buffer = this._buffer;
 
-    // Low Pass Filter for Analysis Snapshot
+    // 1. Low Pass Filter for Analysis Snapshot
     if ( this._useLowPass ) {
-      // Create a copy to avoid mutating the sliding window buffer improperly in place?
-      // Actually, if we mutate the buffer in place, the NEXT window will contain filtered data shifted left.
-      // This is effectively recursive filtering if we aren't careful.
-      // But for a simple pitch detector, filtering the input stream is conceptually what we want.
-      // However, we only filter the *snapshot* here.
-      // So we MUST copy it to a temp buffer.
-
       const analysisBuffer = new Float32Array( this._bufferSize );
       analysisBuffer.set( buffer );
-      buffer = analysisBuffer; // Re-assign local var to point to filtered copy
+      buffer = analysisBuffer; 
 
       const alpha = 0.15;
-      let last = 0; // Reset for snapshot (approximation)
+      let last = 0; 
       for ( let i = 0; i < buffer.length; i++ ) {
         const current = buffer[i]!;
         const val = last + alpha * ( current - last );
@@ -86,27 +83,47 @@ class PitchProcessor extends AudioWorkletProcessor {
       }
     }
 
-    const nsdf = this.normalizedSquareDifference( buffer );
+    // 2. Downsampling
+    let analysisBuffer = buffer;
+    let analysisRate = this._sampleRate;
+
+    if ( this._downsample > 1 ) {
+      const newLen = Math.floor( buffer.length / this._downsample );
+      const downsampled = new Float32Array( newLen );
+      for ( let i = 0; i < newLen; i++ ) {
+        downsampled[i] = buffer[i * this._downsample]!;
+      }
+      analysisBuffer = downsampled;
+      analysisRate = this._sampleRate / this._downsample;
+    }
+
+    const nsdf = this.normalizedSquareDifference( analysisBuffer );
     const maxPositions = this.peakPicking( nsdf );
     
     let pitch: number | null = null;
     let clarity: number = 0;
 
     if ( maxPositions.length > 0 ) {
-      // Pick the highest quality peak
-      const bestPeakIndex = maxPositions[0]!; // MPM usually picks the first major peak
-
-      // Parabolic interpolation for better precision
+      const bestPeakIndex = maxPositions[0]!; 
       const refinedLag = this.parabolicInterpolation( nsdf, bestPeakIndex );
 
-      pitch = this._sampleRate / refinedLag;
+      pitch = analysisRate / refinedLag;
       clarity = nsdf[bestPeakIndex]!;
     }
 
     // Volume (RMS)
     let sumSquares = 0;
+    // Use original buffer for volume, not analysis buffer
+    // But buffer variable might have been reassigned to LPF copy.
+    // That's fine, LPF volume is similar. 
+    // But typically we want RMS of raw signal. 
+    // We should use this._buffer for RMS.
+
+    // However, analyze() uses local var buffer which might be LPF'd.
+    // Let's use this._buffer explicitly for RMS to be safe/consistent.
+    const rawBuffer = this._buffer;
     for (let i = 0; i < this._bufferSize; i++) {
-      sumSquares += buffer[i]! * buffer[i]!;
+      sumSquares += rawBuffer[i]! * rawBuffer[i]!;
     }
     const volume = Math.sqrt(sumSquares / this._bufferSize);
 

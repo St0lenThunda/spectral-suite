@@ -11,7 +11,8 @@ const {
   concertA,
   transposition,
   pitchHistory,
-  isLowPassEnabled
+  isLowPassEnabled,
+  downsample
 } = usePitch()
 
 const { init, isInitialized } = useAudioEngine()
@@ -217,13 +218,23 @@ const toneQualityLabel = computed(() => {
             <div class="flex items-center gap-2">
               <button
                 @click="isLowPassEnabled = !isLowPassEnabled"
-                class="w-full py-2 rounded-lg font-black text-[10px] border transition-all uppercase tracking-widest"
+                class="flex-1 py-2 rounded-lg font-black text-[10px] border transition-all uppercase tracking-widest"
                 :class="isLowPassEnabled ? 'bg-sky-500/20 border-sky-500/50 text-sky-400' : 'bg-slate-900 border-white/5 text-slate-500'"
               >
-                {{ isLowPassEnabled ? 'Low-Pass Active' : 'Enable Low-Pass' }}
+                {{ isLowPassEnabled ? 'Low-Pass: On' : 'Low-Pass: Off' }}
+              </button>
+              <button
+                @click="downsample = downsample === 1 ? 4 : 1"
+                class="flex-1 py-2 rounded-lg font-black text-[10px] border transition-all uppercase tracking-widest"
+                :class="downsample > 1 ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400' : 'bg-slate-900 border-white/5 text-slate-500'"
+              >
+                {{ downsample > 1 ? 'Bass Mode: On' : 'Bass Mode: Off' }}
               </button>
             </div>
-            <p class="text-[9px] text-slate-600">Eliminates octave errors for bass/guitar sources.</p>
+            <p class="text-[9px] text-slate-600">
+              <strong>Low-Pass:</strong> Removes high noise.
+              <strong>Bass Mode:</strong> 4x Downsample for better low-end detection.
+            </p>
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 import { ref, onMounted, onUnmounted } from 'vue';
-import { PitchDetector } from 'pitchy';
 import { Note, Interval } from 'tonal';
 import { useAudioEngine } from './useAudioEngine';
+import processorUrl from './worklets/pitch-processor.ts?worker&url';
 
 export function usePitch () {
   const { getAnalyser, getContext } = useAudioEngine();
@@ -15,42 +15,80 @@ export function usePitch () {
   const pitchHistory = ref<Array<{ time: number, cents: number }>>( [] );
   const isCanceled = ref( false );
 
-  let detector: PitchDetector<Float32Array<ArrayBuffer>> | null = null;
-  let inputBuffer: Float32Array<ArrayBuffer> | null = null;
+  // Refs existing...
+  
+  let workletNode: AudioWorkletNode | null = null;
   const HISTORY_MS = 5000;
 
-  const updatePitch = () => {
-    if ( isCanceled.value ) return;
-
-    const analyser = getAnalyser();
+  const initWorklet = async () => {
     const context = getContext();
+    if ( !context ) return;
 
-    if ( !analyser || !context ) {
-      requestAnimationFrame( updatePitch );
-      return;
+    // Resume if suspended (user interaction requirements usually handled upstream)
+    if ( context.state === 'suspended' ) {
+       await context.resume();
     }
 
-    if ( !detector ) {
-      detector = PitchDetector.forFloat32Array( analyser.fftSize );
-      inputBuffer = new Float32Array( analyser.fftSize );
+    try {
+        await context.audioWorklet.addModule( processorUrl );
+        
+        // Check if node already exists? (Singleton pattern vs Component instance)
+        // Since usePitch might be used multiple times, we should be careful.
+        // Usually usePitch is a singleton or scoped.
+        // Hook logic creates new refs each call.
+        // We should create a new node for this instance? Or share?
+        // Sharing source is cleaner.
+        
+        // But for updatePitch logic... 
+        // Let's create a node per usage for now (easiest refactor), 
+        // but typically AudioEngine should manage a global pitch analyzer node.
+        // Refactoring to global singleton in AudioEngine is better but bigger scope.
+        // Stick to localized node for safey.
+
+        workletNode = new AudioWorkletNode( context, 'pitch-processor' );
+        workletNode.port.onmessage = ( event ) => {
+            const { pitch: p, clarity: c, volume: v } = event.data;
+            
+            pitch.value = p;
+            clarity.value = c;
+            volume.value = v;
+
+            processPitchResult( p, c );
+        };
+
+        // Connect Source
+        // We need a source from AudioEngine.
+        // getAnalyser() returns an AnalyserNode. We can connect THAT to worklet? 
+        // Or get Source from engine?
+        // useAudioEngine usually exposes input source.
+        
+        // We might need to tap into the input stream again or connect from the Analyser.
+        // AnalyserNode is a pass-through. So we can connect Analyser -> Worklet.
+        // But Analyser might be doing FFT for visuals.
+        // Connecting: Input -> Analyser -> Worklet -> Destination (mute).
+        
+        const analyser = getAnalyser();
+        if ( analyser ) {
+            analyser.connect( workletNode );
+            workletNode.connect( context.destination ); // Keep alive, usually process returns output=input or silence. 
+            // My process() code writes input to buffer but doesn't write to output.
+            // So it outputs silence (default). 
+            // If we connect to destination, we might silence the monitoring?
+            // Wait, input[0] is copied. output[0] is left zero? 
+            // If output[0] is zero, we output silence. Perfect.
+            // Wait, if Input -> Analyser -> Speakers?
+            // If we insert worklet: Input -> Analyser -> Worklet -> Destination.
+            // This path is parallel to monitoring. Monitoring is usually Input -> Destination separately.
+        }
+
+    } catch ( e ) {
+        console.error( 'Failed to load PitchProcessor', e );
     }
+  };
 
-    analyser.getFloatTimeDomainData( inputBuffer! );
-    const [p, c] = detector.findPitch( inputBuffer!, context.sampleRate );
-
-    pitch.value = p;
-    clarity.value = c;
-
-    // Volume calculation (RMS)
-    if ( inputBuffer ) {
-      let sumSquares = 0;
-      for ( let i = 0; i < inputBuffer.length; i++ ) {
-        sumSquares += inputBuffer[i]! * inputBuffer[i]!;
-      }
-      volume.value = Math.sqrt( sumSquares / inputBuffer.length );
-    }
-
-    if ( p && c > 0.8 ) {
+  const processPitchResult = ( p: number, c: number ) => {
+      // Original logic from updatePitch
+      if ( p && c > 0.8 ) {
       const calibratedFreq = p * ( 440 / concertA.value );
       const rawNoteName = Note.fromFreq( calibratedFreq );
 
@@ -78,16 +116,19 @@ export function usePitch () {
       currentNote.value = null;
       cents.value = 0;
     }
-
-    requestAnimationFrame( updatePitch );
   };
 
   onMounted( () => {
-    updatePitch();
+    initWorklet();
   } );
 
   onUnmounted( () => {
     isCanceled.value = true;
+    if ( workletNode ) {
+        workletNode.disconnect(); // Disconnects from destination and inputs?
+        // workletNode.port.close();
+        workletNode = null;
+    }
   } );
 
   return {

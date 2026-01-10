@@ -5,7 +5,7 @@
  * between a full panel state and a floating action button (FAB) state.
  */
 
-const props = defineProps<{
+defineProps<{
   isMorphed: boolean;
   expandedClass?: string;
   collapsedClass?: string;

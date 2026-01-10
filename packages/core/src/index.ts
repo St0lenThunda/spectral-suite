@@ -1,4 +1,5 @@
 export * from './audio/AudioEngine';
+export * from './config/sensitivity';
 export * from './audio/useAudioEngine';
 export * from './audio/SynthEngine';
 export * from './audio/SpectralAnalysis';

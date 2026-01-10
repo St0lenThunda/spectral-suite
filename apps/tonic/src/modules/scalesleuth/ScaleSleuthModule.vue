@@ -1,8 +1,7 @@
 <script setup lang="ts">
-import { ref, computed, watch, Transition, onMounted } from 'vue';
-import { useScaleSleuth, useAudioEngine, ScaleEngine, SynthEngine, Fretboard, Note } from '@spectralsuite/core';
+import { ref, computed, Transition, onMounted } from 'vue';
+import { useScaleSleuth, useAudioEngine, SynthEngine, Fretboard, Note } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
-import { sensitivityThreshold } from '@spectralsuite/core';
 
 const {
   pitch,

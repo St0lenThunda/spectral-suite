@@ -9,6 +9,7 @@ interface Props {
   currentNote: string | null;
   pitch: number | null;
   clarity: number | null;
+  keyCenter: string;
 }
 
 defineProps<Props>();
@@ -16,10 +17,20 @@ defineProps<Props>();
 const emit = defineEmits<{
   ( e: 'captureChord', chord: ChordMatch ): void;
   ( e: 'clearNotes' ): void;
+  ( e: 'update:keyCenter', key: string ): void;
 }>();
 
 const isTrayOpen = ref( false );
+const isKeySelectorOpen = ref( false );
 const toggleTray = () => { isTrayOpen.value = !isTrayOpen.value };
+const toggleKeySelector = () => { isKeySelectorOpen.value = !isKeySelectorOpen.value };
+
+const keys = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+
+const selectKey = ( key: string ) => {
+  emit( 'update:keyCenter', key );
+  isKeySelectorOpen.value = false;
+};
 
 </script>
 
@@ -50,6 +61,33 @@ const toggleTray = () => { isTrayOpen.value = !isTrayOpen.value };
       </div>
       <span class="text-[9px] font-black uppercase tracking-widest text-indigo-300">Tray</span>
     </button>
+
+    <!-- Key Context Selector (Top Right) -->
+    <div class="absolute top-8 right-8 z-30 flex flex-col items-end gap-2">
+      <button
+        @click="toggleKeySelector"
+        class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all flex items-center gap-3 active:scale-95"
+      >
+        <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">Key</span>
+        <span class="text-sm font-black text-indigo-400 w-4 text-center">{{ keyCenter }}</span>
+      </button>
+
+      <!-- Key Grid Dropdown -->
+      <div
+        v-if=" isKeySelectorOpen "
+        class="absolute top-12 right-0 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-3 grid grid-cols-4 gap-2 shadow-2xl w-48 animate-fade-in"
+      >
+        <button
+          v-for=" k in keys "
+          :key="k"
+          @click="selectKey( k )"
+          class="aspect-square rounded-lg flex items-center justify-center text-xs font-bold transition-all"
+          :class="k === keyCenter ? 'bg-indigo-500 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'"
+        >
+          {{ k }}
+        </button>
+      </div>
+    </div>
 
     <!-- Pulsing Rings (Background) -->
     <div class="absolute inset-0 flex items-center justify-center pointer-events-none">

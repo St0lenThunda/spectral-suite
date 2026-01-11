@@ -62,7 +62,7 @@ All tools share a consistent interface:
 
 1. **AuraTune** ✨ - Real-time pitch detection
 2. **ScaleSleuth** 🔍 - Scale and mode identification
-3. **ChordCapture** 🎹 - Chord recognition
+3. **ChordCapture** 🎹 - Polyphonic chord recognition, Roman Numeral analysis, and progression export
 4. **Pocket Engine** ⏱️ - Rhythm and timing
 5. **Frequency Flow** 🌊 - Spectral visualization
 6. **Track Tracer** 🧪 - Audio file analysis

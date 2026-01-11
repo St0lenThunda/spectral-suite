@@ -78,6 +78,10 @@ const handleExport = async () => {
   }
 };
 
+const updateKey = ( val: string ) => {
+  keyCenter.value = val;
+};
+
 const emit = defineEmits( ['back'] )
 </script>
 
@@ -151,64 +155,32 @@ const emit = defineEmits( ['back'] )
           <h2 class="text-3xl font-bold text-white mb-2">Chord <span class="text-indigo-400">Capture Pro</span></h2>
           <p class="text-slate-400 text-sm italic">Harmonic recognition, Roman Numerals & Sequence Ledger.</p>
         </div>
-        <div class="flex flex-wrap items-center justify-center gap-4">
-          <!-- Key Selection for Roman Numerals -->
-          <div class="flex flex-col items-end gap-1">
-            <span class="text-[8px] font-black uppercase text-slate-500 tracking-widest mr-2">Analysis Key</span>
-            <select 
-              v-model="keyCenter" 
-              class="bg-slate-900 border border-white/10 rounded-lg text-[10px] font-black text-indigo-400 px-3 py-1.5 focus:outline-none focus:border-indigo-500 transition-all uppercase"
-            >
-              <option v-for="k in ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']" :key="k" :value="k">{{ k }}</option>
-            </select>
-          </div>
-          <div
-            class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest transition-all mb-1"
-          >
-            <div class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></div>
-            Polyphonic Focus
-          </div>
-          <button
-            @click="openInfo( 'chordcapture' )"
-            class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
-          >
-            Intelligence
-          </button>
-        </div>
       </header>
 
       <!-- Step Indicator / Instructions -->
-      <div class="w-full max-w-3xl grid grid-cols-3 gap-4 px-4 text-center">
-        <div class="flex flex-col items-center gap-3">
-          <div
-            class="step-num"
-            :class="{ 'active': capturedNotes.length === 0 }"
-          >1</div>
-          <div class="flex flex-col">
-            <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">Action</span>
-            <span class="text-[10px] font-bold text-white leading-tight">Isolate Note</span>
-          </div>
+      <!-- Secondary Controls: Key & Intelligence -->
+      <div class="w-full max-w-3xl flex justify-center items-center gap-6 mb-8 px-4">
+
+        <!-- Key Selection -->
+        <div class="flex flex-col items-center gap-2">
+          <span class="text-[9px] font-black uppercase text-slate-500 tracking-widest">Analysis Key</span>
+          <select
+            v-model="keyCenter"
+            class="bg-slate-900 border border-white/10 rounded-xl text-xs font-black text-indigo-400 px-6 py-2 focus:outline-none focus:border-indigo-500 transition-all uppercase appearance-none text-center min-w-[100px]"
+          >
+            <option
+              v-for=" k in ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'] "
+              :key="k"
+              :value="k"
+            >{{ k }}</option>
+          </select>
         </div>
-        <div class="flex flex-col items-center gap-3">
-          <div
-            class="step-num"
-            :class="{ 'active': capturedNotes.length > 0 && capturedNotes.length < 3 }"
-          >2</div>
-          <div class="flex flex-col">
-            <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">Growth</span>
-            <span class="text-[10px] font-bold text-white leading-tight">Build Set</span>
-          </div>
-        </div>
-        <div class="flex flex-col items-center gap-3">
-          <div
-            class="step-num"
-            :class="{ 'active': detectedChords.length > 0 }"
-          >3</div>
-          <div class="flex flex-col">
-            <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">Outcome</span>
-            <span class="text-[10px] font-bold text-white leading-tight">Match Chord</span>
-          </div>
-        </div>
+
+        <!-- Intelligence Button -->
+        <button
+          @click="openInfo( 'scalesleuth' )"
+          class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95"
+        >Intelligence</button>
       </div>
 
       <!-- Main Interactive Split: Monitor (Left) & Workspace (Right) -->
@@ -223,6 +195,8 @@ const emit = defineEmits( ['back'] )
           :current-note="currentNote"
           :pitch="pitch"
           :clarity="clarity"
+          :key-center="keyCenter"
+          @update:key-center="updateKey"
           @capture-chord="captureChord"
           @clear-notes="clearNotes"
         />

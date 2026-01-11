@@ -37,5 +37,6 @@ export function useAudioEngine () {
     getContext,
     resume: () => engine.resume(),
     suspend: () => engine.suspend(),
+    close: () => engine.close(),
   };
 }

@@ -16,7 +16,20 @@ export class AudioEngine {
   }
 
   public async init (): Promise<void> {
-    if ( this.context ) return;
+    // If context exists, ensure it's running and stream is active
+    if ( this.context ) {
+      if ( this.context.state === 'suspended' ) {
+        await this.context.resume();
+      }
+
+      // Check if stream is active
+      if ( this.stream && this.stream.active ) {
+        return;
+      }
+
+      // If stream is dead, we need to re-initialize everything
+      this.close();
+    }
 
     this.context = new ( window.AudioContext || ( window as any ).webkitAudioContext )();
 
@@ -34,6 +47,38 @@ export class AudioEngine {
     } catch ( err ) {
       console.error( 'Error accessing microphone:', err );
       throw err;
+    }
+  }
+
+  /**
+   * Stops the media stream and closes the audio context to release resources.
+   */
+  public async close (): Promise<void> {
+    if ( this.stream ) {
+      this.stream.getTracks().forEach( track => track.stop() );
+      this.stream = null;
+    }
+
+    if ( this.source ) {
+      this.source.disconnect();
+      this.source = null;
+    }
+
+    if ( this.gainNode ) {
+      this.gainNode.disconnect();
+      this.gainNode = null;
+    }
+
+    if ( this.analyser ) {
+      this.analyser.disconnect();
+      this.analyser = null;
+    }
+
+    if ( this.context ) {
+      if ( this.context.state !== 'closed' ) {
+        await this.context.close();
+      }
+      this.context = null;
     }
   }
 

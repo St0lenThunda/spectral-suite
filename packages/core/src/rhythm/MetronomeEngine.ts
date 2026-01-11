@@ -141,6 +141,10 @@ export class MetronomeEngine {
     this.stop()
     this.beatCallbacks = []
     this.tempoCallbacks = []
+    if ( this.context && this.context.state !== 'closed' ) {
+      this.context.close()
+    }
+    this.context = null
   }
 
   // --- Getters and Setters ---

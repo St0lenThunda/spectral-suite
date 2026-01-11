@@ -36,7 +36,7 @@ class TransientProcessor extends AudioWorkletProcessor {
 
     // Accumulate samples into our buffer
     for ( let i = 0; i < length; i++ ) {
-      this._buffer[this._bufferIndex] = channelData[i];
+      this._buffer[this._bufferIndex] = channelData[i]!;
       this._bufferIndex++;
 
       // When buffer is full, process it
@@ -54,7 +54,7 @@ class TransientProcessor extends AudioWorkletProcessor {
     let energy = 0;
 
     for ( let i = 0; i < buffer.length; i++ ) {
-      const sample = buffer[i];
+      const sample = buffer[i]!;
       const sq = sample * sample;
       sum += sq;
     }

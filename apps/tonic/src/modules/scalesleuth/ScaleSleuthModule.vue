@@ -9,6 +9,9 @@
 import { ref, computed, Transition, onMounted } from 'vue';
 import { useScaleSleuth, useAudioEngine, SynthEngine, Fretboard, Note } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
+import EngineSettings from '../../components/settings/EngineSettings.vue';
+import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
+import SettingsToggle from '../../components/settings/SettingsToggle.vue';
 
 /**
  * Destructuring the ScaleSleuth Composable
@@ -39,6 +42,23 @@ const { init, isInitialized } = useAudioEngine();
 const { openInfo } = useToolInfo();
 
 // --- UI / Interaction State ---
+
+const isSettingsOpen = ref( false );
+
+const drawerCategories = computed( () => [
+  {
+    id: 'General',
+    label: 'General',
+    description: 'Fretboard & Visuals',
+    showIndicator: !showPlayedNotes.value || showCAGED.value
+  },
+  {
+    id: 'Engine',
+    label: 'Engine',
+    description: 'Global Audio Processing',
+    showIndicator: isLowPassEnabled.value || downsample.value > 1
+  }
+] );
 
 // The scale currently focused by the user
 const selectedScale = ref<string | null>( null );
@@ -157,7 +177,9 @@ const handleScaleClick = ( name: string ) => {
   }
 };
 
-const emit = defineEmits( ['back'] )
+const emit = defineEmits<{
+  ( e: 'back' ): void
+}>()
 
 // --- Notification Logic ---
 const toastVisible = ref( false );
@@ -287,29 +309,104 @@ onMounted( async () => {
         <div class="flex items-center gap-4">
           <button
             @click="openInfo( 'scalesleuth' )"
-            class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95"
-          >Intelligence</button>
+            class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-black text-lg flex items-center justify-center hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
+          >
+            ?
+          </button>
           <button
             @click="clearNotes"
             class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-lg border border-slate-700 transition-all"
           >Reset Detective</button>
-        </div>
-        <!-- Quick Audio Settings -->
-        <div class="flex items-center gap-2">
-          <button
-            @click="isLowPassEnabled = !isLowPassEnabled"
-            class="px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest border transition-all"
-            :class="isLowPassEnabled ? 'bg-sky-500/20 border-sky-500/50 text-sky-400' : 'bg-slate-900 border-slate-700 text-slate-600'"
-          >{{ isLowPassEnabled ? 'LPF: ON' : 'LPF: OFF' }}</button>
 
-          <button
-            @click="downsample = downsample === 1 ? 4 : 1"
-            class="px-2 py-1 rounded text-[9px] font-black uppercase tracking-widest border transition-all"
-            :class="downsample > 1 ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400' : 'bg-slate-900 border-slate-700 text-slate-600'"
-          >{{ downsample > 1 ? 'BASS: ON' : 'BASS: OFF' }}</button>
+          <SettingsToggle
+            :is-open="isSettingsOpen"
+            @click="isSettingsOpen = !isSettingsOpen"
+          />
         </div>
       </div>
     </header>
+
+    <LocalSettingsDrawer
+      :is-open="isSettingsOpen"
+      :categories="drawerCategories"
+      @close="isSettingsOpen = false"
+    >
+      <template #General>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div>
+            <button
+              @click="showPlayedNotes = !showPlayedNotes"
+              class="w-full px-4 py-3 rounded-xl font-black text-xs border transition-all text-left uppercase tracking-widest flex items-center justify-between"
+              :class="showPlayedNotes ? 'bg-sky-500/10 border-sky-400/30 text-sky-400' : 'bg-slate-900 border-white/5 text-slate-500'"
+            >
+              <span>Show Played Notes</span>
+              <div
+                class="w-2 h-2 rounded-full"
+                :class="showPlayedNotes ? 'bg-sky-400' : 'bg-slate-700'"
+              ></div>
+            </button>
+            <p class="text-[11px] text-slate-500 mt-2 leading-relaxed px-1">
+              Highlight all notes you have played on the fretboard since the last reset.
+            </p>
+          </div>
+
+          <div>
+            <button
+              @click="showScaleNotes = !showScaleNotes"
+              class="w-full px-4 py-3 rounded-xl font-black text-xs border transition-all text-left uppercase tracking-widest flex items-center justify-between"
+              :class="showScaleNotes ? 'bg-emerald-500/10 border-emerald-400/30 text-emerald-400' : 'bg-slate-900 border-white/5 text-slate-500'"
+            >
+              <span>Show Scale Notes</span>
+              <div
+                class="w-2 h-2 rounded-full"
+                :class="showScaleNotes ? 'bg-emerald-400' : 'bg-slate-700'"
+              ></div>
+            </button>
+            <p class="text-[11px] text-slate-500 mt-2 leading-relaxed px-1">
+              Highlight the notes and patterns of the currently selected scale match.
+            </p>
+          </div>
+
+          <div class="md:col-span-2 border-t border-white/5 pt-6">
+            <div class="flex items-center justify-between mb-4">
+              <button
+                @click="showCAGED = !showCAGED"
+                class="px-4 py-3 rounded-xl font-black text-xs border transition-all text-left uppercase tracking-widest flex items-center justify-between gap-4"
+                :class="showCAGED ? 'bg-indigo-500/10 border-indigo-400/30 text-indigo-400' : 'bg-slate-900 border-white/5 text-slate-500'"
+              >
+                <span>Enable CAGED Mode</span>
+                <div
+                  class="w-2 h-2 rounded-full"
+                  :class="showCAGED ? 'bg-indigo-400' : 'bg-slate-700'"
+                ></div>
+              </button>
+            </div>
+            <p class="text-[11px] text-slate-500 mb-4 leading-relaxed px-1">
+              Overlay CAGED system box shapes on the fretboard to visualize scale positions.
+            </p>
+
+            <div
+              v-if=" showCAGED "
+              class="flex gap-2 animate-pop-in"
+            >
+              <button
+                v-for=" shape in ['C', 'A', 'G', 'E', 'D'] "
+                :key="shape"
+                @click="selectedCAGEDShape = shape as any"
+                class="w-10 h-10 rounded-xl text-xs font-black transition-all flex items-center justify-center border"
+                :class="selectedCAGEDShape === shape ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'"
+              >{{ shape }}</button>
+            </div>
+          </div>
+        </div>
+      </template>
+
+      <template #Engine>
+        <div class="space-y-6">
+          <EngineSettings />
+        </div>
+      </template>
+    </LocalSettingsDrawer>
 
     <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
       <div class="xl:col-span-1 space-y-6">
@@ -375,22 +472,7 @@ onMounted( async () => {
           <div class="flex justify-between items-center mb-4">
             <h3 class="text-xs font-bold uppercase tracking-widest text-slate-500">Visual Fretboard</h3>
             <div class="flex items-center gap-3">
-              <button
-                @click="showPlayedNotes = !showPlayedNotes"
-                class="flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] font-black uppercase"
-                :class="showPlayedNotes ? 'bg-sky-500/10 border-sky-500 text-sky-400' : 'bg-slate-900 border-slate-700 text-slate-500'"
-              >
-                <span class="w-2 h-2 rounded-full bg-sky-500"></span> Played
-              </button>
-              <button
-                @click="showScaleNotes = !showScaleNotes"
-                class="flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] font-black uppercase"
-                :class="showScaleNotes ? 'bg-emerald-500/10 border-emerald-500 text-emerald-400' : 'bg-slate-900 border-slate-700 text-slate-500'"
-              >
-                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Scale
-              </button>
-
-<!-- Refined Play Button -->
+              <!-- Refined Play Button -->
               <button
                @click="playScale( scaleNotes, 'current' )"
                 :disabled="!selectedScale"
@@ -425,28 +507,6 @@ onMounted( async () => {
                 {{ isPlaying && playingScaleName === 'current' ? 'Stop' : 'Play' }}
               </button>
 
-              <button
-                @click="showCAGED = !showCAGED"
-                class="flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-all text-[10px] font-black uppercase ml-4"
-                :class="showCAGED ? 'bg-indigo-500/10 border-indigo-500 text-indigo-400' : 'bg-slate-900 border-slate-700 text-slate-500'"
-              >
-                <span
-                  class="w-2 h-2 rounded-full"
-                  :class="showCAGED ? 'bg-indigo-500' : 'bg-slate-600'"
-                ></span> CAGED Mode
-              </button>
-              <div
-                v-if=" showCAGED "
-                class="flex bg-slate-950 p-1 rounded-xl border border-white/5 animate-pop-in"
-              >
-                <button
-                  v-for=" shape in ['C', 'A', 'G', 'E', 'D'] "
-                  :key="shape"
-                  @click="selectedCAGEDShape = shape as any"
-                  class="w-8 h-8 rounded-lg text-[10px] font-black transition-all flex items-center justify-center"
-                  :class="selectedCAGEDShape === shape ? 'bg-indigo-500 text-white' : 'text-slate-500 hover:text-slate-300'"
-                >{{ shape }}</button>
-              </div>
               <span
                 class="text-[10px] text-sky-500 font-bold ml-2"
                 v-if=" selectedScale "
@@ -605,8 +665,47 @@ div::-webkit-scrollbar-thumb:hover {
 }
 
 .toast-enter-from,
-.toast-leave-to {
+.drawer-enter-active,
+.drawer-leave-active {
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  max-height: 500px;
+}
+
+.drawer-enter-from,
+.drawer-leave-to {
   opacity: 0;
-  transform: translate(-50%, 40px);
+  max-height: 0;
+  transform: translateY(-10px);
+}
+
+.glass-card {
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background-color: rgba(255, 255, 255, 0.02);
+  transition: all 0.3s ease;
+}
+
+.morph-swell-enter-active,
+.morph-swell-leave-active {
+  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.morph-swell-enter-from,
+.morph-swell-leave-to {
+  opacity: 0;
+  transform: scale(0.85);
+}
+
+.animate-content-swell {
+  animation: content-fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.2s;
+  opacity: 0;
+  transform: translateY(10px);
+  }
+  
+  @keyframes content-fade-in {
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
 }
 </style>

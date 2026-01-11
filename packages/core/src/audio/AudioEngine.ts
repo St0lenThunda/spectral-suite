@@ -34,7 +34,19 @@ export class AudioEngine {
     this.context = new ( window.AudioContext || ( window as any ).webkitAudioContext )();
 
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia( { audio: true } );
+      /**
+       * We request "raw" audio without browser processing.
+       * 1. echoCancellation: false - Prevents the OS from switching to "VoIP mode" (which lowers sample rate/quality).
+       * 2. noiseSuppression: false - We want the full spectral content, even noise, for accurate analysis.
+       * 3. autoGainControl: false - Prevents the volume from "pumping" up and down.
+       */
+      this.stream = await navigator.mediaDevices.getUserMedia( {
+        audio: {
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false
+        }
+      } );
       this.source = this.context.createMediaStreamSource( this.stream );
 
       this.gainNode = this.context.createGain();

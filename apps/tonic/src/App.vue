@@ -10,6 +10,7 @@ import AcademyModule from './modules/academy/AcademyModule.vue';
 import LessonRunner from './modules/academy/LessonRunner.vue';
 import { type Lesson } from './modules/academy/lessons';
 import ToolInfoModal from './components/ToolInfoModal.vue';
+import SettingsModal from './components/settings/SettingsModal.vue';
 import { useAudioEngine, StorageService } from '@spectralsuite/core'
 
 const currentModule = ref( 'dashboard' )
@@ -17,6 +18,15 @@ const activeLesson = ref<Lesson | null>( null )
 const { isInitialized, inputGain, setGain, getAnalyser } = useAudioEngine()
 const volumeLevel = ref( 0 )
 let rafId: number | null = null
+
+// Modal State
+const showSettingsModal = ref( false );
+const settingsInitialTab = ref( 'platform' );
+
+const openSettings = ( tab: string = 'platform' ) => {
+  settingsInitialTab.value = tab;
+  showSettingsModal.value = true;
+};
 
 const ALL_TOOLS = [
   {
@@ -169,9 +179,8 @@ const handleGainChange = ( event: Event ) => {
           :class="currentModule === 'academy' ? 'text-white' : 'text-slate-500 hover:text-slate-300'"
         >Academy</button>
         <button
-          @click="currentModule = 'settings'"
-          class="text-[10px] font-black uppercase tracking-[0.2em] transition-all"
-          :class="currentModule === 'settings' ? 'text-white' : 'text-slate-500 hover:text-slate-300'"
+          @click="openSettings( 'platform' )"
+          class="text-[10px] font-black uppercase tracking-[0.2em] transition-all text-slate-500 hover:text-slate-300"
         >Settings</button>
       </div>
     </nav>
@@ -235,7 +244,7 @@ const handleGainChange = ( event: Event ) => {
           <!-- Empty Slot / Add Tool -->
           <div
             class="flex flex-col items-center justify-center p-8 rounded-[2.5rem] border border-dashed border-white/10 opacity-40 hover:opacity-100 hover:bg-white/5 transition-all cursor-pointer group"
-            @click="currentModule = 'settings'"
+            @click="openSettings( 'platform' )"
           >
             <div
               class="w-12 h-12 rounded-full border border-white/20 flex items-center justify-center text-xl mb-4 group-hover:rotate-90 transition-transform"
@@ -245,67 +254,21 @@ const handleGainChange = ( event: Event ) => {
         </div>
       </div>
 
-      <!-- SETTINGS VIEW -->
-      <div
-        v-else-if=" currentModule === 'settings' "
-        class="animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-2xl mx-auto"
-      >
-        <header class="mb-12">
-          <h2 class="text-3xl font-black tracking-tighter text-white mb-2 uppercase">Platform Settings</h2>
-          <p class="text-slate-500 font-mono text-[10px] uppercase tracking-widest">Modular Registry Management</p>
-        </header>
-
-        <div class="bg-white/5 border border-white/5 rounded-[3rem] p-10 backdrop-blur-xl">
-          <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400 mb-8">Installed Modules</h3>
-
-          <div class="space-y-6">
-            <div
-              v-for=" tool in ALL_TOOLS "
-              :key="tool.id"
-              class="flex items-center justify-between p-6 rounded-3xl bg-black/20 border border-white/5"
-            >
-              <div class="flex items-center gap-4">
-                <div class="text-2xl opacity-80">{{ tool.icon }}</div>
-                <div>
-                  <h4 class="font-bold text-white leading-none mb-1">{{ tool.name }}</h4>
-                  <p class="text-[10px] text-slate-500 font-mono uppercase tracking-wider">{{ tool.id }}</p>
-                </div>
-              </div>
-
-              <button
-                @click="toggleTool( tool.id )"
-                class="w-14 h-8 rounded-full transition-all flex items-center p-1"
-                :class="enabledTools[tool.id] ? 'bg-indigo-500' : 'bg-slate-800'"
-              >
-                <div
-                  class="w-6 h-6 bg-white rounded-full shadow-lg transform transition-transform"
-                  :class="enabledTools[tool.id] ? 'translate-x-6' : 'translate-x-0'"
-                ></div>
-              </button>
-            </div>
-          </div>
-
-          <div class="mt-12 pt-12 border-t border-white/5 text-center">
-            <p class="text-[10px] text-slate-600 font-mono leading-relaxed uppercase tracking-widest">
-              Plug-and-play architecture active. <br>
-              Add folders to <code class="text-indigo-500">apps/</code> to register new tools.
-            </p>
-          </div>
-        </div>
-      </div>
-
       <!-- MODULE VIEWS -->
       <AuraTuneModule
         v-else-if=" currentModule === 'auratune' && enabledTools.auratune "
         @back="currentModule = 'dashboard'"
+        @open-settings="openSettings( 'engine' )"
       />
       <ScaleSleuthModule
         v-else-if=" currentModule === 'scalesleuth' && enabledTools.scalesleuth "
         @back="currentModule = 'dashboard'"
+        @open-settings="openSettings( 'engine' )"
       />
       <ChordCaptureModule
         v-else-if=" currentModule === 'chordcapture' && enabledTools.chordcapture "
         @back="currentModule = 'dashboard'"
+        @open-settings="openSettings( 'engine' )"
       />
       <PocketEngineModule
         v-else-if=" currentModule === 'pocketengine' && enabledTools.pocketengine "
@@ -338,6 +301,16 @@ const handleGainChange = ( event: Event ) => {
       </div>
 
       <ToolInfoModal />
+
+      <!-- Global Settings Modal -->
+      <SettingsModal
+        :show="showSettingsModal"
+        :initial-tab="settingsInitialTab"
+        :tools="ALL_TOOLS"
+        :enabled-state="enabledTools"
+        :enabled-callback="toggleTool"
+        @close="showSettingsModal = false"
+      />
 
       <!-- ACADEMY OVERLAY MOVED -->
     </main>

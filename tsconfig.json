@@ -1,0 +1,13 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./apps/tonic" },
+    { "path": "./apps/01-auratune" },
+    { "path": "./apps/02-chordcapture" },
+    { "path": "./apps/03-frequencyflow" },
+    { "path": "./apps/04-tracktracer" },
+    { "path": "./apps/07-pocket-engine" },
+    { "path": "./apps/09-scalesleuth" },
+    { "path": "./packages/core" }
+  ]
+}

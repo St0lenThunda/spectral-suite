@@ -2,12 +2,26 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { useAudioEngine, MagnitudeSpectrum, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
+import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
+import SettingsToggle from '../../components/settings/SettingsToggle.vue';
+import EngineSettings from '../../components/settings/EngineSettings.vue';
 
 const { openInfo } = useToolInfo();
+const isSettingsOpen = ref( false );
+
+const drawerCategories = [
+  { id: 'Engine', label: 'Engine', description: 'Global Audio Settings', showIndicator: false },
+  { id: 'Exports', label: 'Exports', description: 'Save Analysis Data', showIndicator: false }
+];
 // We'll import the same visualizers. In a real monorepo we'd share them more cleanly, 
 // but for now I'll implement a slightly more compact version here or import if possible.
 // Actually, I'll just implement them here to ensure zero-dependency issues during integration.
 
+/**
+ * Simple Waveform Visualizer (Mini Oscilloscope).
+ * Renders the time-domain audio data as a line graph.
+ * Kept local to avoid dependency overhead for this specific diagnostic view.
+ */
 class MiniOsc {
   canvas: HTMLCanvasElement;
   analyser: AnalyserNode;
@@ -17,21 +31,34 @@ class MiniOsc {
     this.analyser = analyser;
   }
 
+  /**
+   * Renders a single frame of the waveform.
+   * We use `getFloatTimeDomainData` because it gives us the raw audio signal
+   * oscillating between -1.0 and 1.0, which maps directly to speaker cone movement.
+   */
   draw () {
     const ctx = this.canvas.getContext( '2d' );
     if ( !ctx ) return;
+
     // Fix for Netlify/TS: Explicitly use ArrayBuffer and cast to any
+    // We multiply FFT size by 4 bytes (Float32 is 4 bytes per sample)
     const data = new Float32Array( new ArrayBuffer( this.analyser.fftSize * 4 ) );
     this.analyser.getFloatTimeDomainData( data as any );
+
     ctx.clearRect( 0, 0, this.canvas.width, this.canvas.height );
     ctx.strokeStyle = '#00f3ff';
     ctx.lineWidth = 2;
     ctx.beginPath();
+
     const sliceWidth = this.canvas.width / data.length;
     let x = 0;
+
     for ( let i = 0; i < data.length; i++ ) {
       const v = data[i] ?? 0;
+      // Map [-1, 1] audio data to [0, canvasHeight] pixel coordinates
+      // (v + 1) shifts range to [0, 2], then we scale to height/2
       const y = ( v + 1 ) * this.canvas.height / 2;
+
       if ( i === 0 ) ctx.moveTo( x, y ); else ctx.lineTo( x, y );
       x += sliceWidth;
     }
@@ -39,6 +66,11 @@ class MiniOsc {
   }
 }
 
+/**
+ * Scrolling Spectrogram (Waterfall) Visualizer.
+ * Displays frequency intensity over time (History).
+ * Uses a "sliding texture" technique where we draw the previous frame offset by 1 pixel.
+ */
 class MiniSpec {
   canvas: HTMLCanvasElement;
   analyser: AnalyserNode;
@@ -48,6 +80,7 @@ class MiniSpec {
     this.canvas = canvas;
     this.analyser = analyser;
     this.temp = document.createElement( 'canvas' );
+    // Temp canvas matches dimensions to act as a buffer
     this.temp.width = canvas.width;
     this.temp.height = canvas.height;
   }
@@ -56,20 +89,40 @@ class MiniSpec {
     const ctx = this.canvas.getContext( '2d' );
     const tCtx = this.temp.getContext( '2d' );
     if ( !ctx || !tCtx ) return;
+
+    // ByteFrequencyData gives us values 0-255 (Decibels mapped to integers)
+    // 0 = Silence (-Infinity dB), 255 = Max Volume (0 dB)
     const data = new Uint8Array( this.analyser.frequencyBinCount );
     this.analyser.getByteFrequencyData( data );
+
+    // 1. Copy current canvas to temp buffer
     tCtx.drawImage( this.canvas, 0, 0 );
+
+    // 2. Generate a new vertical slice (1px wide) for the current moment
     const imgData = ctx.createImageData( this.canvas.width, 1 );
     for ( let x = 0; x < this.canvas.width; x++ ) {
+      // Map x-coordinate (linear) to frequency bin index
+      // We only use the lower half of data usually, but here we span the full width
       const freqIdx = Math.floor( ( x / this.canvas.width ) * data.length * 0.5 );
       const val = data[freqIdx] || 0;
+
+      // Calculate pixel index (Red, Green, Blue, Alpha)
       const i = x * 4;
-      imgData.data[i] = val > 128 ? 255 : val * 2;
-      imgData.data[i + 1] = val > 128 ? ( val - 128 ) * 2 : 0;
-      imgData.data[i + 2] = val * 0.5;
-      imgData.data[i + 3] = 255;
+
+      // Heatmap Color Logic:
+      // Low volume = Dark Purple/Blue
+      // Med volume = Green/Cyan
+      // High volume = Red/White (clipping)
+      imgData.data[i] = val > 128 ? 255 : val * 2;     // Red channel boost properties
+      imgData.data[i + 1] = val > 128 ? ( val - 128 ) * 2 : 0; // Green kicks in late
+      imgData.data[i + 2] = val * 0.5;                 // Always some Blue for "cool" background
+      imgData.data[i + 3] = 255;                       // Alpha (Opaque)
     }
+
+    // 3. Draw the OLD history shifted down by 1 pixel
     ctx.drawImage( this.temp, 0, 1 );
+
+    // 4. Draw the NEW slice at the top (y=0)
     ctx.putImageData( imgData, 0, 0 );
   }
 }
@@ -100,7 +153,7 @@ const dominantNote = ref( "-" );
 const showInstrumentLabels = ref( true );
 const showHarmonics = ref( false );
 const peakHoldData = ref<Uint8Array | null>( null );
-const PEAK_DECAY_RATE = 0.98; // per frame
+const PEAK_DECAY_RATE = 0.98; // Multiplier to fade peaks (98% retention per frame)
 
 // Instrument Frequency Ranges
 // instrumentRanges imported from core
@@ -108,14 +161,23 @@ const PEAK_DECAY_RATE = 0.98; // per frame
 // EQ Suggestions (computed based on spectrum)
 const eqSuggestions = ref<EQSuggestion[]>( [] );
 
+/**
+ * Updates the AudioAnalyzer node properties.
+ * Called when the user adjusts sliders in the UI.
+ */
 const updateEngine = () => {
   const analyser = getAnalyser();
   if ( analyser ) {
     analyser.fftSize = fftSize.value;
+    // Smoothing: 0.0 = React instantly (jittery), 0.99 = Very slow average (ghosting)
     analyser.smoothingTimeConstant = smoothing.value;
   }
 };
 
+/**
+ * Captures a snapshot of the current spectrum data.
+ * Used to compare a specific moment (e.g., a snare hit) against live input.
+ */
 const toggleFreeze = () => {
   if ( !isFrozen.value ) {
     const analyser = getAnalyser();
@@ -132,30 +194,41 @@ const toggleFreeze = () => {
 
 // getNoteFromFreq imported from core
 
+/**
+ * Main Animation Loop.
+ * Runs at the browser's refresh rate (usually 60Hz).
+ */
 const render = () => {
   if ( osc ) osc.draw();
   if ( spec ) spec.draw();
+  // MagnitudeSpectrum is a more complex visualizer imported from @spectralsuite/core
   if ( mag ) mag.draw( frozenData.value, scaleMode.value, peakHoldData.value, showInstrumentLabels.value, INSTRUMENT_RANGES, showHarmonics.value, dominantFreq.value );
 
-  // Detect dominant frequency
+  // Detect dominant frequency for the HUD
   const analyser = getAnalyser();
   if ( analyser ) {
     const data = new Uint8Array( analyser.frequencyBinCount );
     analyser.getByteFrequencyData( data );
 
-    // Update Peak Hold
+    // Update Peak Hold State using "decay" physics
     if ( !peakHoldData.value ) {
       peakHoldData.value = new Uint8Array( data.length );
     }
     for ( let i = 0; i < data.length; i++ ) {
       const currentPeak = peakHoldData.value[i] ?? 0;
+      // If current val is higher, push the peak up instantly (Attack time = 0)
       if ( data[i]! > currentPeak ) {
         peakHoldData.value[i] = data[i]!;
       } else {
+        // Otherwise, let it fade out slowly (Release time = PEAK_DECAY_RATE)
         peakHoldData.value[i] = Math.floor( currentPeak * PEAK_DECAY_RATE );
       }
     }
 
+    // Mathematical Peak Detection (Naive Approach)
+    // We just look for the bin with the highest magnitude.
+    // NOTE: For better pitch accuracy, we should use the autocorrelation/HPS engine (usePitch).
+    // This is just a visual "Quick Check" for the dominant frequency band.
     let maxVal = 0;
     let maxIdx = 0;
     for ( let i = 0; i < data.length; i++ ) {
@@ -165,12 +238,14 @@ const render = () => {
         maxIdx = i;
       }
     }
+
+    // Only detect if signal is above a noise floor (50/255 ≈ -60dB)
     if ( maxVal > 50 ) {
       const nyquist = analyser.context.sampleRate / 2;
       dominantFreq.value = Math.round( ( maxIdx / data.length ) * nyquist );
       dominantNote.value = getNoteFromFreq( dominantFreq.value );
 
-      // Generate EQ Suggestions
+      // Generate EQ Suggestions based on spectral balance
       eqSuggestions.value = generateEqSuggestions( data, nyquist );
     } else {
       dominantNote.value = "-";
@@ -182,28 +257,38 @@ const render = () => {
 
 // generateEqSuggestions imported from core
 
+/**
+ * Exports the current spectral frame to a file.
+ * 
+ * @param format - 'png' for visual snapshot, 'json' for raw data analysis
+ */
 const exportSpectrum = ( format: 'png' | 'json' ) => {
   const analyser = getAnalyser();
   if ( !analyser ) return;
 
   if ( format === 'png' && magCanvas.value ) {
+    // Canvas API allows direct export to Data URL
     const link = document.createElement( 'a' );
     link.download = `spectrum-${Date.now()}.png`;
     link.href = magCanvas.value.toDataURL( 'image/png' );
     link.click();
   } else if ( format === 'json' ) {
+    // Construct a scientific data object
     const data = new Uint8Array( analyser.frequencyBinCount );
     analyser.getByteFrequencyData( data );
     const nyquist = analyser.context.sampleRate / 2;
+
     const json = {
       timestamp: new Date().toISOString(),
       sampleRate: analyser.context.sampleRate,
       fftSize: fftSize.value,
+      // Map raw bins to Hz values for portability
       frequencies: Array.from( data ).map( ( val, i ) => ( {
         hz: Math.round( ( i / data.length ) * nyquist ),
-        magnitude: val
+        magnitude: val // 0-255 scale
       } ) )
     };
+
     const blob = new Blob( [JSON.stringify( json, null, 2 )], { type: 'application/json' } );
     const link = document.createElement( 'a' );
     link.download = `spectrum-${Date.now()}.json`;
@@ -234,7 +319,7 @@ onUnmounted( () => {
 
 <template>
   <div class="space-y-6">
-    <header class="flex justify-between items-end">
+    <header class="flex justify-between items-end mb-8">
       <div>
         <button
           @click="emit( 'back' )"
@@ -247,26 +332,52 @@ onUnmounted( () => {
           >Pro</span></h2>
         <p class="text-slate-400 text-sm">Real-time spectral analysis and waveform diagnostics.</p>
       </div>
-      <div class="flex items-center gap-3">
-        <!-- Export Buttons -->
-        <div class="flex gap-1 bg-white/5 p-1 rounded-lg border border-white/5">
-          <button
-            @click="exportSpectrum( 'png' )"
-            class="px-3 py-1 text-[8px] font-black uppercase tracking-widest rounded-md transition-all text-emerald-400 hover:bg-emerald-500/20"
-          >📷 PNG</button>
-          <button
-            @click="exportSpectrum( 'json' )"
-            class="px-3 py-1 text-[8px] font-black uppercase tracking-widest rounded-md transition-all text-amber-400 hover:bg-amber-500/20"
-          >📊 JSON</button>
-        </div>
+      <div class="flex items-center gap-4">
+        <SettingsToggle
+          :is-open="isSettingsOpen"
+          @click="isSettingsOpen = !isSettingsOpen"
+        />
         <button
           @click="openInfo( 'frequencyflow' )"
-          class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
+          class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-black text-lg flex items-center justify-center hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
         >
-          Intelligence
+          ?
         </button>
       </div>
     </header>
+
+    <LocalSettingsDrawer
+      :is-open="isSettingsOpen"
+      :categories="drawerCategories"
+      @close="isSettingsOpen = false"
+    >
+      <template #Engine>
+        <EngineSettings />
+      </template>
+      <template #Exports>
+        <div class="space-y-4">
+          <p class="text-[11px] text-slate-500 leading-relaxed">
+            Export the current spectral analysis data for external processing or documentation.
+          </p>
+          <div class="grid grid-cols-2 gap-3">
+            <button
+              @click="exportSpectrum( 'png' )"
+              class="px-4 py-8 rounded-2xl bg-slate-900 border border-emerald-500/20 hover:border-emerald-500/50 hover:bg-emerald-500/10 transition-all group flex flex-col items-center gap-3"
+            >
+              <span class="text-2xl opacity-50 group-hover:opacity-100 group-hover:scale-110 transition-all">📷</span>
+              <span class="text-[10px] uppercase font-black tracking-widest text-emerald-400">Export PNG</span>
+            </button>
+            <button
+              @click="exportSpectrum( 'json' )"
+              class="px-4 py-8 rounded-2xl bg-slate-900 border border-amber-500/20 hover:border-amber-500/50 hover:bg-amber-500/10 transition-all group flex flex-col items-center gap-3"
+            >
+              <span class="text-2xl opacity-50 group-hover:opacity-100 group-hover:scale-110 transition-all">📊</span>
+              <span class="text-[10px] uppercase font-black tracking-widest text-amber-400">Export JSON</span>
+            </button>
+          </div>
+        </div>
+      </template>
+    </LocalSettingsDrawer>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Interactive Spectrum Analyzer (Magnitude) -->

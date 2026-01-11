@@ -4,6 +4,10 @@ import { NativePitch } from './NativePitch';
 import { useAudioEngine } from './useAudioEngine';
 import processorUrl from './worklets/pitch-processor.ts?worker&url';
 
+// Global State for Engine Settings (Shared across all instances)
+export const isLowPassEnabled = ref( false );
+export const downsample = ref( 1 );
+
 export function usePitch ( config: { smoothing?: number } = {} ) {
   const { getAnalyser, getContext, isInitialized } = useAudioEngine();
   const pitch = ref<number | null>( null );
@@ -15,8 +19,6 @@ export function usePitch ( config: { smoothing?: number } = {} ) {
   const transposition = ref<number>( 0 ); // semitones
   const pitchHistory = ref<Array<{ time: number, cents: number }>>( [] );
   const isCanceled = ref( false );
-  const isLowPassEnabled = ref( false );
-  const downsample = ref( 1 );
 
   // Median Filter State
   const medianBuffer: ( number | null )[] = [];

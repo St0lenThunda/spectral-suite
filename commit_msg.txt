@@ -1,0 +1,16 @@
+feat(ui): unify module settings and improve audio input quality
+
+- **UI Refactor**:
+  - Implement `LocalSettingsDrawer` for consistent settings access across all modules.
+  - Create `EngineSettings`, `SettingsModal`, `SettingsToggle`, and `SettingsTrigger` components in `apps/tonic/src/components/settings/`.
+  - Add `PillNav` component for UI navigation.
+  - Update `ChordCaptureModule`, `FrequencyFlowModule`, and other modules to use the new settings drawer pattern.
+  - Refactor module headers to align with `AuraTuneModule` design.
+
+- **Audio Engine**:
+  - Configure `getUserMedia` to request raw audio (disable echo cancellation, noise suppression, AGC) in `AudioEngine.ts`.
+  - This ensures full spectral content is available for analysis, preventing OS-level filtering artifacts.
+
+- **Build & Chore**:
+  - Update `tsconfig.json` and `env.d.ts` to resolve TypeScript build errors.
+  - Apply JSDoc and comments per `code-style-guide.md`.

@@ -4,6 +4,7 @@ trigger: always_on
 
 # Educational Codebase Mode
 # Use this file to instruct the AI to treat the codebase as a teaching tool.
+All edited or newly created code should review this guide
 
 ## Philosophy
 The user has NO experience with TypeScript. This codebase is their primary learning resource.

@@ -83,3 +83,10 @@
 1. **Tauri (Desktop)** - Lower friction, faster to ship
 2. **Capacitor (Mobile)** - Higher effort, bigger market
 3. **Monetization** - After platforms are stable
+
+## 🎧 Audio Engine Enhancements
+
+### Input Processor (DSP)
+- [ ] **Noise Gate**: Mute signal below variable threshold (Clean up silence)
+- [ ] **Input Gain**: Digital gain boost for quiet microphones
+- [ ] **Compressor**: Dynamic range cleaner (Even out volume)

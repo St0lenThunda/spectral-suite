@@ -2,6 +2,9 @@
 import { usePitch, useAudioEngine, Note } from '@spectralsuite/core'
 import { onMounted, ref, computed, watch } from 'vue'
 import { useToolInfo } from '../../composables/useToolInfo';
+import EngineSettings from '../../components/settings/EngineSettings.vue';
+import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
+import SettingsToggle from '../../components/settings/SettingsToggle.vue';
 
 const {
   pitch,
@@ -19,13 +22,42 @@ const { init, isInitialized } = useAudioEngine()
 const { openInfo } = useToolInfo();
 
 const isSettingsOpen = ref( false )
-const activeCategory = ref<string | null>( null )
+
+const drawerCategories = computed( () => [
+  {
+    id: 'General',
+    label: 'General',
+    description: 'Layout & Visibility',
+    showIndicator: !showDiagnostics.value || !showVibrato.value
+  },
+  {
+    id: 'Tuning',
+    label: 'Tuning',
+    description: 'Concert A, Transposition',
+    showIndicator: concertA.value !== 440 || transposition.value !== 0
+  },
+  {
+    id: 'Drone',
+    label: 'Drone',
+    description: 'Background Guide Pitch',
+    showIndicator: isDroneActive.value
+  },
+  {
+    id: 'Engine',
+    label: 'Engine',
+    description: 'Algorithm Filters & Modes',
+    showIndicator: isLowPassEnabled.value || downsample.value > 1
+  }
+] );
+
 const showDiagnostics = ref( true )
 const showVibrato = ref( true )
 const droneVolume = ref( 0 )
 const isDroneActive = ref( false )
 
-const emit = defineEmits( ['back'] )
+const emit = defineEmits<{
+  ( e: 'back' ): void
+}>()
 
 // Strobe Rendering
 const strobeCanvas = ref<HTMLCanvasElement | null>( null )
@@ -127,268 +159,142 @@ const toneQualityLabel = computed(() => {
         <p class="text-slate-500 text-[10px] font-mono uppercase tracking-[0.2em] mt-1">Intonation & Stability Suite</p>
       </div>
       <div class="flex items-center gap-4">
-        <button
+        <SettingsToggle
+          :is-open="isSettingsOpen"
           @click="isSettingsOpen = !isSettingsOpen"
-          class="p-2 text-slate-500 hover:text-white transition-all transform"
-          :class="{ 'rotate-90 text-sky-400': isSettingsOpen }"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            class="h-6 w-6"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2.5"
-              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 0 0 2.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 0 0 1.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 0 0-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 0 0-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 0 0-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 0 0-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 0 0 1.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
-            />
-            <path
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              stroke-width="2.5"
-              d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0z"
-            />
-          </svg>
-        </button>
+        />
         <button
           @click="openInfo( 'auratune' )"
-          class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
+          class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-black text-lg flex items-center justify-center hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
         >
-          Intelligence
+          ?
         </button>
       </div>
     </header>
 
-    <Transition name="drawer">
-      <div v-if="isSettingsOpen" class="glass-card mb-8 p-8 rounded-[2rem] overflow-hidden">
-        <div class="relative min-h-[300px]">
-          <!-- Level 1: Category Pills -->
-          <Transition
-            name="morph-swell"
-            mode="out-in"
-          >
-            <div
-              v-if=" !activeCategory "
-              class="flex flex-wrap items-start content-start gap-4 absolute inset-0"
+    <LocalSettingsDrawer
+      :is-open="isSettingsOpen"
+      :categories="drawerCategories"
+      @close="isSettingsOpen = false"
+    >
+      <template #General>
+        <div class="space-y-4">
+          <div>
+            <button
+              @click="showDiagnostics = !showDiagnostics"
+              class="w-full px-4 py-3 rounded-xl font-black text-xs border transition-all text-left uppercase tracking-widest flex items-center justify-between"
+              :class="showDiagnostics ? 'bg-sky-500/10 border-sky-400/30 text-sky-400' : 'bg-slate-900 border-white/5 text-slate-500'"
             >
-              <button
-                v-for=" cat in ['General', 'Tuning', 'Drone', 'Engine'] "
-                :key="cat"
-                @click="activeCategory = cat"
-                class="group relative px-6 py-4 rounded-2xl bg-slate-800 border border-slate-700 hover:border-slate-500 transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
-              >
-                <div
-                  class="text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-white mb-1 transition-colors"
-                >
-                  {{ cat }}
-                </div>
-                <div class="text-[9px] text-slate-600 group-hover:text-slate-500 italic">
-                  {{
-                    cat === 'General' ? 'Layout & Visibility' :
-                      cat === 'Tuning' ? 'Concert A, Transposition' :
-                        cat === 'Drone' ? 'Background Guide Pitch' :
-                          'Algorithm Filters & Modes'
-                  }}
-                </div>
-                <!-- Active Indicator Dots -->
-                <div
-                  v-if=" ( cat === 'General' && ( !showDiagnostics || !showVibrato ) ) || ( cat === 'Tuning' && ( concertA !== 440 || transposition !== 0 ) ) || ( cat === 'Drone' && isDroneActive ) || ( cat === 'Engine' && ( isLowPassEnabled || downsample > 1 ) ) "
-                  class="absolute top-2 right-2 w-1.5 h-1.5 rounded-full bg-sky-500 shadow-lg shadow-sky-500/50"
-                ></div>
-              </button>
+              <span>Show Diagnostic Data</span>
+              <div
+                class="w-2 h-2 rounded-full"
+                :class="showDiagnostics ? 'bg-sky-400' : 'bg-slate-700'"
+              ></div>
+            </button>
+            <p class="text-[11px] text-slate-500 mt-2 leading-relaxed px-1">
+              Display panels for Tone Quality and Calibration data. Useful for analyzing signal health.
+            </p>
+          </div>
 
-              <!-- Close Button -->
-              <button
-                @click="isSettingsOpen = false"
-                class="absolute top-0 right-0 p-2 text-slate-500 hover:text-white transition-colors rounded-full hover:bg-white/10"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-5 w-5"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                >
-                  <path
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-
-            <!-- Level 2: Expanded Content -->
-            <div
-              v-else
-              class="absolute inset-0 bg-slate-800 rounded-2xl border border-slate-700 flex flex-col overflow-hidden shadow-2xl"
+          <div>
+            <button
+              @click="showVibrato = !showVibrato"
+              class="w-full px-4 py-3 rounded-xl font-black text-xs border transition-all text-left uppercase tracking-widest flex items-center justify-between"
+              :class="showVibrato ? 'bg-indigo-500/10 border-indigo-400/30 text-indigo-400' : 'bg-slate-900 border-white/5 text-slate-500'"
             >
-              <div class="flex-1 flex flex-col animate-content-swell">
-                <!-- Header -->
-                <div class="flex items-center justify-between px-6 py-4 border-b border-white/5 bg-black/20">
-                  <h3 class="text-xs font-black uppercase tracking-[0.2em] text-white">{{ activeCategory }}</h3>
-                  <button
-                    @click="activeCategory = null"
-                    class="text-[10px] font-bold text-slate-500 hover:text-white uppercase tracking-wider px-3 py-1.5 rounded-lg hover:bg-white/5 transition-all"
-                  >
-                    Done
-                  </button>
-                </div>
-
-                <!-- Scrollable Content -->
-                <div class="p-6 overflow-y-auto custom-scrollbar flex-1">
-                  <!-- General Section -->
-                  <div
-                    v-if=" activeCategory === 'General' "
-                    class="grid grid-cols-1 md:grid-cols-2 gap-4"
-                  >
-                    <button
-                      @click="showDiagnostics = !showDiagnostics"
-                      class="px-4 py-3 rounded-xl font-black text-[10px] border transition-all text-left uppercase tracking-widest flex items-center justify-between"
-                      :class="showDiagnostics ? 'bg-sky-500/10 border-sky-400/30 text-sky-400' : 'bg-slate-900 border-white/5 text-slate-500'"
-                    >
-                      <span>Show Diagnostic Data</span>
-                      <div
-                        class="w-2 h-2 rounded-full"
-                        :class="showDiagnostics ? 'bg-sky-400' : 'bg-slate-700'"
-                      ></div>
-                    </button>
-                    <button
-                      @click="showVibrato = !showVibrato"
-                      class="px-4 py-3 rounded-xl font-black text-[10px] border transition-all text-left uppercase tracking-widest flex items-center justify-between"
-                      :class="showVibrato ? 'bg-indigo-500/10 border-indigo-400/30 text-indigo-400' : 'bg-slate-900 border-white/5 text-slate-500'"
-                    >
-                      <span>Show Vibrato Graph</span>
-                      <div
-                        class="w-2 h-2 rounded-full"
-                        :class="showVibrato ? 'bg-indigo-400' : 'bg-slate-700'"
-                      ></div>
-                    </button>
-                  </div>
-                  <!-- Tuning Section -->
-                  <div
-                    v-if=" activeCategory === 'Tuning' "
-                    class="grid grid-cols-1 md:grid-cols-2 gap-8"
-                  >
-                    <div class="space-y-4">
-                      <div class="flex justify-between">
-                        <label class="text-[10px] font-black uppercase tracking-widest text-slate-500">Concert A</label>
-                        <span class="text-xs font-black text-white">{{ concertA }}Hz</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="390"
-                        max="490"
-                        v-model.number="concertA"
-                        class="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
-                      />
-                    </div>
-
-
-
-                    <div class="space-y-4">
-
-                      <label
-                        class="text-[10px] font-black uppercase tracking-widest text-slate-500 block">Transposition</label>
-                      <div class="flex gap-2">
-                        <button
-                          v-for=" ( label, val ) in { 0: 'C', '-2': 'Bb', '-9': 'Eb', '-7': 'F' } "
-                          :key="val"
-                          @click="transposition = Number( val )"
-                          class="flex-1 py-1.5 rounded-lg font-black text-[10px] border transition-all"
-                          :class="transposition === Number( val ) ? 'bg-sky-500/20 border-sky-500/50 text-sky-400' : 'bg-slate-900 border-white/5 text-slate-500'"
-                        >
-                          {{ label }}
-                        </button>
-                      </div>
-                    </div>
-
-
-                  </div>
-
-
-
-                  <!-- Drone Section -->
-                  <div
-                    v-if=" activeCategory === 'Drone' "
-                    class="max-w-md mx-auto space-y-6"
-                  >
-                    <div class="flex justify-between items-center">
-                      <label class="text-[10px] font-black uppercase tracking-widest text-slate-500">Drone Guide</label>
-                      <button
-                        @click="isDroneActive = !isDroneActive"
-                        class="px-4 py-2 rounded-xl text-[10px] font-black transition-all"
-                        :class="isDroneActive ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-slate-500'"
-                      >
-
-                        {{ isDroneActive ? 'ENABLED' : 'MUTED' }}
-                      </button>
-                    </div>
-
-                    <div class="space-y-3">
-                      <div class="flex justify-between text-[10px] font-black uppercase text-slate-600">
-                        <span>Volume</span>
-                        <span>{{ Math.round( droneVolume * 100 ) }}%</span>
-                      </div>
-
-
-                      <input
-                        type="range"
-                        min="0"
-                        max="1"
-                        step="0.1"
-                        v-model.number="droneVolume"
-                        class="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
-                      />
-                    </div>
-
-
-
-                  </div>
-
-
-
-                  <!-- Engine Section -->
-                  <div
-                    v-if=" activeCategory === 'Engine' "
-                    class="space-y-6"
-                  >
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <button
-                        @click="isLowPassEnabled = !isLowPassEnabled"
-                        class="py-4 rounded-2xl font-black text-[10px] border transition-all uppercase tracking-widest text-center"
-                        :class="isLowPassEnabled ? 'bg-sky-500/20 border-sky-500/50 text-sky-400' : 'bg-slate-900 border-white/5 text-slate-500'"
-                      >
-
-                        Low-Pass Filter: {{ isLowPassEnabled ? 'ON' : 'OFF' }}
-                      </button>
-                      <button
-                        @click="downsample = downsample === 1 ? 4 : 1"
-                        class="py-4 rounded-2xl font-black text-[10px] border transition-all uppercase tracking-widest text-center"
-                        :class="downsample > 1 ? 'bg-indigo-500/20 border-indigo-500/50 text-indigo-400' : 'bg-slate-900 border-white/5 text-slate-500'"
-                      >
-
-                        Bass Mode: {{ downsample > 1 ? 'ON' : 'OFF' }}
-                      </button>
-                    </div>
-
-                    <p class="text-[9px] text-slate-500 text-center italic">
-                      Enable <strong>Low-Pass</strong> to remove background noise. Use <strong>Bass Mode</strong> for
-                      instruments below 100Hz.
-                    </p>
-                  </div>
-
-                </div>
-              </div>
-            </div>
-          </Transition>
+              <span>Show Vibrato Graph</span>
+              <div
+                class="w-2 h-2 rounded-full"
+                :class="showVibrato ? 'bg-indigo-400' : 'bg-slate-700'"
+              ></div>
+            </button>
+            <p class="text-[11px] text-slate-500 mt-2 leading-relaxed px-1">
+              Real-time plot of pitch fluctuation over time. Helps visualize stability and modulation width.
+            </p>
+          </div>
         </div>
-      </div>
-    </Transition>
+      </template>
+
+      <template #Tuning>
+        <div class="space-y-8">
+          <div class="space-y-4">
+            <div class="flex justify-between">
+              <label class="text-xs font-black uppercase tracking-widest text-slate-500">Concert A (Reference)</label>
+              <span class="text-xs font-black text-white">{{ concertA }}Hz</span>
+            </div>
+            <input
+              type="range"
+              min="390"
+              max="490"
+              v-model.number="concertA"
+              class="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
+            />
+            <p class="text-[11px] text-slate-500 leading-relaxed">
+              Sets the frequency of A4. Standard is 440Hz. 432Hz or other scientific tunings can be set here.
+            </p>
+          </div>
+
+          <div class="space-y-4">
+            <label class="text-xs font-black uppercase tracking-widest text-slate-500 block">Transposition</label>
+            <div class="flex gap-2">
+              <button
+                v-for=" ( label, val ) in { 0: 'C', '-2': 'Bb', '-9': 'Eb', '-7': 'F' } "
+                :key="val"
+                @click="transposition = Number( val )"
+                class="flex-1 py-1.5 rounded-lg font-black text-xs border transition-all"
+                :class="transposition === Number( val ) ? 'bg-sky-500/20 border-sky-500/50 text-sky-400' : 'bg-slate-900 border-white/5 text-slate-500'"
+              >
+                {{ label }}
+              </button>
+            </div>
+            <p class="text-[11px] text-slate-500 leading-relaxed">
+              Shift the detected note display for transposing instruments (e.g., Bb Trumpet, Eb Sax).
+            </p>
+          </div>
+        </div>
+      </template>
+
+      <template #Drone>
+        <div class="max-w-md mx-auto space-y-6">
+          <div>
+            <div class="flex justify-between items-center mb-4">
+              <label class="text-xs font-black uppercase tracking-widest text-slate-500">Drone Guide</label>
+              <button
+                @click="isDroneActive = !isDroneActive"
+                class="px-4 py-2 rounded-xl text-xs font-black transition-all"
+                :class="isDroneActive ? 'bg-emerald-500 text-white' : 'bg-slate-900 text-slate-500'"
+              >
+                {{ isDroneActive ? 'ENABLED' : 'MUTED' }}
+              </button>
+            </div>
+            <p class="text-[11px] text-slate-500 leading-relaxed">
+              Plays a continuous reference tone matching the currently detected note. Excellent for intonation training.
+            </p>
+          </div>
+
+          <div class="space-y-3">
+            <div class="flex justify-between text-xs font-black uppercase text-slate-600">
+              <span>Playback Volume</span>
+              <span>{{ Math.round( droneVolume * 100 ) }}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.1"
+              v-model.number="droneVolume"
+              class="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
+            />
+          </div>
+        </div>
+      </template>
+
+      <template #Engine>
+        <div class="space-y-6">
+          <EngineSettings />
+        </div>
+      </template>
+    </LocalSettingsDrawer>
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Tuner Card -->

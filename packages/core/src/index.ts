@@ -1,3 +1,4 @@
+/// <reference path="./env.d.ts" />
 export * from './audio/AudioEngine';
 export * from './config/sensitivity';
 export * from './audio/useAudioEngine';

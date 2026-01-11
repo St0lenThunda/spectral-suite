@@ -1,12 +1,27 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useChordCapture, useAudioEngine, ChordEngine, Fretboard, SynthEngine, type ChordMatch } from '@spectralsuite/core'
+import { useChordCapture, useAudioEngine, ChordEngine, Fretboard, SynthEngine, type ChordMatch, isLowPassEnabled, downsample } from '@spectralsuite/core'
 import { useToolInfo } from '../../composables/useToolInfo';
 import ChordModal from '../../components/ChordModal.vue';
-import LiveMonitor from './LiveMonitor.vue';
 import CaptureTray from './CaptureTray.vue';
+import LiveMonitor from './LiveMonitor.vue';
+import EngineSettings from '../../components/settings/EngineSettings.vue';
+import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
+import SettingsToggle from '../../components/settings/SettingsToggle.vue';
 
 const { openInfo } = useToolInfo();
+
+// --- UI / Interaction State ---
+const isSettingsOpen = ref( false );
+
+const drawerCategories = computed( () => [
+  {
+    id: 'Engine',
+    label: 'Engine',
+    description: 'Global Audio Processing',
+    showIndicator: isLowPassEnabled.value || downsample.value > 1
+  }
+] );
 
 const { 
   pitch, 
@@ -32,20 +47,28 @@ const { init, isInitialized, error } = useAudioEngine()
 const topChord = computed( () => detectedChords.value[0] || null );
 
 /**
- * Theoretical suggestions for the "Next Sound" in a sequence.
- * We use the topChord's symbol and the current key center to look up
- * functional movements (like V -> I) in the ChordEngine.
+ * Theoretical suggestions for the "Next Sound" in a harmonic sequence.
+ * This is the "Predictive Analysis" feature.
+ * 
+ * Logic:
+ * 1. We take the currently strongest detected chord (topChord).
+ * 2. We compare it against the user-selected key center (or detected key).
+ * 3. We use the ChordEngine (based on Circle of Fifths/Tonal.js) to find
+ *    chords that mathematically resolve tension or extend the narrative (e.g., V7 -> I).
  */
 const suggestions = computed( () => {
   if ( !topChord.value ) return [];
-  // ChordEngine.suggestNext takes a symbol string and a key string
+  // ChordEngine.suggestNext takes a symbol string (e.g., "Cm7") and a key string (e.g., "Eb")
+  // It returns an array of Chord objects that fit the western music theory grammar.
   return ChordEngine.suggestNext( topChord.value.symbol, keyCenter.value );
 } );
 
 /**
- * Modal State Management
- * We track which chord is currently "selected" to show its details
- * in the modal.
+ * Modal State Management.
+ * Controls the popover that appears when a user clicks a chord to see details.
+ * 
+ * We track `selectedChord` separately so the modal can display static data
+ * even if the live detection engine moves on to a new chord.
  */
 const selectedChord = ref<ChordMatch | null>( null );
 const isModalOpen = ref( false );
@@ -61,6 +84,16 @@ const openChordDetail = ( chord: ChordMatch ) => {
  */
 const auditChord = ( chord: ChordMatch ) => {
   SynthEngine.getInstance().playChord( chord.notes );
+};
+
+const handleChordCapture = ( chord: ChordMatch ) => {
+  // Logic: User Feedback Loop
+  // When a user "captures" a chord, they expect confirmation.
+  // We trigger the synth to play the notes so they can "audit" what they just saved.
+  SynthEngine.getInstance().playChord( chord.notes );
+
+  // Hand off to the theory engine to store in history
+  captureChord( chord );
 };
 
 const start = () => {
@@ -82,7 +115,35 @@ const updateKey = ( val: string ) => {
   keyCenter.value = val;
 };
 
-const emit = defineEmits( ['back'] )
+// --- Progression Playback ---
+const activePlaybackIndex = ref<number | null>( null );
+const isPlayingProgression = ref( false );
+
+const playProgression = async () => {
+  if ( isPlayingProgression.value ) return;
+  isPlayingProgression.value = true;
+
+  try {
+    for ( let i = 0; i < chordHistory.value.length; i++ ) {
+      activePlaybackIndex.value = i;
+      const chord = chordHistory.value[i];
+      if ( !chord ) continue;
+
+      // Play chord for 1 second
+      SynthEngine.getInstance().playChord( chord.notes );
+
+      // Visual feedback wait
+      await new Promise( resolve => setTimeout( resolve, 1000 ) );
+    }
+  } finally {
+    activePlaybackIndex.value = null;
+    isPlayingProgression.value = false;
+  }
+};
+
+const emit = defineEmits<{
+  ( e: 'back' ): void
+}>()
 </script>
 
 <template>
@@ -142,10 +203,8 @@ const emit = defineEmits( ['back'] )
       class="w-full flex flex-col items-center gap-6 md:gap-12 animate-fade-in"
     >
       <!-- Standard Module Header -->
-      <header
-        class="w-full max-w-3xl flex flex-col items-center md:flex-row md:justify-between md:items-end px-4 gap-6 md:gap-0"
-      >
-        <div class="text-center md:text-left">
+      <header class="flex justify-between items-end mb-8">
+        <div>
           <button
             @click="emit( 'back' )"
             class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 hover:text-white transition-colors mb-4 flex items-center gap-2"
@@ -155,33 +214,32 @@ const emit = defineEmits( ['back'] )
           <h2 class="text-3xl font-bold text-white mb-2">Chord <span class="text-indigo-400">Capture Pro</span></h2>
           <p class="text-slate-400 text-sm italic">Harmonic recognition, Roman Numerals & Sequence Ledger.</p>
         </div>
+
+        <div class="flex items-center gap-4">
+          <SettingsToggle
+            :is-open="isSettingsOpen"
+            @click="isSettingsOpen = !isSettingsOpen"
+          />
+          <button
+            @click="openInfo( 'chordcapture' )"
+            class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-black text-lg flex items-center justify-center hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
+          >
+            ?
+          </button>
+        </div>
       </header>
 
-      <!-- Step Indicator / Instructions -->
-      <!-- Secondary Controls: Key & Intelligence -->
-      <div class="w-full max-w-3xl flex justify-center items-center gap-6 mb-8 px-4">
-
-        <!-- Key Selection -->
-        <div class="flex flex-col items-center gap-2">
-          <span class="text-[9px] font-black uppercase text-slate-500 tracking-widest">Analysis Key</span>
-          <select
-            v-model="keyCenter"
-            class="bg-slate-900 border border-white/10 rounded-xl text-xs font-black text-indigo-400 px-6 py-2 focus:outline-none focus:border-indigo-500 transition-all uppercase appearance-none text-center min-w-[100px]"
-          >
-            <option
-              v-for=" k in ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B'] "
-              :key="k"
-              :value="k"
-            >{{ k }}</option>
-          </select>
-        </div>
-
-        <!-- Intelligence Button -->
-        <button
-          @click="openInfo( 'scalesleuth' )"
-          class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95"
-        >Intelligence</button>
-      </div>
+      <LocalSettingsDrawer
+        :is-open="isSettingsOpen"
+        :categories="drawerCategories"
+        @close="isSettingsOpen = false"
+      >
+        <template #Engine>
+          <div class="space-y-6">
+            <EngineSettings />
+          </div>
+        </template>
+      </LocalSettingsDrawer>
 
       <!-- Main Interactive Split: Monitor (Left) & Workspace (Right) -->
       <div
@@ -197,7 +255,7 @@ const emit = defineEmits( ['back'] )
           :clarity="clarity"
           :key-center="keyCenter"
           @update:key-center="updateKey"
-          @capture-chord="captureChord"
+          @capture-chord="handleChordCapture"
           @clear-notes="clearNotes"
         />
 
@@ -269,27 +327,57 @@ const emit = defineEmits( ['back'] )
             class="px-4 py-2 text-[9px] font-black text-slate-600 hover:text-red-400 transition-colors uppercase tracking-widest"
           >Clear All</button>
 
-          <button
-            v-if=" chordHistory.length > 0 "
-            @click="handleExport"
-            class="ml-4 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-black text-indigo-400 hover:bg-indigo-500/20 transition-all uppercase tracking-widest flex items-center gap-2"
-          >
-            <span>Export</span>
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="h-3 w-3"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
+          <div class="flex flex-col gap-2 ml-4">
+            <button
+              v-if=" chordHistory.length > 0 "
+              @click="handleExport"
+              class="px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-black text-indigo-400 hover:bg-indigo-500/20 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
             >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
-              />
-            </svg>
-          </button>
+              <span>Export</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-3 w-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
+                />
+              </svg>
+            </button>
+            <button
+              v-if=" chordHistory.length > 0 "
+              @click="playProgression"
+              :disabled="isPlayingProgression"
+              class="px-6 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black text-emerald-400 hover:bg-emerald-500/20 transition-all uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <span>{{ isPlayingProgression ? 'Playing...' : 'Play All' }}</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="h-3 w-3"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"
+                />
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div
@@ -299,7 +387,8 @@ const emit = defineEmits( ['back'] )
           <div
             v-for=" ( item, idx ) in chordHistory "
             :key="idx"
-            class="flex items-center gap-6 group"
+            class="flex items-center gap-6 group transition-all duration-300 rounded-xl p-2"
+            :class="{ 'bg-emerald-500/10 scale-105 shadow-xl shadow-emerald-500/10 ring-1 ring-emerald-500/30': activePlaybackIndex === idx }"
           >
             <div
               class="flex flex-col items-center cursor-pointer hover:scale-110 transition-transform relative"

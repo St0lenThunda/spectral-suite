@@ -11,7 +11,7 @@ interface Props {
   clarity: number | null;
 }
 
-const props = defineProps<Props>();
+defineProps<Props>();
 
 const emit = defineEmits<{
   ( e: 'captureChord', chord: ChordMatch ): void;

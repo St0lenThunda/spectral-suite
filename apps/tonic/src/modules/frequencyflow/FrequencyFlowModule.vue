@@ -131,7 +131,9 @@ class MiniSpec {
 // or just as placeholders.
 // ... (MiniOsc and MiniSpec code remains) ...
 
-const { init, isInitialized, getAnalyser } = useAudioEngine();
+// ... (MiniOsc and MiniSpec code remains) ...
+
+const { init, isInitialized, getAnalyser, activate, deactivate } = useAudioEngine();
 const oscCanvas = ref<HTMLCanvasElement | null>( null );
 const specCanvas = ref<HTMLCanvasElement | null>( null );
 const magCanvas = ref<HTMLCanvasElement | null>( null );
@@ -161,159 +163,172 @@ const PEAK_DECAY_RATE = 0.98; // Multiplier to fade peaks (98% retention per fra
 // EQ Suggestions (computed based on spectrum)
 const eqSuggestions = ref<EQSuggestion[]>( [] );
 
+const emit = defineEmits( ['back'] )
+
 /**
- * Updates the AudioAnalyzer node properties.
- * Called when the user adjusts sliders in the UI.
+ * Main Animation Loop.
+ * This function runs ~60 times per second to update the visualizers.
+ * 
+ * Physics Note:
+ * We use `requestAnimationFrame` instead of `setInterval` because it syncs with the monitor's refresh rate,
+ * preventing visual tearing and pausing automatically when the tab is inactive to save battery.
+ */
+const tick = () => {
+  if ( isFrozen.value ) {
+    animId = requestAnimationFrame( tick );
+    return;
+  }
+
+  // Draw Time Domain (Oscilloscope)
+  if ( osc ) osc.draw();
+
+  // Draw Frequency History (Spectrogram)
+  if ( spec ) spec.draw();
+
+  // Draw Main Frequency Spectrum
+  if ( mag && isInitialized.value ) {
+    mag.draw(
+      frozenData.value,
+      scaleMode.value,
+      peakHoldData.value,
+      showInstrumentLabels.value,
+      INSTRUMENT_RANGES,
+      showHarmonics.value,
+      dominantFreq.value
+    );
+  }
+
+  // Update stats periodically (every ~60 frames or throttled via random check)
+  // We don't need to re-calculate complex math every single frame (16ms) for UI text updates.
+  if ( Math.random() > 0.95 && isInitialized.value ) {
+    const analyser = getAnalyser();
+    if ( analyser ) {
+      const bufferLength = analyser.frequencyBinCount;
+      const dataArray = new Uint8Array( bufferLength );
+      analyser.getByteFrequencyData( dataArray );
+
+      // Simple peak detection: Find the louded frequency bin
+      let maxVal = -1;
+      let maxIndex = -1;
+      for ( let i = 0; i < bufferLength; i++ ) {
+        const val = dataArray[i] ?? 0;
+        if ( val > maxVal ) {
+          maxVal = val;
+          maxIndex = i;
+        }
+      }
+
+      // Filter out low-level noise (Noise Floor)
+      if ( maxVal > 100 ) {
+        // The Nyquist frequency is half the sample rate (e.g., 22050Hz for 44.1kHz).
+        // It represents the highest frequency correctly representable by the system.
+        const nyquist = analyser.context.sampleRate / 2;
+
+        // Map the array index back to a frequency value (Hz)
+        const freq = maxIndex * ( nyquist / bufferLength );
+
+        dominantFreq.value = Math.round( freq );
+        dominantNote.value = getNoteFromFreq( freq );
+
+        // Update EQ suggestions based on the full spectrum analysis
+        eqSuggestions.value = generateEqSuggestions( dataArray, nyquist );
+      }
+    }
+  }
+
+  animId = requestAnimationFrame( tick );
+};
+
+/**
+ * Updates the AudioAnalyserNode settings.
+ * Called when the user adjusts the UI sliders.
+ * 
+ * @param - None, reads directly from reactive refs.
  */
 const updateEngine = () => {
   const analyser = getAnalyser();
   if ( analyser ) {
+    // fftSize determines frequency resolution. Higher = cleaner bass, Lower = faster response.
+    // Must be a power of 2 (256, 512, 1024, etc.) due to the Fast Fourier Transform algorithm.
     analyser.fftSize = fftSize.value;
-    // Smoothing: 0.0 = React instantly (jittery), 0.99 = Very slow average (ghosting)
+
+    // Smooths the transition between frames to reduce jitter.
+    // 0 = no smoothing, 0.99 = very slow/sluggish.
     analyser.smoothingTimeConstant = smoothing.value;
   }
 };
 
 /**
- * Captures a snapshot of the current spectrum data.
- * Used to compare a specific moment (e.g., a snare hit) against live input.
+ * Toggles the "Freeze" state.
+ * Allows the user to pause the data stream to analyze a specific sound moment closely.
  */
 const toggleFreeze = () => {
-  if ( !isFrozen.value ) {
+  isFrozen.value = !isFrozen.value;
+};
+
+/**
+ * Exports the current analysis data.
+ * Useful for saving a "snapshot" of a sound's fingerprint.
+ * 
+ * @param format - 'png' for an image or 'json' for raw data.
+ */
+const exportSpectrum = ( format: 'png' | 'json' ) => {
+  if ( !magCanvas.value ) return;
+
+  if ( format === 'png' ) {
+    const link = document.createElement( 'a' );
+    link.download = `spectral-analysis-${Date.now()}.png`;
+    link.href = magCanvas.value.toDataURL();
+    link.click();
+  } else {
+    // JSON Export of current frequency data
     const analyser = getAnalyser();
     if ( analyser ) {
       const data = new Uint8Array( analyser.frequencyBinCount );
       analyser.getByteFrequencyData( data );
-      frozenData.value = data;
+
+      const json = JSON.stringify( Array.from( data ) );
+      const blob = new Blob( [json], { type: 'application/json' } );
+      const url = URL.createObjectURL( blob );
+
+      const link = document.createElement( 'a' );
+      link.download = `spectral-data-${Date.now()}.json`;
+      link.href = url;
+      link.click();
     }
-  } else {
-    frozenData.value = null;
-  }
-  isFrozen.value = !isFrozen.value;
-};
-
-// getNoteFromFreq imported from core
-
-/**
- * Main Animation Loop.
- * Runs at the browser's refresh rate (usually 60Hz).
- */
-const render = () => {
-  if ( osc ) osc.draw();
-  if ( spec ) spec.draw();
-  // MagnitudeSpectrum is a more complex visualizer imported from @spectralsuite/core
-  if ( mag ) mag.draw( frozenData.value, scaleMode.value, peakHoldData.value, showInstrumentLabels.value, INSTRUMENT_RANGES, showHarmonics.value, dominantFreq.value );
-
-  // Detect dominant frequency for the HUD
-  const analyser = getAnalyser();
-  if ( analyser ) {
-    const data = new Uint8Array( analyser.frequencyBinCount );
-    analyser.getByteFrequencyData( data );
-
-    // Update Peak Hold State using "decay" physics
-    if ( !peakHoldData.value ) {
-      peakHoldData.value = new Uint8Array( data.length );
-    }
-    for ( let i = 0; i < data.length; i++ ) {
-      const currentPeak = peakHoldData.value[i] ?? 0;
-      // If current val is higher, push the peak up instantly (Attack time = 0)
-      if ( data[i]! > currentPeak ) {
-        peakHoldData.value[i] = data[i]!;
-      } else {
-        // Otherwise, let it fade out slowly (Release time = PEAK_DECAY_RATE)
-        peakHoldData.value[i] = Math.floor( currentPeak * PEAK_DECAY_RATE );
-      }
-    }
-
-    // Mathematical Peak Detection (Naive Approach)
-    // We just look for the bin with the highest magnitude.
-    // NOTE: For better pitch accuracy, we should use the autocorrelation/HPS engine (usePitch).
-    // This is just a visual "Quick Check" for the dominant frequency band.
-    let maxVal = 0;
-    let maxIdx = 0;
-    for ( let i = 0; i < data.length; i++ ) {
-      const val = data[i] ?? 0;
-      if ( val > maxVal ) {
-        maxVal = val;
-        maxIdx = i;
-      }
-    }
-
-    // Only detect if signal is above a noise floor (50/255 ≈ -60dB)
-    if ( maxVal > 50 ) {
-      const nyquist = analyser.context.sampleRate / 2;
-      dominantFreq.value = Math.round( ( maxIdx / data.length ) * nyquist );
-      dominantNote.value = getNoteFromFreq( dominantFreq.value );
-
-      // Generate EQ Suggestions based on spectral balance
-      eqSuggestions.value = generateEqSuggestions( data, nyquist );
-    } else {
-      dominantNote.value = "-";
-    }
-  }
-
-  animId = requestAnimationFrame( render );
-};
-
-// generateEqSuggestions imported from core
-
-/**
- * Exports the current spectral frame to a file.
- * 
- * @param format - 'png' for visual snapshot, 'json' for raw data analysis
- */
-const exportSpectrum = ( format: 'png' | 'json' ) => {
-  const analyser = getAnalyser();
-  if ( !analyser ) return;
-
-  if ( format === 'png' && magCanvas.value ) {
-    // Canvas API allows direct export to Data URL
-    const link = document.createElement( 'a' );
-    link.download = `spectrum-${Date.now()}.png`;
-    link.href = magCanvas.value.toDataURL( 'image/png' );
-    link.click();
-  } else if ( format === 'json' ) {
-    // Construct a scientific data object
-    const data = new Uint8Array( analyser.frequencyBinCount );
-    analyser.getByteFrequencyData( data );
-    const nyquist = analyser.context.sampleRate / 2;
-
-    const json = {
-      timestamp: new Date().toISOString(),
-      sampleRate: analyser.context.sampleRate,
-      fftSize: fftSize.value,
-      // Map raw bins to Hz values for portability
-      frequencies: Array.from( data ).map( ( val, i ) => ( {
-        hz: Math.round( ( i / data.length ) * nyquist ),
-        magnitude: val // 0-255 scale
-      } ) )
-    };
-
-    const blob = new Blob( [JSON.stringify( json, null, 2 )], { type: 'application/json' } );
-    const link = document.createElement( 'a' );
-    link.download = `spectrum-${Date.now()}.json`;
-    link.href = URL.createObjectURL( blob );
-    link.click();
   }
 };
 
 onMounted( async () => {
-  if ( !isInitialized.value ) await init();
-  const analyser = getAnalyser();
-  if ( analyser ) {
-    updateEngine();
-    await nextTick();
-    if ( oscCanvas.value ) osc = new MiniOsc( oscCanvas.value, analyser );
-    if ( specCanvas.value ) spec = new MiniSpec( specCanvas.value, analyser );
-    if ( magCanvas.value ) mag = new MagnitudeSpectrum( magCanvas.value, analyser );
-    render();
+  // 1. Activate Engine
+  // If the engine hasn't been started yet (e.g. fresh reload on this page), we must init it.
+  activate();
+  if ( !isInitialized.value ) {
+    await init();
   }
-} );
 
-const emit = defineEmits( ['back'] )
+  // 2. Initialize Visualizers
+  const analyser = getAnalyser();
+
+  if ( analyser && oscCanvas.value ) {
+    osc = new MiniOsc( oscCanvas.value, analyser );
+  }
+
+  if ( analyser && specCanvas.value ) {
+    spec = new MiniSpec( specCanvas.value, analyser );
+  }
+
+  if ( analyser && magCanvas.value ) {
+    mag = new MagnitudeSpectrum( magCanvas.value, analyser );
+  }
+
+  // 3. Start Loop
+  tick();
+} );
 
 onUnmounted( () => {
   if ( animId ) cancelAnimationFrame( animId );
+  deactivate();
 } );
 </script>
 

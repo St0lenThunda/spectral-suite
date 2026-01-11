@@ -1,0 +1,30 @@
+services:
+  # 1. Python Backend (Forensic Proxy)
+  - type: web
+    name: forensic-proxy
+    env: docker
+    region: ohio
+    plan: free
+    dockerContext: apps/forensic-proxy
+    dockerfilePath: apps/forensic-proxy/Dockerfile
+    healthCheckPath: /health
+    envVars:
+      - key: PORT
+        value: 8000
+
+  # 2. Vue Frontend (Tonic)
+  - type: static
+    name: tonic-frontend
+    env: node
+    region: ohio
+    plan: free
+    # Build command runs from root, installing all deps and building specific workspace
+    buildCommand: npm install && npm run build:tonic
+    publishDir: apps/tonic/dist
+    envVars:
+      # Link to the backend service URL for API calls
+      - key: VITE_FORENSIC_PROXY_URL
+        fromService:
+          type: web
+          name: forensic-proxy
+          property: url

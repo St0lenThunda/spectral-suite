@@ -209,8 +209,9 @@ export function usePitch ( config: { smoothing?: number } = {} ) {
     // Use a multi-stage lock:
     // 1. High-Clarity Lock: Note must start with > 0.8 clarity.
     // 2. Sustain Lock: Once locked, we follow it down to 0.65 clarity (decay phase).
-    const CLARITY_START = 0.8;
-    const CLARITY_SUSTAIN = 0.65;
+    // Adjusted thresholds for raw audio (no noise suppression)
+    const CLARITY_START = 0.6;
+    const CLARITY_SUSTAIN = 0.5;
     const isLocked = currentNote.value !== null;
     const effectiveClarityThreshold = isLocked ? CLARITY_SUSTAIN : CLARITY_START;
 

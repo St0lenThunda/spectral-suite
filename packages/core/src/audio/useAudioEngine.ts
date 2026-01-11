@@ -4,6 +4,7 @@ import { AudioEngine } from './AudioEngine';
 const isInitialized = ref( false );
 const error = ref<string | null>( null );
 const inputGain = ref( 1.0 );
+const activeConsumers = ref( 0 );
 
 export function useAudioEngine () {
   const engine = AudioEngine.getInstance();
@@ -24,6 +25,32 @@ export function useAudioEngine () {
     inputGain.value = value;
   };
 
+  /**
+   * Registers a consumer that requires the audio engine to be running.
+   * Resumes the engine references go from 0 -> 1.
+   */
+  const activate = async () => {
+    if ( activeConsumers.value === 0 ) {
+      if ( isInitialized.value ) {
+        await engine.resume();
+      }
+    }
+    activeConsumers.value++;
+  };
+
+  /**
+   * Unregisters a consumer.
+   * Suspends the engine if references drop to 0.
+   */
+  const deactivate = () => {
+    activeConsumers.value = Math.max( 0, activeConsumers.value - 1 );
+    if ( activeConsumers.value === 0 ) {
+      if ( isInitialized.value ) {
+        engine.suspend();
+      }
+    }
+  };
+
   const getAnalyser = () => engine.getAnalyser();
   const getContext = () => engine.getContext();
 
@@ -35,6 +62,8 @@ export function useAudioEngine () {
     setGain,
     getAnalyser,
     getContext,
+    activate,
+    deactivate,
     resume: () => engine.resume(),
     suspend: () => engine.suspend(),
     close: () => engine.close(),

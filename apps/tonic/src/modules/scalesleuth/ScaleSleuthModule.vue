@@ -6,7 +6,7 @@
  * It combines real-time frequency analysis with music theory to suggest
  * potential scales based on the notes a user plays.
  */
-import { ref, computed, Transition, onMounted } from 'vue';
+import { ref, computed, Transition, onMounted, onUnmounted, watch } from 'vue';
 import { useScaleSleuth, useAudioEngine, SynthEngine, Fretboard, Note } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
@@ -38,7 +38,7 @@ const {
 } = useScaleSleuth();
 
 // initialization helpers for audio and info panels
-const { init, isInitialized } = useAudioEngine();
+const { init, isInitialized, activate, deactivate } = useAudioEngine();
 const { openInfo } = useToolInfo();
 
 // --- UI / Interaction State ---
@@ -284,10 +284,19 @@ const getWeightColor = ( note: string ) => {
 
 // Ensure audio is ready on mount
 onMounted( async () => {
+ activate();
   if ( !isInitialized.value ) {
     await init();
   }
 } );
+
+onUnmounted( () => {
+ deactivate();
+});
+
+watch( isInitialized, ( newVal ) => {
+ if ( newVal ) activate();
+});
 </script>
 
 <template>

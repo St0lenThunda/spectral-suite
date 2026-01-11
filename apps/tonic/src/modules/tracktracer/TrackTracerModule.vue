@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue';
-import { TrackAnalyzer, type AnalysisResult, useAudioRecorder } from '@spectralsuite/core';
+import { TrackAnalyzer, type AnalysisResult, useAudioRecorder, useAudioEngine } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
 
 const { openInfo } = useToolInfo();
@@ -16,13 +16,14 @@ const showSpecimens = ref( false );
 const {
   isListening,
   listeningDuration,
-  audioLevel,
   startListening: startMic,
-  stopListening: stopMic
+  stopListening: stopMic,
+  getAnalyser: getMicAnalyser
 } = useAudioRecorder();
 
 // Wrap stopListening to handle analysis
 const stopListening = async () => {
+  stopWaveform(); // Stop visualizer
   try {
     const file = await stopMic();
     isAnalyzing.value = true;
@@ -39,9 +40,64 @@ const stopListening = async () => {
   }
 };
 
+const waveformCanvas = ref<HTMLCanvasElement | null>( null );
+let waveformAnimId: number | null = null;
+
+const drawWaveform = () => {
+  const canvas = waveformCanvas.value;
+  const analyser = getMicAnalyser();
+  if ( !canvas || !analyser ) return;
+
+  const ctx = canvas.getContext( '2d' );
+  if ( !ctx ) return;
+
+  // Handle high-DPI displays
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale( dpr, dpr );
+
+  const bufferLength = analyser.frequencyBinCount;
+  const dataArray = new Uint8Array( bufferLength );
+  analyser.getByteTimeDomainData( dataArray );
+
+  ctx.clearRect( 0, 0, rect.width, rect.height );
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#fb7185'; // Rose-400
+  ctx.beginPath();
+
+  const sliceWidth = rect.width * 1.0 / bufferLength;
+  let x = 0;
+
+  for ( let i = 0; i < bufferLength; i++ ) {
+    const v = dataArray[i]! / 128.0;
+    const y = v * ( rect.height / 2 );
+
+    if ( i === 0 ) ctx.moveTo( x, y );
+    else ctx.lineTo( x, y );
+
+    x += sliceWidth;
+  }
+
+  ctx.lineTo( rect.width, rect.height / 2 );
+  ctx.stroke();
+
+  waveformAnimId = requestAnimationFrame( drawWaveform );
+};
+
+const stopWaveform = () => {
+  if ( waveformAnimId ) {
+    cancelAnimationFrame( waveformAnimId );
+    waveformAnimId = null;
+  }
+};
+
 const startListening = async () => {
   try {
     await startMic();
+    // Start visualizer after a brief delay to ensure analyser is ready
+    setTimeout( drawWaveform, 100 );
   } catch ( err: any ) {
     error.value = err.message;
   }
@@ -63,6 +119,10 @@ const analyzeFile = async ( event: Event ) => {
   result.value = null;
 
   try {
+    // Ensure engine is ready (TrackAnalyzer uses it)
+    if ( !useAudioEngine().isInitialized.value ) {
+      await useAudioEngine().init();
+    }
     result.value = await TrackAnalyzer.analyze( file );
   } catch ( err: any ) {
     error.value = "Forensic analysis failed: " + err.message;
@@ -86,7 +146,33 @@ const analyzeUrl = async () => {
       return;
     }
 
-    result.value = await TrackAnalyzer.analyzeUrl( targetUrl );
+    // Ensure engine is ready (TrackAnalyzer uses it)
+    if ( !useAudioEngine().isInitialized.value ) {
+      await useAudioEngine().init();
+    }
+
+    // Check for YouTube / Proxy requirement
+    if ( targetUrl.includes( 'youtube.com' ) || targetUrl.includes( 'youtu.be' ) ) {
+      // PROXY MODE
+      // TODO: Move this URL to environment variable
+      const PROXY_BASE = import.meta.env.VITE_FORENSIC_PROXY_URL || "http://localhost:8000";
+      const resolveUrl = `${PROXY_BASE}/resolve?url=${encodeURIComponent( targetUrl )}`;
+
+      try {
+        const resp = await fetch( resolveUrl );
+        if ( !resp.ok ) throw new Error( "Proxy resolution failed" );
+
+        const blob = await resp.blob();
+        // Convert blob to File object for the analyzer
+        const proxyFile = new File( [blob], "youtube_stream.mp3", { type: "audio/mpeg" } );
+        result.value = await TrackAnalyzer.analyze( proxyFile );
+      } catch ( e: any ) {
+        throw new Error( "Forensic Proxy Error: " + e.message );
+      }
+    } else {
+    // DIRECT MODE
+      result.value = await TrackAnalyzer.analyzeUrl( targetUrl );
+    }
   } catch ( err: any ) {
     error.value = "URL analysis failed: " + err.message;
   } finally {
@@ -120,6 +206,7 @@ let playbackSource: AudioBufferSourceNode | null = null;
 let playStartTime = 0;
 let offsetTime = 0;
 let progressInterval: number | null = null;
+const { getContext } = useAudioEngine();
 
 const togglePlayback = () => {
   if ( !result.value || !result.value.buffer ) return;
@@ -134,7 +221,8 @@ const togglePlayback = () => {
 const startPlayback = ( offset = offsetTime ) => {
   if ( !result.value || !result.value.buffer ) return;
 
-  const ctx = TrackAnalyzer.audioCtx;
+  const ctx = getContext();
+  if ( !ctx ) return;
   if ( ctx.state === 'suspended' ) ctx.resume();
 
   playbackSource = ctx.createBufferSource();
@@ -182,7 +270,8 @@ const stopPlayback = ( reset = false ) => {
 
 const updateProgress = () => {
   if ( !isPlaying.value || !result.value ) return;
-  const ctx = TrackAnalyzer.audioCtx;
+  const ctx = getContext();
+  if ( !ctx ) return;
   currentTime.value = offsetTime + ( ctx.currentTime - playStartTime );
 
   if ( currentTime.value < result.value.duration ) {
@@ -394,15 +483,12 @@ const exportAnalysis = () => {
             v-else
             class="relative h-48 rounded-[2.5rem] bg-rose-500/10 border border-rose-500/50 backdrop-blur-xl flex flex-col items-center justify-center p-6 overflow-hidden"
           >
-            <!-- Audio Level Bars (FrequencyFlow-style) -->
-            <div class="flex items-end gap-1 h-12 mb-4">
-              <div
-                v-for=" i in 12 "
-                :key="i"
-                class="w-2 rounded-full transition-all duration-75"
-                :class="audioLevel > ( i * 8 ) ? 'bg-rose-400' : 'bg-rose-500/20'"
-                :style="{ height: Math.max( 8, Math.min( 48, audioLevel * 0.5 + Math.random() * 8 ) ) + 'px' }"
-              ></div>
+            <!-- Waveform Visualizer -->
+            <div class="relative w-full h-24 mb-4 bg-rose-500/10 rounded-xl overflow-hidden">
+              <canvas
+                ref="waveformCanvas"
+                class="w-full h-full"
+              ></canvas>
             </div>
 
             <div class="flex items-center gap-4 mb-3">
@@ -410,14 +496,6 @@ const exportAnalysis = () => {
               <h3 class="text-lg font-bold text-rose-400 uppercase tracking-tight">Listening</h3>
               <span
                 class="text-white font-mono text-lg font-black">{{ Math.floor( listeningDuration / 60 ) }}:{{ ( listeningDuration % 60 ).toString().padStart( 2, '0' ) }}</span>
-            </div>
-
-            <!-- Level Indicator -->
-            <div class="w-full max-w-[200px] h-2 bg-white/10 rounded-full overflow-hidden mb-4">
-              <div
-                class="h-full bg-gradient-to-r from-rose-500 to-amber-400 transition-all duration-75"
-                :style="{ width: audioLevel + '%' }"
-              ></div>
             </div>
 
             <button

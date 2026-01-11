@@ -10,7 +10,7 @@ export class NativePitch {
   private bufferSize: number;
   // private buffer: Float32Array; // Removed unused buffer
   private sampleRate: number;
-  private cutoff: number = 0.88; // Relaxed from 0.93 for better lock on string instruments
+  private cutoff: number = 0.5; // Relaxed to allow downstream filtering
   public useLowPass: boolean = false;
   public downsample: number = 1;
   private lpfState: number = 0;

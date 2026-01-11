@@ -1,13 +1,11 @@
-// import Meyda from 'meyda';
 import processorUrl from '../audio/worklets/transient-processor.ts?worker&url';
+import { AudioEngine } from '../audio/AudioEngine';
 
 /**
  * TransientDetector - Detects audio transients (peaks) for timing analysis
  */
 export class TransientDetector {
   private workletNode: AudioWorkletNode | null = null
-  private stream: MediaStream | null = null
-  private audioContext: AudioContext | null = null
   private threshold: number = 0.3
   private lastTransientTime: number = 0
   private cooldownMs: number = 50
@@ -19,16 +17,34 @@ export class TransientDetector {
 
   public async init () {
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia( { audio: true } )
-      this.audioContext = new ( window.AudioContext || ( window as any ).webkitAudioContext )()
+      const engine = AudioEngine.getInstance();
+
+      // Ensure engine is initialized
+      if ( !engine.getContext() ) {
+        await engine.init();
+      }
+
+      const context = engine.getContext();
+      const stream = engine.getStream();
+
+      if ( !context || !stream ) {
+        throw new Error( 'AudioEngine failed to provide context or stream' );
+      }
 
       // Load the processor module
-      await this.audioContext.audioWorklet.addModule( processorUrl )
-
-      const source = this.audioContext.createMediaStreamSource( this.stream )
+      // Note: addModule can be called multiple times safely, browser handles deduplication usually,
+      // but to be safe/clean we could check if defined. 
+      // However, we don't have a registry of loaded modules. 
+      // Trying to add it again is generally harmless but might throw if network fails.
+      try {
+        await context.audioWorklet.addModule( processorUrl )
+      } catch ( e ) {
+        // It might already be loaded or failed. 
+        console.warn( 'TransientDetector addModule warning (might be already loaded):', e );
+      }
 
       // Create worklet node 'transient-processor' (must match name in registersProcessor)
-      this.workletNode = new AudioWorkletNode( this.audioContext, 'transient-processor' )
+      this.workletNode = new AudioWorkletNode( context, 'transient-processor' )
 
       // Handle messages from the processor
       this.workletNode.port.onmessage = ( event ) => {
@@ -36,8 +52,10 @@ export class TransientDetector {
         this.analyzeFrame( event.data )
       }
 
+      // Create a new source for this detector to avoid interfering with Engine's graph
+      const source = context.createMediaStreamSource( stream )
       source.connect( this.workletNode )
-      this.workletNode.connect( this.audioContext.destination ) // Keep alive
+      this.workletNode.connect( context.destination ) // Keep alive
 
     } catch ( err ) {
       console.error( 'Failed to initialize transient detector:', err )
@@ -46,16 +64,13 @@ export class TransientDetector {
   }
 
   public start () {
-    if ( this.audioContext && this.audioContext.state === 'suspended' ) {
-      this.audioContext.resume()
-    }
-    // Worklet is always running once connected, we could add a 'bypass' param if needed
+    AudioEngine.getInstance().resume();
   }
 
   public stop () {
-    if ( this.audioContext && this.audioContext.state === 'running' ) {
-      this.audioContext.suspend()
-    }
+    // We do NOT suspend the context because other nodes might be using it.
+    // Ideally we disconnect our node or mute it.
+    // For now, we rely on the app to manage global suspend/resume or ignore callbacks.
   }
 
   public setThreshold ( threshold: number ) {
@@ -69,7 +84,8 @@ export class TransientDetector {
   private analyzeFrame ( features: any ) {
     const energy = features.energy || 0
     // Use the exact time from the audio hardware buffer
-    const now = features.time ?? ( this.audioContext?.currentTime || 0 )
+    const context = AudioEngine.getInstance().getContext();
+    const now = features.time ?? ( context?.currentTime || 0 )
 
     // Detect transient based on energy threshold
     if ( energy > this.threshold ) {
@@ -85,9 +101,10 @@ export class TransientDetector {
   }
 
   public cleanup () {
-    this.stop()
-    if ( this.stream ) {
-      this.stream.getTracks().forEach( track => track.stop() )
+    if ( this.workletNode ) {
+      this.workletNode.disconnect();
+      this.workletNode = null;
     }
+    // Do not close context or stop tracks as they are owned by AudioEngine
   }
 }

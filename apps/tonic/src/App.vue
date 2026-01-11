@@ -332,7 +332,9 @@ const handleGainChange = ( event: Event ) => {
         <LessonRunner
           class="pointer-events-auto"
           :lesson="activeLesson"
+          :current-module="currentModule"
           @complete="activeLesson = null; currentModule = 'academy'"
+          @quit="activeLesson = null; currentModule = 'academy'"
           @tool-change="( toolId ) => currentModule = toolId"
         />
       </div>

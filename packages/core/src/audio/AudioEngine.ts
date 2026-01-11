@@ -40,13 +40,19 @@ export class AudioEngine {
        * 2. noiseSuppression: false - We want the full spectral content, even noise, for accurate analysis.
        * 3. autoGainControl: false - Prevents the volume from "pumping" up and down.
        */
-      this.stream = await navigator.mediaDevices.getUserMedia( {
+      // Simplified constraints for debugging
+      const constraints: MediaStreamConstraints = {
         audio: {
           echoCancellation: false,
-          noiseSuppression: false,
-          autoGainControl: false
+          autoGainControl: false,
+          noiseSuppression: false
         }
-      } );
+      };
+
+      console.log( 'Requesting raw audio input...', constraints );
+      const stream = await navigator.mediaDevices.getUserMedia( constraints );
+      console.log( 'Audio stream acquired:', stream.id );
+      this.stream = stream;
       this.source = this.context.createMediaStreamSource( this.stream );
 
       this.gainNode = this.context.createGain();
@@ -122,5 +128,9 @@ export class AudioEngine {
     if ( this.context && this.context.state === 'running' ) {
       this.context.suspend();
     }
+  }
+
+  public getStream (): MediaStream | null {
+    return this.stream;
   }
 }

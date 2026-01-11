@@ -16,7 +16,7 @@ class PitchProcessor extends AudioWorkletProcessor {
   private _bufferIndex: number = 0;
 
   // MPM Constants
-  private _cutoff: number = 0.88; // Relaxed from 0.93 for better lock on string instruments
+  private _cutoff: number = 0.5; // Relaxed to allow downstream filtering
   private _sampleRate: number;
   private _useLowPass: boolean = false;
   private _downsample: number = 1;

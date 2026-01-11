@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePitch, useAudioEngine, Note } from '@spectralsuite/core'
-import { onMounted, ref, computed, watch } from 'vue'
+import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { useToolInfo } from '../../composables/useToolInfo';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
@@ -18,8 +18,22 @@ const {
   downsample
 } = usePitch()
 
-const { init, isInitialized } = useAudioEngine()
+const { init, isInitialized, error: engineError, activate, deactivate } = useAudioEngine()
 const { openInfo } = useToolInfo();
+
+// Ensure engine is active when we mount this tool
+onMounted( () => {
+ activate();
+});
+
+onUnmounted( () => {
+ deactivate();
+});
+
+// Watch for initialization to auto-activate if user initializes FROM this screen
+watch( isInitialized, ( newVal ) => {
+ if ( newVal ) activate();
+});
 
 const isSettingsOpen = ref( false )
 
@@ -298,7 +312,10 @@ const toneQualityLabel = computed(() => {
 
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Tuner Card -->
-      <div class="lg:col-span-2 bg-slate-800/50 rounded-3xl p-8 border border-slate-700 backdrop-blur-xl">
+      <div
+        class="bg-slate-800/50 rounded-3xl p-8 border border-slate-700 backdrop-blur-xl transition-all duration-500 ease-spring"
+        :class="showDiagnostics ? 'lg:col-span-2' : 'lg:col-span-3'"
+      >
         <div class="flex items-center justify-between mb-8">
           <div
             v-if=" isInitialized "
@@ -317,6 +334,10 @@ const toneQualityLabel = computed(() => {
             <div class="w-2 h-2 rounded-full bg-white animate-pulse"></div>
             Initialize Engine
           </button>
+        </div>
+
+        <div v-if="engineError" class="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl text-rose-400 text-xs font-bold text-center">
+           {{ engineError }}
         </div>
 
         <div class="flex flex-col items-center py-8 relative">

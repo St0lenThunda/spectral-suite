@@ -49,6 +49,18 @@ export const lessons: Lesson[] = [
         title: 'The Octave',
         content: 'If you double the frequency (440Hz -> 880Hz), you get the same note, just higher! This is an "Perfect Octave". Try going higher.',
         targetTool: 'auratune'
+      },
+      {
+        id: 'step-4',
+        title: 'Using the Drone',
+        content: 'Training your ear requires a reference. Open **Settings > Drone** and enable it. Match your voice to the drone pitch.',
+        targetTool: 'auratune'
+      },
+      {
+        id: 'step-5',
+        title: 'Visualizing Stability',
+        content: 'Vibrato is the natural fluctuation of pitch. Open **Settings > Vibrato Graph** to see a real-time plot of your voice\'s stability.',
+        targetTool: 'auratune'
       }
     ]
   },
@@ -129,7 +141,7 @@ export const lessons: Lesson[] = [
   {
     id: 'scale-101',
     title: 'Mode Detective',
-    description: 'COMING SOON: Identify Dorian vs. Phrygian modes with Scale Sleuth.',
+    description: 'Identify Dorian and Phrygian modes with Scale Sleuth.',
     category: 'theory',
     difficulty: 'intermediate',
     steps: [
@@ -145,22 +157,22 @@ export const lessons: Lesson[] = [
       },
       {
         id: 'step-2',
-        title: 'The Minor Scale',
-        content: 'Now let\'s darken the mood. Play a **C Minor Scale** (C, D, Eb, F, G, Ab, Bb). You need at least 5 distinct notes to trigger detection.',
+        title: 'The Dorian Mode',
+        content: 'Dorian is Major with a flat 3rd and flat 7th. It sounds "jazzy" or "folky". Play white keys starting on D (D, E, F, G, A, B, C). usage: **b3, b7**.',
         targetTool: 'scalesleuth',
         validationCriteria: {
           type: 'scale',
-          target: 'C Minor'
+          target: 'D Dorian'
         }
       },
       {
         id: 'step-3',
-        title: 'Relative Minor',
-        content: 'The **A Minor Scale** uses the exact same notes as C Major, but focuses on A. Play A, B, C, D, E, F, G.',
+        title: 'The Phrygian Mode',
+        content: 'Phrygian is Minor with a flat 2nd. It sounds "exotic" or "spanish". Play white keys starting on E (E, F, G, A, B, C, D). Usage: **b2, b3, b6, b7**.',
         targetTool: 'scalesleuth',
         validationCriteria: {
           type: 'scale',
-          target: 'A Minor'
+          target: 'E Phrygian'
         }
       }
     ]
@@ -188,6 +200,171 @@ export const lessons: Lesson[] = [
         id: 'step-3',
         title: 'Noise',
         content: 'Noise is chaotic energy across the frequency spectrum. Make a "Shhh" or "Sssss" sound. Watch how the spectrum fills up with jagged activity like grass growing.',
+        targetTool: 'frequencyflow'
+      },
+      {
+        id: 'step-4',
+        title: 'Logarithmic vs Linear',
+        content: 'Our ears hear pitch logarithmically (octaves double in frequency). Toggle scale to **Log** to see how we naturally perceive spacing, or **Lin** to see the physics.',
+        targetTool: 'frequencyflow'
+      },
+      {
+        id: 'step-5',
+        title: 'Harmonics Overlay',
+        content: 'Click **Harmonics** in the top bar. This projects a guide showing where the overtones SHOULD be for the loudest detected note. Try to line up your voice!',
+        targetTool: 'frequencyflow'
+      }
+    ]
+  },
+  {
+    id: 'pitch-201',
+    title: 'Precision Tuning',
+    description: 'Master fine intonation control and interval sensing.',
+    category: 'audio',
+    difficulty: 'advanced',
+    steps: [
+      {
+        id: 'step-1',
+        title: 'Cents & Sensibility',
+        content: 'A "Cent" is 1/100th of a semitone. Professional tuning requires precision within +/- 5 cents. Watch the "Cents" display on the tuner.',
+        targetTool: 'auratune'
+      },
+      {
+        id: 'step-2',
+        title: 'Sustain G4',
+        content: 'Sustain a steady **G4** (392Hz) for 3 seconds. Keep the needle green.',
+        targetTool: 'auratune',
+        validationCriteria: {
+          type: 'pitch',
+          target: 'G'
+        }
+      },
+      {
+        id: 'step-3',
+        title: 'Major Third Interval',
+        content: 'Now find the Major Third above C (E4). Sustain **E4** (329.6Hz) to lock it in.',
+        targetTool: 'auratune',
+        validationCriteria: {
+          type: 'pitch',
+          target: 'E'
+        }
+      }
+    ]
+  },
+  {
+    id: 'chord-201',
+    title: 'Jazz Harmony',
+    description: 'Construct lush 7th chords for jazz voicings.',
+    category: 'theory',
+    difficulty: 'advanced',
+    steps: [
+      {
+        id: 'step-1',
+        title: 'The Major 7th',
+        content: 'Add a 7th note (B) to your C Major triad. Play **C Maj7** (C - E - G - B). It sounds dreamy and resolved.',
+        targetTool: 'chordcapture',
+        validationCriteria: {
+          type: 'chord',
+          target: 'CMaj7'
+        }
+      },
+      {
+        id: 'step-2',
+        title: 'The Dominant 7th',
+        content: 'Flatten the 7th (B -> Bb). This creates tension. Play **C7** (C - E - G - Bb). (Note: Try G7 if C7 is too low: G-B-D-F). Let\'s try **G7**.',
+        targetTool: 'chordcapture',
+        validationCriteria: {
+          type: 'chord',
+          target: 'G7'
+        }
+      },
+      {
+        id: 'step-3',
+        title: 'The Minor 7th',
+        content: 'Smooth and cool. Play a **D Minor 7** (D - F - A - C).',
+        targetTool: 'chordcapture',
+        validationCriteria: {
+          type: 'chord',
+          target: 'Dm7'
+        }
+      }
+    ]
+  },
+  {
+    id: 'rhythm-201',
+    title: 'Rhythm Proficiency',
+    description: 'Build endurance and consistency.',
+    category: 'rhythm',
+    difficulty: 'intermediate',
+    steps: [
+      {
+        id: 'step-1',
+        title: 'Warmup',
+        content: 'Get in the groove. Score **5 Perfect hits** to start.',
+        targetTool: 'pocketengine',
+        validationCriteria: {
+          type: 'rhythm',
+          target: 5
+        }
+      },
+      {
+        id: 'step-2',
+        title: 'Endurance Test',
+        content: 'Prove your stability. Maintain the pocket for **40 Perfect hits** in a row. Don\'t rush!',
+        targetTool: 'pocketengine',
+        validationCriteria: {
+          type: 'rhythm',
+          target: 40
+        }
+      }
+    ]
+  },
+  {
+    id: 'scale-201',
+    title: 'Exotic Scales',
+    description: 'Explore non-western and advanced mode colors.',
+    category: 'theory',
+    difficulty: 'advanced',
+    steps: [
+      {
+        id: 'step-1',
+        title: 'Harmonic Minor',
+        content: 'Aladdin\'s sound. Play A Minor but raise the 7th (G -> G#). Notes: A, B, C, D, E, F, G#.',
+        targetTool: 'scalesleuth',
+        validationCriteria: {
+          type: 'scale',
+          target: 'A Harmonic Minor'
+        }
+      },
+      {
+        id: 'step-2',
+        title: 'Mixolydian Rock',
+        content: 'The "Classic Rock" scale. Major with a flat 7th. Play G Mixolydian (all white keys starting on G).',
+        targetTool: 'scalesleuth',
+        validationCriteria: {
+          type: 'scale',
+          target: 'G Mixolydian'
+        }
+      }
+    ]
+  },
+  {
+    id: 'freq-201',
+    title: 'Spectral Investigation',
+    description: 'Analyze complex sound identifiers.',
+    category: 'audio',
+    difficulty: 'advanced',
+    steps: [
+      {
+        id: 'step-1',
+        title: 'White Noise',
+        content: 'Make a "Shhh" sound. Notice how the spectrum flattens out like "grass"? That is equal energy across frequencies.',
+        targetTool: 'frequencyflow'
+      },
+      {
+        id: 'step-2',
+        title: 'Vowel Formants',
+        content: 'Sing "Eeee" then slide to "Oooo". Watch the humps (formants) in the spectrum move. These shapes define vowels!',
         targetTool: 'frequencyflow'
       }
     ]

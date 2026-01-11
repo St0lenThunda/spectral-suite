@@ -1,5 +1,6 @@
 import { BpmDetector } from './BpmDetector';
 import { KeyDetector } from './KeyDetector';
+import { AudioEngine } from '../audio/AudioEngine';
 
 export interface AnalysisResult {
   bpm: number;
@@ -12,7 +13,13 @@ export interface AnalysisResult {
 }
 
 export class TrackAnalyzer {
-  public static audioCtx = new ( window.AudioContext || ( window as any ).webkitAudioContext )();
+  public static get audioCtx () {
+    const context = AudioEngine.getInstance().getContext();
+    if ( !context ) {
+      throw new Error( 'AudioEngine not initialized. Call init() first.' );
+    }
+    return context;
+  }
 
   public static async analyze ( file: File ): Promise<AnalysisResult> {
     const arrayBuffer = await file.arrayBuffer();

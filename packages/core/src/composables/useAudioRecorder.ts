@@ -116,6 +116,7 @@ export const useAudioRecorder = () => {
     error,
     startListening,
     stopListening,
-    cancelListening
+    cancelListening,
+    getAnalyser: () => listeningAnalyser
   };
 };

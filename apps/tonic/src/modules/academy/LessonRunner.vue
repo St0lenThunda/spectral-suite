@@ -5,9 +5,12 @@ import { usePitch, useChordCapture, useRhythmStore, useScaleSleuth, Note, Chord 
 import { TOOL_METADATA } from '../../data/toolMetadata';
 import MorphContainer from '../../components/MorphContainer.vue';
 
-const props = defineProps<{ lesson: Lesson; }>();
+const props = defineProps<{
+  lesson: Lesson;
+  currentModule: string;
+}>();
 
-const emit = defineEmits<{ ( e: 'complete' ): void; ( e: 'tool-change', tool: string ): void; }>();
+const emit = defineEmits<{ ( e: 'complete' ): void; ( e: 'tool-change', tool: string ): void; ( e: 'quit' ): void; }>();
 
 const currentStepIndex = ref( 0 );
 const currentStep = computed( () => props.lesson.steps[currentStepIndex.value] );
@@ -27,6 +30,12 @@ const isStepComplete = ref( false );
 const currentToolInfo = computed( () => {
   if ( !currentStep.value ) return null;
   return TOOL_METADATA[currentStep.value.targetTool];
+} );
+
+const isOverlayVisible = computed( () => {
+  if ( !currentStep.value ) return false;
+  // Always show if no specific tool is targeted (unlikely given types) OR if we are on the correct tool
+  return props.currentModule === currentStep.value.targetTool;
 } );
 
 watch( [currentNote, cents, detectedChords, () => rhythmStats.perfect], ( [newNote] ) => {
@@ -103,7 +112,10 @@ function nextStep () {
 </script>
 
 <template>
-  <MorphContainer v-model:isMorphed="isMorphed">
+  <MorphContainer
+    v-model:isMorphed="isMorphed"
+    v-show="isOverlayVisible"
+  >
     <!-- FAB Morph -->
     <template #collapsed>
       <div class="relative">
@@ -134,6 +146,13 @@ function nextStep () {
           </div>
 
           <div class="flex items-center gap-3 pointer-events-auto">
+            <button
+              @click.stop="emit( 'quit' )"
+              class="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-slate-500 hover:bg-rose-500/20 hover:text-rose-400 transition-all transform hover:scale-110 group/quit"
+              title="Quit Lesson"
+            >
+              <span class="text-[10px] font-black">✕</span>
+            </button>
             <div
               class="w-6 h-6 rounded-full bg-white/5 flex items-center justify-center text-slate-500 group-hover/header:bg-white/10 group-hover/header:text-white transition-all transform hover:scale-110"
             >

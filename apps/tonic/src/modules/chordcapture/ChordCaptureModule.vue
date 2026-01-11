@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useChordCapture, useAudioEngine, ChordEngine, Fretboard, SynthEngine, type ChordMatch, isLowPassEnabled, downsample } from '@spectralsuite/core'
 import { useToolInfo } from '../../composables/useToolInfo';
 import ChordModal from '../../components/ChordModal.vue';
@@ -37,7 +37,19 @@ const {
   clearHistory,
   getFormattedLedger
 } = useChordCapture()
-const { init, isInitialized, error } = useAudioEngine()
+const { init, isInitialized, error, activate, deactivate } = useAudioEngine()
+
+onMounted( () => {
+ activate();
+});
+
+onUnmounted( () => {
+ deactivate();
+});
+
+watch( isInitialized, ( newVal ) => {
+ if ( newVal ) activate();
+});
 
 /**
  * The topChord is the primary harmonic match identified by the system.

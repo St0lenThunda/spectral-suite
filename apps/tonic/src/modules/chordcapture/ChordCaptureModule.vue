@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import { useChordCapture, useAudioEngine, ChordEngine, Fretboard } from '@spectralsuite/core'
+import { ref, computed } from 'vue'
+import { useChordCapture, useAudioEngine, ChordEngine, Fretboard, SynthEngine, type ChordMatch } from '@spectralsuite/core'
 import { useToolInfo } from '../../composables/useToolInfo';
+import ChordModal from '../../components/ChordModal.vue';
+import LiveMonitor from './LiveMonitor.vue';
+import CaptureTray from './CaptureTray.vue';
 
 const { openInfo } = useToolInfo();
 
@@ -15,19 +18,65 @@ const {
   keyCenter,
   clearNotes,
   captureChord,
-  clearHistory
+  removeChord,
+  clearHistory,
+  getFormattedLedger
 } = useChordCapture()
 const { init, isInitialized, error } = useAudioEngine()
 
+/**
+ * The topChord is the primary harmonic match identified by the system.
+ * We isolate the first entry from the detectedChords array because it represents
+ * the most mathematically probable chord based on the current spectral input.
+ */
+const topChord = computed( () => detectedChords.value[0] || null );
+
+/**
+ * Theoretical suggestions for the "Next Sound" in a sequence.
+ * We use the topChord's symbol and the current key center to look up
+ * functional movements (like V -> I) in the ChordEngine.
+ */
 const suggestions = computed( () => {
-  const topChord = detectedChords.value[0];
-  if ( !topChord ) return [];
-  return ChordEngine.suggestNext( topChord.symbol, keyCenter.value );
+  if ( !topChord.value ) return [];
+  // ChordEngine.suggestNext takes a symbol string and a key string
+  return ChordEngine.suggestNext( topChord.value.symbol, keyCenter.value );
 } );
+
+/**
+ * Modal State Management
+ * We track which chord is currently "selected" to show its details
+ * in the modal.
+ */
+const selectedChord = ref<ChordMatch | null>( null );
+const isModalOpen = ref( false );
+
+const openChordDetail = ( chord: ChordMatch ) => {
+  selectedChord.value = chord;
+  isModalOpen.value = true;
+};
+
+/**
+ * Quick Audition
+ * Triggers the SynthEngine to play the voicing of a chord.
+ */
+const auditChord = ( chord: ChordMatch ) => {
+  SynthEngine.getInstance().playChord( chord.notes );
+};
 
 const start = () => {
   init()
 }
+
+const handleExport = async () => {
+  const text = getFormattedLedger();
+  try {
+    await navigator.clipboard.writeText( text );
+    // Ideally use a Toast here, but for now we'll rely on button visual feedback or a simple alert
+    alert( 'Progression copied to clipboard!' );
+  } catch ( err ) {
+    console.error( 'Failed to copy:', err );
+  }
+};
 
 const emit = defineEmits( ['back'] )
 </script>
@@ -40,7 +89,7 @@ const emit = defineEmits( ['back'] )
       class="w-full flex flex-col items-center animate-fade-in"
     >
       <div
-        class="glass-container w-full max-w-2xl p-12 text-center rounded-[3rem] border border-white/10 bg-white/5 backdrop-blur-3xl shadow-2xl relative"
+        class="glass-container w-full max-w-2xl p-12 text-center rounded-[2rem] border border-white/10 bg-white/5 backdrop-blur-3xl shadow-2xl relative"
       >
         <button
           @click="openInfo( 'chordcapture' )"
@@ -86,11 +135,13 @@ const emit = defineEmits( ['back'] )
     <!-- Stage 1-4: The Active Flow -->
     <main
       v-else
-      class="w-full flex flex-col items-center gap-12 animate-fade-in"
+      class="w-full flex flex-col items-center gap-6 md:gap-12 animate-fade-in"
     >
       <!-- Standard Module Header -->
-      <header class="w-full max-w-3xl flex justify-between items-end px-4">
-        <div>
+      <header
+        class="w-full max-w-3xl flex flex-col items-center md:flex-row md:justify-between md:items-end px-4 gap-6 md:gap-0"
+      >
+        <div class="text-center md:text-left">
           <button
             @click="emit( 'back' )"
             class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 hover:text-white transition-colors mb-4 flex items-center gap-2"
@@ -100,7 +151,7 @@ const emit = defineEmits( ['back'] )
           <h2 class="text-3xl font-bold text-white mb-2">Chord <span class="text-indigo-400">Capture Pro</span></h2>
           <p class="text-slate-400 text-sm italic">Harmonic recognition, Roman Numerals & Sequence Ledger.</p>
         </div>
-        <div class="flex items-center gap-4">
+        <div class="flex flex-wrap items-center justify-center gap-4">
           <!-- Key Selection for Roman Numerals -->
           <div class="flex flex-col items-end gap-1">
             <span class="text-[8px] font-black uppercase text-slate-500 tracking-widest mr-2">Analysis Key</span>
@@ -110,6 +161,12 @@ const emit = defineEmits( ['back'] )
             >
               <option v-for="k in ['C', 'C#', 'Db', 'D', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'Ab', 'A', 'Bb', 'B']" :key="k" :value="k">{{ k }}</option>
             </select>
+          </div>
+          <div
+            class="flex items-center gap-2 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest transition-all mb-1"
+          >
+            <div class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse"></div>
+            Polyphonic Focus
           </div>
           <button
             @click="openInfo( 'chordcapture' )"
@@ -154,219 +211,189 @@ const emit = defineEmits( ['back'] )
         </div>
       </div>
 
-      <!-- Main Interactive Split -->
-      <div class="w-full max-w-[90rem] grid grid-cols-1 lg:grid-cols-[3fr_1fr] gap-8 items-start animate-fade-in">
+      <!-- Main Interactive Split: Monitor (Left) & Workspace (Right) -->
+      <div
+        class="w-full max-w-[100rem] grid grid-cols-1 lg:grid-cols-[35%_65%] gap-8 items-start animate-fade-in px-4 relative"
+      >
 
-        <!-- Column 1: The Eye (Live Monitor) -->
-        <div
-          class="relative w-full aspect-[16/10] md:aspect-video rounded-[3rem] md:rounded-[4rem] bg-black/40 border border-white/10 backdrop-blur-sm flex flex-col items-center justify-center overflow-hidden shadow-2xl"
-        >
-          <div class="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent"></div>
+        <!-- 1. Live Monitor (Top-Left) -->
+        <LiveMonitor
+          :top-chord="topChord || null"
+          :captured-notes="capturedNotes"
+          :current-note="currentNote"
+          :pitch="pitch"
+          :clarity="clarity"
+          @capture-chord="captureChord"
+          @clear-notes="clearNotes"
+        />
 
-          <!-- Large Reactive Note -->
+        <!-- 2. Harmonic Suggestions (Top-Right) -->
+        <div class="w-full flex justify-center h-full">
           <div
-            class="relative z-10 text-center transition-all duration-300 transform px-8"
-            :class="{ 'scale-105': currentNote }"
+            class="bg-slate-900/50 rounded-3xl p-8 border border-white/5 backdrop-blur-md w-full text-center flex flex-col justify-center min-h-[200px]"
           >
-            <span
-              class="block text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em] md:tracking-[0.6em] text-indigo-400/40 mb-2"
-            >
-              {{ detectedChords.length > 0 ? 'Harmonic Match' : 'Live Monitor' }}
-            </span>
-            <div
-              class="font-black text-white leading-none font-outfit drop-shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300"
-              :class="[
-  detectedChords.length > 0 && ( detectedChords[0]?.symbol?.length ?? 0 ) > 4 ? 'text-[5rem] sm:text-[7rem] md:text-[9rem] lg:text-[11rem]' : 'text-[8rem] sm:text-[10rem] md:text-[12rem] lg:text-[16rem]'
-              ]"
-            >
-              {{ detectedChords.length > 0 ? detectedChords[0]?.symbol : ( currentNote || '--' ) }}
-            </div>
-            <div
-              class="mt-4 flex items-center justify-center gap-4 text-[10px] md:text-xs font-mono font-bold text-slate-500"
-            >
-              <span :class="{ 'text-cyan-400': pitch }">{{ pitch ? pitch.toFixed( 1 ) : '000.0' }} Hz</span>
-              <span class="opacity-20">|</span>
-              <span
-                :class="{ 'text-emerald-400': ( clarity || 0 ) > 0.9 }">{{ ( ( clarity || 0 ) * 100 ).toFixed( 0 ) }}%
-                Clarity</span>
-            </div>
-          </div>
-
-          <!-- Pulsing Rings -->
-          <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div
-              class="ring-pulse ring-1"
-              :style="{ opacity: ( clarity || 0 ) * 0.3 }"
-            ></div>
-            <div
-              class="ring-pulse ring-2"
-              :style="{ opacity: ( clarity || 0 ) * 0.1 }"
-            ></div>
-          </div>
-        </div>
-
-        <!-- Column 2: Note Tray & Management -->
-        <div class="flex flex-col gap-6 h-full">
-          <div class="flex items-center gap-4 w-full">
-            <span class="h-px bg-white/5 flex-1"></span>
-            <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 text-center">Capture Tray</h3>
-            <span class="h-px bg-white/5 flex-1"></span>
-          </div>
-
-          <div
-            class="grid grid-cols-[repeat(auto-fill,minmax(80px,1fr))] gap-3 lg:max-h-[60vh] lg:overflow-y-auto w-full p-6 rounded-[2.5rem] bg-white/5 border border-white/5 backdrop-blur-md custom-scrollbar"
-          >
-            <template v-if=" capturedNotes.length > 0 ">
-              <div
-                v-for=" note in capturedNotes "
-                :key="note"
-                class="note-pill animate-pop-in text-center py-4 text-2xl"
-              >
-                {{ note }}
-              </div>
-              <button
-                @click="clearNotes"
-                class="note-pill-clear w-full mt-2 col-span-full sticky bottom-0 bg-indigo-500/10 backdrop-blur-md py-4"
-              >
-                Reset Sequence
-              </button>
-            </template>
-            <div
-              v-else
-              class="flex items-center justify-center w-full py-8 px-6 border border-dashed border-white/10 rounded-3xl opacity-20 text-center"
-            >
-              <p class="text-[9px] font-black uppercase tracking-widest leading-relaxed">Pluck notes to build a
-                sequence...</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Final Result: Harmonic Matches -->
-      <div class="w-full max-w-3xl animate-slide-up">
-        <div
-          v-if=" detectedChords.length > 0 "
-          class="flex flex-col gap-6"
-        >
-          <div
-            v-for=" chord in detectedChords.slice(0, 1) "
-            :key="chord.symbol"
-            class="chord-hero overflow-hidden"
-          >
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
-              <div class="flex flex-col items-center text-center">
-                <span
-                  class="text-[9px] md:text-[11px] font-black uppercase tracking-[0.4em] md:tracking-[0.5em] text-indigo-400/60 mb-6"
-                >Current Detection</span>
-                <div class="flex items-baseline gap-2">
-                  <div class="text-7xl md:text-8xl font-black text-white font-outfit drop-shadow-xl">
-                    {{ chord.symbol }}
-                  </div>
-                  <div class="text-2xl font-black text-indigo-400 italic">{{ chord.roman }}</div>
-                </div>
-                <div class="text-xs md:text-sm font-bold text-slate-400 uppercase tracking-[0.2em] mb-8">
-                  {{ chord.name }}
-                </div>
-
-                <div class="flex gap-2 mb-10">
-                  <span
-                    v-for=" note in chord.notes "
-                    :key="note"
-                    class="pc-chip"
-                  >
-                    {{ note }}
-                  </span>
-                </div>
-
-                <button 
-                  @click="captureChord(chord)"
-                  class="px-8 py-3 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/20 active:scale-95 flex items-center gap-2"
+            <span class="text-[9px] font-black uppercase tracking-widest text-slate-500 block mb-6">Theory-Based
+              Progressions</span>
+            <div class="flex flex-wrap justify-center gap-3">
+              <template v-if=" suggestions.length > 0 ">
+                <div
+                  v-for=" s in suggestions "
+                  :key="s"
+                  class="px-5 py-3 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-xs font-black text-indigo-300 uppercase tracking-tighter hover:bg-indigo-500/20 transition-all cursor-default"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4" />
-                  </svg>
-                  Capture to Ledger
-                </button>
-              </div>
-
-              <!-- Chord Voicing Map -->
-              <div class="bg-black/20 rounded-3xl p-6 border border-white/5">
-                <div class="flex justify-between mb-4">
-                  <span class="text-[8px] font-black uppercase tracking-widest text-slate-500">Guitar Voicing Map</span>
-                  <span class="text-[8px] font-black uppercase tracking-widest text-indigo-400">{{ chord.symbol }}</span>
+                  {{ s }}
                 </div>
-                <Fretboard 
-                  :active-notes="chord.notes"
-                  :highlight-notes="chord.notes"
-                  :num-frets="24"
-                />
-
-                <!-- Harmonic Suggestions -->
-                <div v-if="suggestions.length > 0" class="mt-8 pt-8 border-t border-white/5">
-                  <span class="text-[8px] font-black uppercase tracking-widest text-slate-500 block mb-4">Suggested Next Steps</span>
-                  <div class="flex flex-wrap gap-2">
-                    <div 
-                      v-for="s in suggestions" 
-                      :key="s"
-                      class="px-4 py-2 rounded-lg bg-indigo-500/5 border border-indigo-500/20 text-[10px] font-black text-indigo-300 uppercase tracking-tighter"
-                    >
-                      {{ s }}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Progression Ledger -->
-        <div class="mt-12 bg-slate-900/40 rounded-[3rem] p-10 border border-white/5 backdrop-blur-3xl">
-          <div class="flex justify-between items-center mb-10 px-4">
-            <div>
-              <h3 class="text-xl font-black text-white italic uppercase tracking-tighter">Progression <span
-                  class="text-indigo-500"
-                >Ledger</span></h3>
-              <p class="text-[9px] text-slate-500 uppercase font-bold tracking-widest mt-1">Stored Harmonic Flow</p>
-            </div>
-            <button
-                v-if="chordHistory.length > 0"
-                @click="clearHistory"
-                class="px-4 py-2 text-[9px] font-black text-slate-600 hover:text-red-400 transition-colors uppercase tracking-widest"
-            >Clear All</button>
-          </div>
-
-          <div
-            v-if=" chordHistory.length > 0 "
-            class="flex flex-wrap gap-6 px-4"
-          >
-            <div
-              v-for=" ( item, idx ) in chordHistory "
-              :key="idx"
-              class="flex items-center gap-6 group"
-            >
-              <div class="flex flex-col items-center">
-                <div class="text-2xl font-black text-white font-outfit group-hover:text-indigo-400 transition-colors">
-                  {{ item.symbol }}
-                </div>
-                <div class="text-[10px] font-black text-indigo-500/60 uppercase tracking-tighter">{{ item.roman }}</div>
-              </div>
+              </template>
               <div
-                v-if=" idx < chordHistory.length - 1 "
-                class="text-slate-800 font-black text-xl"
-              >→</div>
+                v-else
+                class="text-[10px] text-slate-700 italic font-bold uppercase tracking-widest"
+              >No suggestions until match</div>
             </div>
           </div>
-          <div
-            v-else
-            class="py-12 text-center opacity-20 italic text-sm"
-          >
-            Your captured progression will appear here.
+        </div>
+
+        <!-- 3. Relocated Capture Tray (Bottom-Left) -->
+        <!-- Visible on Desktop, Hidden on Mobile (Mobile uses internal drawer) -->
+        <CaptureTray
+          class="hidden lg:flex h-full"
+          :captured-notes="capturedNotes"
+          @clear-notes="clearNotes"
+        />
+
+        <!-- 4. Fretboard / Voicing Atlas (Bottom-Right) -->
+        <div
+          class="w-full bg-black/20 rounded-[3rem] p-8 md:p-10 border border-white/5 shadow-2xl flex-1 flex flex-col min-h-[300px]"
+        >
+          <div class="flex justify-between mb-6 px-2">
+            <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">Guitar Voicing Atlas</span>
+          </div>
+          <div class="flex-1 flex flex-col justify-center">
+            <Fretboard
+              :active-notes="topChord ? topChord.notes : capturedNotes"
+              :highlight-notes="topChord ? topChord.notes : capturedNotes"
+              :num-frets="24"
+            />
           </div>
         </div>
+
       </div>
 
+      <!-- Progression Ledger -->
+      <div
+        class="mt-12 w-full max-w-[100rem] bg-slate-900/40 rounded-[3rem] p-10 border border-white/5 backdrop-blur-3xl px-4 mx-auto"
+      >
+        <div class="flex justify-between items-center mb-10 px-4">
+          <div>
+            <h3 class="text-xl font-black text-white italic uppercase tracking-tighter">Progression <span
+                class="text-indigo-500"
+              >Ledger</span></h3>
+            <p class="text-[9px] text-slate-500 uppercase font-bold tracking-widest mt-1">Stored Harmonic Flow</p>
+          </div>
+          <button
+            v-if=" chordHistory.length > 0 "
+            @click="clearHistory"
+            class="px-4 py-2 text-[9px] font-black text-slate-600 hover:text-red-400 transition-colors uppercase tracking-widest"
+          >Clear All</button>
+
+          <button
+            v-if=" chordHistory.length > 0 "
+            @click="handleExport"
+            class="ml-4 px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-black text-indigo-400 hover:bg-indigo-500/20 transition-all uppercase tracking-widest flex items-center gap-2"
+          >
+            <span>Export</span>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="h-3 w-3"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div
+          v-if=" chordHistory.length > 0 "
+          class="flex flex-wrap gap-6 px-4"
+        >
+          <div
+            v-for=" ( item, idx ) in chordHistory "
+            :key="idx"
+            class="flex items-center gap-6 group"
+          >
+            <div
+              class="flex flex-col items-center cursor-pointer hover:scale-110 transition-transform relative"
+              @click="openChordDetail( item )"
+            >
+              <!-- Play Button Overlay -->
+              <button
+                @click.stop="auditChord( item )"
+                class="absolute -top-4 -right-4 w-6 h-6 rounded-full bg-white text-slate-950 flex items-center justify-center translate-y-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all shadow-xl z-20"
+                title="Audition"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-3 w-3"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </button>
+
+              <!-- Remove Button -->
+              <button
+                @click.stop="removeChord( idx )"
+                class="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 z-20"
+                title="Remove Chord"
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-3 w-3"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clip-rule="evenodd"
+                  />
+                </svg>
+              </button>
+              <div class="text-2xl font-black text-white font-outfit group-hover:text-indigo-400 transition-colors">
+                {{ item.symbol }}
+              </div>
+              <div class="text-[10px] font-black text-indigo-500/60 uppercase tracking-tighter">{{ item.roman }}</div>
+            </div>
+            <div
+              v-if=" idx < chordHistory.length - 1 "
+              class="text-slate-800 font-black text-xl"
+            >→</div>
+          </div>
+        </div>
+        <div
+          v-else
+          class="py-12 text-center opacity-20 italic text-sm"
+        >
+          Your captured progression will appear here.
+        </div>
+      </div>
 
     </main>
+
+    <!-- Detailed Analysis Modal -->
+    <ChordModal
+      v-if=" selectedChord "
+      :is-open="isModalOpen"
+      :chord="selectedChord"
+      @close=" isModalOpen = false"
+    />
   </div>
 </template>
 
@@ -404,67 +431,6 @@ const emit = defineEmits( ['back'] )
   @apply border-white/10 bg-white/[0.04];
 }
 
-.ring-pulse {
-  @apply absolute rounded-full border border-white/10 transition-all duration-300;
-}
-
-.ring-1 {
-  width: 28rem;
-  height: 28rem;
-  animation: ring-pulse 4s infinite linear;
-}
-
-.ring-2 {
-  width: 34rem;
-  height: 34rem;
-  animation: ring-pulse 6s infinite linear reverse;
-}
-
-@keyframes ring-pulse {
-  0% {
-    transform: scale(1) rotate(0deg);
-  }
-
-  50% {
-    transform: scale(1.05) rotate(180deg);
-    opacity: 0.2;
-  }
-
-  100% {
-    transform: scale(1) rotate(360deg);
-  }
-}
-
-.note-pill {
-  @apply px-8 py-5 rounded-2xl bg-white/10 border border-white/20 text-3xl font-black text-white shadow-lg shadow-black/20;
-  font-family: 'Outfit', sans-serif;
-}
-
-.note-pill-clear {
-  @apply px-6 py-5 rounded-2xl bg-red-500/10 border border-red-500/20 text-[10px] font-black uppercase tracking-widest text-red-400 hover:bg-red-500/20 transition-all;
-}
-
-/* Custom Scrollbar */
-.custom-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  @apply bg-transparent rounded-full;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-white/10 rounded-full transition-all hover:bg-indigo-500/30;
-}
-
-.chord-hero {
-  @apply p-16 rounded-[4rem] bg-gradient-to-b from-indigo-500/20 to-transparent border border-white/10 backdrop-blur-3xl shadow-2xl;
-}
-
-.pc-chip {
-  @apply px-3 py-1.5 rounded-lg bg-black/40 border border-white/5 text-[11px] font-black text-indigo-300 font-mono tracking-tighter;
-}
-
 /* Animations */
 @keyframes fade-in {
   from {
@@ -482,35 +448,20 @@ const emit = defineEmits( ['back'] )
   animation: fade-in 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-@keyframes pop-in {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
+/* Ensure the workspace content doesn't overflow its grid cell */
+.chord-hero {
+  @apply min-w-0 w-full overflow-hidden;
 }
 
-.animate-pop-in {
-  animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+/* Drawer Transitions */
+.drawer-enter-active,
+.drawer-leave-active {
+  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-@keyframes slide-up {
-  from {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-.animate-slide-up {
-  animation: slide-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.drawer-enter-from,
+.drawer-leave-to {
+  transform: translateX(-100%);
+  opacity: 0;
 }
 </style>

@@ -32,14 +32,50 @@ if ( typeof window !== 'undefined' ) {
   if ( savedKey ) globalKeyCenter.value = savedKey;
 }
 
+import { usePolyPitch } from '../audio/usePolyPitch';
+
 export function useChordCapture () {
   const { pitch, clarity, volume } = usePitch( { smoothing: 3 } );
+  const { detectedNotes: polyNotes } = usePolyPitch();
 
   const capturedNotes = globalCapturedNotes;
   const detectedChords = globalDetectedChords;
   const currentNote = globalCurrentNote;
   const chordHistory = globalChordHistory;
   const keyCenter = globalKeyCenter;
+
+  // Polyphonic Integration
+  watch( polyNotes, ( newPoly ) => {
+    if ( newPoly.length >= 2 ) {
+      /**
+       * Strum-Sync Logic:
+       * If we see 3 or more notes at once, we assume a "Strum Event".
+       * Instead of adding to the tray (which might contain old transients),
+       * we SYNC the tray to exactly what the spectral engine sees.
+       */
+      if ( newPoly.length >= 3 ) {
+        noteBuffer.clear();
+        newPoly.forEach( pc => noteBuffer.add( pc ) );
+        capturedNotes.value = Array.from( noteBuffer );
+        detectedChords.value = ChordEngine.detectChords( capturedNotes.value, keyCenter.value );
+        return;
+      }
+
+      // For 2 notes, we stick to "Additive Mode" so the user can build a chord slowly.
+      let changed = false;
+      newPoly.forEach( pc => {
+        if ( !noteBuffer.has( pc ) ) {
+          noteBuffer.add( pc );
+          changed = true;
+        }
+      } );
+
+      if ( changed ) {
+        capturedNotes.value = Array.from( noteBuffer );
+        detectedChords.value = ChordEngine.detectChords( capturedNotes.value, keyCenter.value );
+      }
+    }
+  } );
 
   watch( pitch, ( newPitch ) => {
     // Noise Gate: must have pitch, decent clarity (lowered for guitar), and exceed volume threshold
@@ -67,15 +103,20 @@ export function useChordCapture () {
     const note = Note.fromFreq( newPitch );
     const pc = Note.get( note ).pc;
 
+    /**
+     * Transient Protection:
+     * If the polyphonic engine is already seeing multiple notes (a strum),
+     * we ignore the single-pitch detector to prevent "Note Flickering"
+     * in the tray. The poly engine is more stable for chords.
+     */
     if ( pc && pc !== currentNote.value ) {
       currentNote.value = pc;
-      noteBuffer.add( pc );
 
-      // Update captured notes array
-      capturedNotes.value = Array.from( noteBuffer );
-
-      // Update detected chords (This stays visible until a new note is played later)
-      detectedChords.value = ChordEngine.detectChords( capturedNotes.value, keyCenter.value );
+      if ( polyNotes.value.length < 2 ) {
+        noteBuffer.add( pc );
+        capturedNotes.value = Array.from( noteBuffer );
+        detectedChords.value = ChordEngine.detectChords( capturedNotes.value, keyCenter.value );
+      }
     }
   } );
 
@@ -116,6 +157,17 @@ export function useChordCapture () {
     chordHistory.value = [];
   };
 
+  const removeChord = ( index: number ) => {
+    chordHistory.value.splice( index, 1 );
+  };
+
+  const getFormattedLedger = (): string => {
+    return chordHistory.value.map( ( chord, i ) => {
+      const notes = chord.notes.join( '-' );
+      return `${i + 1}. ${chord.symbol} (${chord.roman}) [${notes}]`;
+    } ).join( '\n' );
+  };
+
   return {
     pitch,
     clarity,
@@ -126,6 +178,8 @@ export function useChordCapture () {
     keyCenter,
     clearNotes,
     captureChord,
-    clearHistory
+    removeChord,
+    clearHistory,
+    getFormattedLedger
   };
 }

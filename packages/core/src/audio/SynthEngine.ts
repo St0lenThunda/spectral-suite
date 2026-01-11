@@ -1,3 +1,4 @@
+import { Note } from 'tonal';
 import { AudioEngine } from './AudioEngine';
 
 /**
@@ -108,5 +109,55 @@ export class SynthEngine {
     // Start generating sound and schedule it to stop
     osc.start( now );
     osc.stop( now + duration );
+  }
+
+  /**
+   * Plays a collection of notes simultaneously to form a chord.
+   * To prevent "clipping" (digital distortion) when multiple sounds 
+   * combine, we scale the volume of each individual note by 1/N.
+   * 
+   * @param notes - Array of note names (e.g., ['C4', 'E4', 'G4'])
+   * @param durationMs - How long the chord should play
+   */
+  public playChord ( notes: string[], durationMs: number = 500 ) {
+    this.init();
+    if ( !this.context || !this.gainNode || notes.length === 0 ) return;
+
+    if ( this.context.state === 'suspended' ) {
+      this.context.resume();
+    }
+
+    const now = this.context.currentTime;
+    const duration = durationMs / 1000;
+    const attack = 0.05;
+    const release = 0.1;
+
+    // We scale volume by the number of notes to keep the total output level safe.
+    // If we have 3 notes, each gets 1/3 of the targeted volume.
+    const noteVolume = 0.3 / notes.length;
+
+    notes.forEach( noteName => {
+      // Note.freq() converts a name like "C4" into a frequency like 261.63Hz
+      const freq = Note.freq( noteName );
+      if ( freq === null ) return;
+
+      const osc = this.context!.createOscillator();
+      const noteGain = this.context!.createGain();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime( freq, now );
+
+      osc.connect( noteGain );
+      noteGain.connect( this.gainNode! );
+
+      // Envelope Application
+      noteGain.gain.setValueAtTime( 0, now );
+      noteGain.gain.linearRampToValueAtTime( noteVolume, now + attack );
+      noteGain.gain.setValueAtTime( noteVolume, now + duration - release );
+      noteGain.gain.linearRampToValueAtTime( 0, now + duration );
+
+      osc.start( now );
+      osc.stop( now + duration );
+    } );
   }
 }

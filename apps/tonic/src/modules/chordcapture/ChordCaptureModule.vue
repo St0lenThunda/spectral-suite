@@ -28,6 +28,8 @@ const suggestions = computed( () => {
 const start = () => {
   init()
 }
+
+const emit = defineEmits( ['back'] )
 </script>
 
 <template>
@@ -89,6 +91,12 @@ const start = () => {
       <!-- Standard Module Header -->
       <header class="w-full max-w-3xl flex justify-between items-end px-4">
         <div>
+          <button
+            @click="emit( 'back' )"
+            class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 hover:text-white transition-colors mb-4 flex items-center gap-2"
+          >
+            <span>←</span> Back to Tonic
+          </button>
           <h2 class="text-3xl font-bold text-white mb-2">Chord <span class="text-indigo-400">Capture Pro</span></h2>
           <p class="text-slate-400 text-sm italic">Harmonic recognition, Roman Numerals & Sequence Ledger.</p>
         </div>
@@ -309,37 +317,50 @@ const start = () => {
               </div>
             </div>
           </div>
+        </div>
 
-          <!-- Progression Ledger -->
-          <div class="mt-12 bg-slate-900/40 rounded-[3rem] p-10 border border-white/5 backdrop-blur-3xl">
-            <div class="flex justify-between items-center mb-10 px-4">
-               <div>
-                  <h3 class="text-xl font-black text-white italic uppercase tracking-tighter">Progression <span class="text-indigo-500">Ledger</span></h3>
-                  <p class="text-[9px] text-slate-500 uppercase font-bold tracking-widest mt-1">Stored Harmonic Flow</p>
-               </div>
-               <button 
+        <!-- Progression Ledger -->
+        <div class="mt-12 bg-slate-900/40 rounded-[3rem] p-10 border border-white/5 backdrop-blur-3xl">
+          <div class="flex justify-between items-center mb-10 px-4">
+            <div>
+              <h3 class="text-xl font-black text-white italic uppercase tracking-tighter">Progression <span
+                  class="text-indigo-500"
+                >Ledger</span></h3>
+              <p class="text-[9px] text-slate-500 uppercase font-bold tracking-widest mt-1">Stored Harmonic Flow</p>
+            </div>
+            <button
                 v-if="chordHistory.length > 0"
                 @click="clearHistory"
                 class="px-4 py-2 text-[9px] font-black text-slate-600 hover:text-red-400 transition-colors uppercase tracking-widest"
-               >Clear All</button>
-            </div>
-            
-            <div v-if="chordHistory.length > 0" class="flex flex-wrap gap-6 px-4">
-              <div 
-                v-for="(item, idx) in chordHistory" 
-                :key="idx"
-                class="flex items-center gap-6 group"
-              >
-                <div class="flex flex-col items-center">
-                  <div class="text-2xl font-black text-white font-outfit group-hover:text-indigo-400 transition-colors">{{ item.symbol }}</div>
-                  <div class="text-[10px] font-black text-indigo-500/60 uppercase tracking-tighter">{{ item.roman }}</div>
+            >Clear All</button>
+          </div>
+
+          <div
+            v-if=" chordHistory.length > 0 "
+            class="flex flex-wrap gap-6 px-4"
+          >
+            <div
+              v-for=" ( item, idx ) in chordHistory "
+              :key="idx"
+              class="flex items-center gap-6 group"
+            >
+              <div class="flex flex-col items-center">
+                <div class="text-2xl font-black text-white font-outfit group-hover:text-indigo-400 transition-colors">
+                  {{ item.symbol }}
                 </div>
-                <div v-if="idx < chordHistory.length - 1" class="text-slate-800 font-black text-xl">→</div>
+                <div class="text-[10px] font-black text-indigo-500/60 uppercase tracking-tighter">{{ item.roman }}</div>
               </div>
+              <div
+                v-if=" idx < chordHistory.length - 1 "
+                class="text-slate-800 font-black text-xl"
+              >→</div>
             </div>
-            <div v-else class="py-12 text-center opacity-20 italic text-sm">
-              Your captured progression will appear here.
-            </div>
+          </div>
+          <div
+            v-else
+            class="py-12 text-center opacity-20 italic text-sm"
+          >
+            Your captured progression will appear here.
           </div>
         </div>
       </div>

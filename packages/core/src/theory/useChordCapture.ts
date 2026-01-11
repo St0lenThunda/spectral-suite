@@ -33,7 +33,7 @@ if ( typeof window !== 'undefined' ) {
 }
 
 export function useChordCapture () {
-  const { pitch, clarity, volume } = usePitch();
+  const { pitch, clarity, volume } = usePitch( { smoothing: 3 } );
 
   const capturedNotes = globalCapturedNotes;
   const detectedChords = globalDetectedChords;

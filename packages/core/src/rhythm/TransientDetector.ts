@@ -10,7 +10,7 @@ export class TransientDetector {
   private audioContext: AudioContext | null = null
   private threshold: number = 0.3
   private lastTransientTime: number = 0
-  private cooldownMs: number = 100
+  private cooldownMs: number = 50
   private transientCallbacks: Array<( time: number, energy: number ) => void> = []
 
   constructor( threshold: number = 0.3 ) {
@@ -68,13 +68,15 @@ export class TransientDetector {
 
   private analyzeFrame ( features: any ) {
     const energy = features.energy || 0
-    const now = this.audioContext?.currentTime || 0
+    // Use the exact time from the audio hardware buffer
+    const now = features.time ?? ( this.audioContext?.currentTime || 0 )
 
     // Detect transient based on energy threshold
     if ( energy > this.threshold ) {
       const timeSinceLastTransient = ( now - this.lastTransientTime ) * 1000
 
       // Only trigger if cooldown has passed
+      // Lowered to 50ms (default) to support 16th notes up to 300 BPM
       if ( timeSinceLastTransient > this.cooldownMs ) {
         this.lastTransientTime = now
         this.transientCallbacks.forEach( cb => cb( now, energy ) )

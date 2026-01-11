@@ -61,12 +61,30 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
       detector.onTransient( ( time, _energy ) => {
         if ( !isPlaying.value || lastBeatTime.value === 0 ) return;
 
-        const offset = ( time - lastBeatTime.value ) * 1000;
+        // --- Nearest Beat Logic ---
+        // A user might be EARLY for the next beat (Rushing) or LATE for the current one (Dragging).
+        // To be accurate, we compare their hit to whichever beat is closer.
+
+        const secondsPerBeat = 60 / tempo.value;
+        const secondsPerPulse = secondsPerBeat / subdivision.value;
+        const nextBeatTime = lastBeatTime.value + secondsPerPulse;
+
+        const offsetFromLast = ( time - lastBeatTime.value ) * 1000;
+        const offsetFromNext = ( time - nextBeatTime ) * 1000;
+
+        // Choose the smaller absolute offset
+        const offset = Math.abs( offsetFromLast ) < Math.abs( offsetFromNext )
+          ? offsetFromLast
+          : offsetFromNext;
+
         const absOffset = Math.abs( offset );
 
-        // Ignore noise/echoes outside 500ms window
-        // (Assuming 120bpm = 500ms per beat. This logic might need tempo-awareness later)
-        if ( absOffset < 300 ) {
+        // --- Tempo-Aware Window ---
+        // At 60BPM, beats are 1000ms apart. At 240BPM, they are 250ms apart.
+        // We only accept hits within 50% of the pulse duration to avoid cross-beat noise.
+        const windowMs = ( secondsPerPulse * 1000 ) * 0.5;
+
+        if ( absOffset < windowMs ) {
           timingOffset.value = offset;
           history.value.push( offset );
           if ( history.value.length > maxHistory ) history.value.shift();

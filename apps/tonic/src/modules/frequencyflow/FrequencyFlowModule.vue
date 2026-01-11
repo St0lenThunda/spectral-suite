@@ -225,6 +225,8 @@ onMounted( async () => {
   }
 } );
 
+const emit = defineEmits( ['back'] )
+
 onUnmounted( () => {
   if ( animId ) cancelAnimationFrame( animId );
 } );
@@ -234,6 +236,12 @@ onUnmounted( () => {
   <div class="space-y-6">
     <header class="flex justify-between items-end">
       <div>
+        <button
+          @click="emit( 'back' )"
+          class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 hover:text-white transition-colors mb-4 flex items-center gap-2"
+        >
+          <span>←</span> Back to Tonic
+        </button>
         <h2 class="text-3xl font-bold text-white mb-2">Frequency <span class="text-sky-400">Flow</span> <span
             class="text-indigo-400 text-lg"
           >Pro</span></h2>

@@ -217,6 +217,8 @@ onUnmounted( () => {
   stopPlayback();
 } );
 
+const emit = defineEmits( ['back'] )
+
 const formatDuration = ( seconds: number ) => {
   const mins = Math.floor( seconds / 60 );
   const secs = Math.floor( seconds % 60 );
@@ -337,6 +339,12 @@ const exportAnalysis = () => {
 
     <header class="flex justify-between items-end">
       <div>
+        <button
+          @click="emit( 'back' )"
+          class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 hover:text-white transition-colors mb-4 flex items-center gap-2"
+        >
+          <span>←</span> Back to Tonic
+        </button>
         <h2 class="text-4xl font-black text-white italic tracking-tighter uppercase">Track<span
             class="text-blue-500">Tracer</span> <span class="text-indigo-400 text-lg">Pro</span></h2>
         <p class="text-slate-500 text-xs font-mono uppercase tracking-widest mt-1">Song Deconstruction & Forensic Lab

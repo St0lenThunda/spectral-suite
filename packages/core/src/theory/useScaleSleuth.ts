@@ -5,7 +5,7 @@ import { ScaleEngine, type ScaleMatch } from '../theory/ScaleEngine';
 import { sensitivityThreshold } from '../config/sensitivity';
 
 export function useScaleSleuth () {
-  const { pitch, clarity, volume, isLowPassEnabled, downsample } = usePitch();
+  const { pitch, clarity, volume, isLowPassEnabled, downsample } = usePitch( { smoothing: 3 } );
   const detectedNotes = ref<string[]>( [] );
   const potentialScales = ref<ScaleMatch[]>( [] );
   const currentNote = ref<string | null>( null );

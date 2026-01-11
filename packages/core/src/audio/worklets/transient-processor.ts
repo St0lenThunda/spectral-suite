@@ -7,6 +7,7 @@ declare class AudioWorkletProcessor {
   process ( inputs: Float32Array[][], outputs: Float32Array[][], parameters: Record<string, Float32Array> ): boolean;
 }
 declare function registerProcessor ( name: string, processorCtor: new () => AudioWorkletProcessor ): void;
+declare const currentTime: number;
 
 
 class TransientProcessor extends AudioWorkletProcessor {
@@ -40,7 +41,7 @@ class TransientProcessor extends AudioWorkletProcessor {
 
       // When buffer is full, process it
       if ( this._bufferIndex >= this._bufferSize ) {
-        this.analyze( this._buffer );
+        this.analyze( this._buffer, currentTime );
         this._bufferIndex = 0;
       }
     }
@@ -48,13 +49,9 @@ class TransientProcessor extends AudioWorkletProcessor {
     return true; // Keep alive
   }
 
-  analyze ( buffer: Float32Array ) {
+  analyze ( buffer: Float32Array, currentAudioTime: number ) {
     let sum = 0;
     let energy = 0;
-
-    // Calculate RMS and Energy (Meyda 'energy' is usually just sum of squares or similar)
-    // Meyda RMS: Math.sqrt( sigma(x^2) / N )
-    // Meyda Energy: sigma(x^2) approx (or sometimes just RMS squared? Meyda docs say "Energy: The infinite integral of the squared signal... approximated by sum of squares")
 
     for ( let i = 0; i < buffer.length; i++ ) {
       const sample = buffer[i];
@@ -63,12 +60,13 @@ class TransientProcessor extends AudioWorkletProcessor {
     }
 
     const rms = Math.sqrt( sum / buffer.length );
-    energy = sum; // Approximate energy as sum of squares
+    energy = sum;
 
-    // Send data back to main thread
+    // Send data back to main thread with the exact hardware clock time
     this.port.postMessage( {
       rms: rms,
-      energy: energy
+      energy: energy,
+      time: currentAudioTime
     } );
   }
 }

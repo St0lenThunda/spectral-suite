@@ -4,6 +4,7 @@ import { lessons, type Lesson } from './lessons';
 const emit = defineEmits<{
   ( e: 'tool-request', tool: string ): void;
   ( e: 'start-lesson', lesson: Lesson ): void;
+  ( e: 'back' ): void;
 }>();
 
 function startLesson ( lesson: Lesson ) {
@@ -23,6 +24,12 @@ function startLesson ( lesson: Lesson ) {
     <div class="h-full p-8 overflow-y-auto">
       <div class="max-w-4xl mx-auto">
         <div class="mb-12">
+          <button
+            @click="emit( 'back' )"
+            class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 hover:text-white transition-colors mb-6 flex items-center gap-2"
+          >
+            <span>←</span> Back to Tonic
+          </button>
           <h1 class="text-4xl md:text-5xl font-black text-white mb-4 font-outfit uppercase tracking-tighter">
             Spectral <span class="text-emerald-400">Academy</span>
           </h1>

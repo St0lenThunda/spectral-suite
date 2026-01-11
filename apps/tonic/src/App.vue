@@ -185,10 +185,21 @@ const handleGainChange = ( event: Event ) => {
         class="animate-in fade-in slide-in-from-bottom-4 duration-1000"
       >
         <header class="mb-12">
-          <h2 class="text-4xl font-black tracking-tighter text-white mb-2 uppercase">Tonic</h2>
-          <p class="text-slate-500 font-mono text-[10px] uppercase tracking-widest">Active Modules:
-            {{ activeTools.length }}
-          </p>
+          <div class="flex items-baseline gap-4 mb-3">
+            <h2 class="text-4xl font-black tracking-tighter text-white uppercase italic">Tonic</h2>
+            <div class="h-px flex-1 bg-gradient-to-r from-indigo-500/50 to-transparent"></div>
+          </div>
+          <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
+            <p class="text-slate-400 text-sm max-w-xl leading-relaxed italic">
+              In music theory, the <span class="text-indigo-400 font-bold">Tonic</span> is the "home" note—the
+              foundation of resolution and stability.
+              This dashboard is your harmonic center: the home base from which you explore the spectrum and return to
+              find balance.
+            </p>
+            <p class="text-slate-500 font-mono text-[10px] uppercase tracking-widest whitespace-nowrap">
+              Active Modules: {{ activeTools.length }}
+            </p>
+          </div>
         </header>
 
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -284,15 +295,34 @@ const handleGainChange = ( event: Event ) => {
       </div>
 
       <!-- MODULE VIEWS -->
-      <AuraTuneModule v-else-if=" currentModule === 'auratune' && enabledTools.auratune " />
-      <ScaleSleuthModule v-else-if=" currentModule === 'scalesleuth' && enabledTools.scalesleuth " />
-      <ChordCaptureModule v-else-if=" currentModule === 'chordcapture' && enabledTools.chordcapture " />
-      <PocketEngineModule v-else-if=" currentModule === 'pocketengine' && enabledTools.pocketengine " />
-      <FrequencyFlowModule v-else-if=" currentModule === 'frequencyflow' && enabledTools.frequencyflow " />
-      <TrackTracerModule v-else-if=" currentModule === 'tracktracer' && enabledTools.tracktracer " />
+      <AuraTuneModule
+        v-else-if=" currentModule === 'auratune' && enabledTools.auratune "
+        @back="currentModule = 'dashboard'"
+      />
+      <ScaleSleuthModule
+        v-else-if=" currentModule === 'scalesleuth' && enabledTools.scalesleuth "
+        @back="currentModule = 'dashboard'"
+      />
+      <ChordCaptureModule
+        v-else-if=" currentModule === 'chordcapture' && enabledTools.chordcapture "
+        @back="currentModule = 'dashboard'"
+      />
+      <PocketEngineModule
+        v-else-if=" currentModule === 'pocketengine' && enabledTools.pocketengine "
+        @back="currentModule = 'dashboard'"
+      />
+      <FrequencyFlowModule
+        v-else-if=" currentModule === 'frequencyflow' && enabledTools.frequencyflow "
+        @back="currentModule = 'dashboard'"
+      />
+      <TrackTracerModule
+        v-else-if=" currentModule === 'tracktracer' && enabledTools.tracktracer "
+        @back="currentModule = 'dashboard'"
+      />
       <AcademyModule
         v-else-if=" currentModule === 'academy' "
         @start-lesson="( l ) => activeLesson = l"
+        @back="currentModule = 'dashboard'"
       />
 
       <div
@@ -307,7 +337,6 @@ const handleGainChange = ( event: Event ) => {
         >Return to Base</button>
       </div>
 
-      <ToolInfoModal />
       <ToolInfoModal />
 
       <!-- ACADEMY OVERLAY MOVED -->

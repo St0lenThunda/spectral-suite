@@ -157,6 +157,8 @@ const handleScaleClick = ( name: string ) => {
   }
 };
 
+const emit = defineEmits( ['back'] )
+
 // --- Notification Logic ---
 const toastVisible = ref( false );
 const toastMessage = ref( '' );
@@ -270,6 +272,12 @@ onMounted( async () => {
   <div class="p-6">
     <header class="mb-8 flex justify-between items-start">
       <div>
+        <button
+          @click="emit( 'back' )"
+          class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 hover:text-white transition-colors mb-4 flex items-center gap-2"
+        >
+          <span>←</span> Back to Tonic
+        </button>
         <h2 class="text-3xl font-bold text-white mb-2">Scale <span class="text-sky-400">Sleuth</span> <span
             class="text-indigo-400 text-lg"
           >Pro</span></h2>

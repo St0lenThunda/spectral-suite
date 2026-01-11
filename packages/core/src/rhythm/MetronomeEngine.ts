@@ -228,9 +228,9 @@ export class MetronomeEngine {
       }
     }
 
-    // If still playing, run this function again in 25ms.
+    // If still playing, run this function again in 15ms (higher resolution for fast tempos)
     if ( this.isPlaying ) {
-      this.timerID = window.setTimeout( () => this.schedule(), 25 )
+      this.timerID = window.setTimeout( () => this.schedule(), 15 )
     }
   }
 
@@ -311,11 +311,12 @@ export class MetronomeEngine {
         }
       }
 
-      // Envelope: Fast Attack, Fast Decay (Short "Click" sound)
-      gain.gain.exponentialRampToValueAtTime( 0.01, time + 0.04 )
+      // Envelope: Fast Attack, Fast Decay (Snappy "Click" sound)
+      // Shortened to 25ms to avoid overlapping/muddiness at high speeds
+      gain.gain.exponentialRampToValueAtTime( 0.01, time + 0.025 )
 
       osc.start( time )
-      osc.stop( time + 0.04 )
+      osc.stop( time + 0.025 )
     }
 
     // Notify the UI (so the LEDs can blink)

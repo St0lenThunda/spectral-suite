@@ -4,8 +4,8 @@ import { NativePitch } from './NativePitch';
 import { useAudioEngine } from './useAudioEngine';
 import processorUrl from './worklets/pitch-processor.ts?worker&url';
 
-export function usePitch () {
-  const { getAnalyser, getContext } = useAudioEngine();
+export function usePitch ( config: { smoothing?: number } = {} ) {
+  const { getAnalyser, getContext, isInitialized } = useAudioEngine();
   const pitch = ref<number | null>( null );
   const clarity = ref<number | null>( null );
   const volume = ref<number>( 0 );
@@ -19,8 +19,10 @@ export function usePitch () {
   const downsample = ref( 1 );
 
   // Median Filter State
-  const medianBuffer: number[] = [];
-  const MEDIAN_SIZE = 5;
+  const medianBuffer: ( number | null )[] = [];
+  const MEDIAN_SIZE = config.smoothing ?? 7; // Default to stable (7), allow agile (1-3)
+  let nullFrameCount = 0;
+  const NULL_GRACE_PERIOD = 10; // Frames to wait before giving up on a note
 
   // Watch for LPF toggle
   // Watch for configuration changes
@@ -104,15 +106,7 @@ export function usePitch () {
         const analyser = getAnalyser();
         if ( analyser ) {
             analyser.connect( workletNode );
-            workletNode.connect( context.destination ); // Keep alive, usually process returns output=input or silence. 
-            // My process() code writes input to buffer but doesn't write to output.
-            // So it outputs silence (default). 
-            // If we connect to destination, we might silence the monitoring?
-            // Wait, input[0] is copied. output[0] is left zero? 
-            // If output[0] is zero, we output silence. Perfect.
-            // Wait, if Input -> Analyser -> Speakers?
-            // If we insert worklet: Input -> Analyser -> Worklet -> Destination.
-            // This path is parallel to monitoring. Monitoring is usually Input -> Destination separately.
+          workletNode.connect( context.destination ); 
         }
 
     } catch ( e ) {
@@ -120,6 +114,28 @@ export function usePitch () {
       startLegacyLoop();
     }
   };
+
+  // Watch for initialization to load or connect the worklet node
+  watch( isInitialized, ( initialized ) => {
+    if ( initialized ) {
+      if ( !workletNode && !legacyDetector ) {
+        // Not initialized at all, start the loading process
+        initWorklet();
+      } else if ( workletNode ) {
+        // Node exists but might need reconnection after a context resume
+        const analyser = getAnalyser();
+        const context = getContext();
+        if ( analyser && context ) {
+          try {
+            analyser.connect( workletNode );
+            workletNode.connect( context.destination );
+          } catch ( e ) {
+            // Already connected
+          }
+        }
+      }
+    }
+  } );
 
   const startLegacyLoop = () => {
     const loop = () => {
@@ -159,52 +175,64 @@ export function usePitch () {
 
   const updateState = ( rawPitch: number | null, rawClarity: number, v: number ) => {
     // 3. Jitter Killer (Median Smoothing)
-    // Physics: Pitch detectors sometimes make mistakes (glitches), jumping up or down for 1 frame.
-    // Instead of trusting the newest value immediately, we store the last 5 values.
-    // We then pick the "Median" (the middle value when sorted).
-    // Example: [440, 440, 880 (glitch), 441, 439] -> Sort -> [439, 440, 440, 441, 880] -> Middle is 440.
-    // The glitch (880) is ignored! A simple average would have been pulled up by the 880.
+    // We allow a small "grace period" for nulls to prevent flickering.
+    if ( rawPitch ) {
+      nullFrameCount = 0;
+      medianBuffer.push( rawPitch );
+    } else {
+      nullFrameCount++;
+      if ( nullFrameCount > NULL_GRACE_PERIOD ) {
+        medianBuffer.length = 0; // Truly lost the signal
+      } else {
+        // Hold the last known values in the buffer during dropout
+        // This effectively "freezes" the median for a few frames
+      }
+    }
+
+    if ( medianBuffer.length > MEDIAN_SIZE ) medianBuffer.shift();
+
+    // Calculate median excluding nulls
+    const validPitches = medianBuffer.filter( ( p ): p is number => p !== null );
     let p = rawPitch;
 
-    if ( rawPitch ) {
-      medianBuffer.push( rawPitch );
-      // Keep buffer exactly MEDIAN_SIZE length (FIFO: First In, First Out)
-      if ( medianBuffer.length > MEDIAN_SIZE ) medianBuffer.shift();
-
-      // Find the Median
-      const sorted = [...medianBuffer].sort( ( a, b ) => a - b );
-      const mid = Math.floor( sorted.length / 2 );
-      p = sorted[mid] || rawPitch;
-    } else {
-      // If no pitch detected, clear history so we don't "remember" old notes when we start playing again.
-      medianBuffer.length = 0;
+    if ( validPitches.length > 0 ) {
+      const sorted = [...validPitches].sort( ( a, b ) => a - b );
+      p = sorted[Math.floor( sorted.length / 2 )]!;
     }
 
     pitch.value = p;
     clarity.value = rawClarity;
     volume.value = v;
 
-    if ( p && rawClarity > 0.8 ) {
-        const calibratedFreq = p * ( 440 / concertA.value );
-        const rawNoteName = Note.fromFreq( calibratedFreq );
-        const displayNote = Note.transpose( rawNoteName, Interval.fromSemitones( transposition.value ) );
-        currentNote.value = displayNote;
+    // Use a multi-stage lock:
+    // 1. High-Clarity Lock: Note must start with > 0.8 clarity.
+    // 2. Sustain Lock: Once locked, we follow it down to 0.65 clarity (decay phase).
+    const CLARITY_START = 0.8;
+    const CLARITY_SUSTAIN = 0.65;
+    const isLocked = currentNote.value !== null;
+    const effectiveClarityThreshold = isLocked ? CLARITY_SUSTAIN : CLARITY_START;
 
-        const refFreq = Note.get( rawNoteName ).freq;
-        if ( refFreq ) {
-          cents.value = Math.round( 1200 * Math.log2( calibratedFreq / refFreq ) * 10 ) / 10;
-          const now = performance.now();
-          pitchHistory.value.push( { time: now, cents: cents.value } );
-          while ( pitchHistory.value.length > 0 && ( now - ( pitchHistory.value[0]?.time ?? 0 ) ) > HISTORY_MS ) {
-            pitchHistory.value.shift();
-          }
-        } else {
-          cents.value = 0;
+    if ( p && rawClarity > effectiveClarityThreshold ) {
+      const calibratedFreq = p * ( 440 / concertA.value );
+      const rawNoteName = Note.fromFreq( calibratedFreq );
+      const displayNote = Note.transpose( rawNoteName, Interval.fromSemitones( transposition.value ) );
+      currentNote.value = displayNote;
+
+      const refFreq = Note.get( rawNoteName ).freq;
+      if ( refFreq ) {
+        cents.value = Math.round( 1200 * Math.log2( calibratedFreq / refFreq ) * 10 ) / 10;
+        const now = performance.now();
+        pitchHistory.value.push( { time: now, cents: cents.value } );
+        while ( pitchHistory.value.length > 0 && ( now - ( pitchHistory.value[0]?.time ?? 0 ) ) > HISTORY_MS ) {
+          pitchHistory.value.shift();
         }
       } else {
-        currentNote.value = null;
         cents.value = 0;
       }
+    } else {
+      currentNote.value = null;
+      cents.value = 0;
+    }
   }
 
   onMounted( () => {

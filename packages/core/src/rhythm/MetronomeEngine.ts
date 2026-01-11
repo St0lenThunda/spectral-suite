@@ -133,6 +133,16 @@ export class MetronomeEngine {
     }
   }
 
+  /**
+   * Cleans up all event listeners and stops the engine.
+   * Call this when the component unmounts.
+   */
+  public dispose () {
+    this.stop()
+    this.beatCallbacks = []
+    this.tempoCallbacks = []
+  }
+
   // --- Getters and Setters ---
   // We use methods instead of direct property access to validate inputs (e.g. min/max values).
 

@@ -85,7 +85,7 @@ const analyzeUrl = async () => {
 
     if ( targetUrl.includes( 'youtube.com' ) || targetUrl.includes( 'youtu.be' ) ) {
       // PROXY MODE
-      let proxyBase = import.meta.env.VITE_FORENSIC_PROXY_URL || "http://127.0.0.1:8000";
+      let proxyBase = import.meta.env.VITE_FORENSIC_PROXY_URL || "http://127.0.0.1:8081";
 
       if ( !proxyBase.startsWith( 'http' ) ) {
         proxyBase = `https://${proxyBase}`;

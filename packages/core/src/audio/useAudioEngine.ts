@@ -42,11 +42,11 @@ export function useAudioEngine () {
    * Unregisters a consumer.
    * Suspends the engine if references drop to 0.
    */
-  const deactivate = () => {
+  const deactivate = async () => {
     activeConsumers.value = Math.max( 0, activeConsumers.value - 1 );
     if ( activeConsumers.value === 0 ) {
       if ( isInitialized.value ) {
-        engine.suspend();
+        await engine.suspend();
       }
     }
   };

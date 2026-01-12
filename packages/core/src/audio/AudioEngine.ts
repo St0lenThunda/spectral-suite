@@ -118,15 +118,15 @@ export class AudioEngine {
     return this.analyser;
   }
 
-  public resume (): void {
+  public async resume (): Promise<void> {
     if ( this.context && this.context.state === 'suspended' ) {
-      this.context.resume();
+      await this.context.resume();
     }
   }
 
-  public suspend (): void {
+  public async suspend (): Promise<void> {
     if ( this.context && this.context.state === 'running' ) {
-      this.context.suspend();
+      await this.context.suspend();
     }
   }
 

@@ -3,6 +3,7 @@ import { Note, Interval } from 'tonal';
 import { NativePitch } from './NativePitch';
 import { useAudioEngine } from './useAudioEngine';
 import processorUrl from './worklets/pitch-processor.ts?worker&url';
+import { clarityThreshold } from '../config/sensitivity';
 
 // Global State for Engine Settings (Shared across all instances)
 export const isLowPassEnabled = ref( false );
@@ -207,11 +208,10 @@ export function usePitch ( config: { smoothing?: number } = {} ) {
     volume.value = v;
 
     // Use a multi-stage lock:
-    // 1. High-Clarity Lock: Note must start with > 0.8 clarity.
-    // 2. Sustain Lock: Once locked, we follow it down to 0.65 clarity (decay phase).
-    // Adjusted thresholds for raw audio (no noise suppression)
-    const CLARITY_START = 0.6;
-    const CLARITY_SUSTAIN = 0.5;
+    // 1. High-Clarity Lock: Note must start with > Global Threshold.
+    // 2. Sustain Lock: Once locked, we follow it down slightly lower (decay phase).
+    const CLARITY_START = clarityThreshold.value;
+    const CLARITY_SUSTAIN = Math.max( 0, clarityThreshold.value - 0.1 ); // Sustain 10% lower than start
     const isLocked = currentNote.value !== null;
     const effectiveClarityThreshold = isLocked ? CLARITY_SUSTAIN : CLARITY_START;
 

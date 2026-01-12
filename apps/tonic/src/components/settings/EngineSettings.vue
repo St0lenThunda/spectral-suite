@@ -7,7 +7,7 @@
  * This component acts as a "View Controller" for the SynthEngine singleton and Global Input State.
  */
 import { ref } from 'vue';
-import { SynthEngine, type TonePreset, isLowPassEnabled, downsample } from '@spectralsuite/core';
+import { SynthEngine, type TonePreset, isLowPassEnabled, downsample, sensitivityThreshold, clarityThreshold } from '@spectralsuite/core';
 import PillNav from '../ui/PillNav.vue';
 
 // Access the singleton instance (The "Model")
@@ -121,6 +121,43 @@ const updatePreset = ( val: string ) => {
             sub-100Hz spectrum.
           </p>
         </button>
+      </div>
+
+      <!-- Sensitivity Sliders -->
+      <div class="mt-6 pt-6 border-t border-white/5 space-y-6">
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <label class="text-xs font-bold uppercase tracking-widest text-slate-500">Microphone Gate</label>
+            <span class="text-xs font-mono text-sky-400">{{ ( sensitivityThreshold * 100 ).toFixed( 0 ) }}%</span>
+          </div>
+          <input
+            type="range"
+            min="0.01"
+            max="0.2"
+            step="0.01"
+            v-model.number="sensitivityThreshold"
+            class="w-full accent-sky-500 bg-slate-800 h-2 rounded-lg appearance-none cursor-pointer"
+          />
+          <p class="text-[10px] text-slate-500 mt-1">Minimum volume required to detect signal.</p>
+        </div>
+
+        <div>
+          <div class="flex justify-between items-center mb-2">
+            <label class="text-xs font-bold uppercase tracking-widest text-slate-500">Note Clarity</label>
+            <span class="text-xs font-mono text-emerald-400">{{ ( clarityThreshold * 100 ).toFixed( 0 ) }}%</span>
+          </div>
+          <input
+            type="range"
+            min="0.5"
+            max="0.95"
+            step="0.05"
+            v-model.number="clarityThreshold"
+            class="w-full accent-emerald-500 bg-slate-800 h-2 rounded-lg appearance-none cursor-pointer"
+          />
+          <p class="text-[10px] text-slate-500 mt-1">Strictness of pitch detection. Lower for sustain, Higher for
+            accuracy.</p>
+        </div>
+
       </div>
     </div>
   </div>

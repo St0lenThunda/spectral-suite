@@ -2,7 +2,7 @@ import { ref, watch } from 'vue';
 import { Note } from 'tonal';
 import { usePitch } from '../audio/usePitch';
 import { ScaleEngine, type ScaleMatch } from '../theory/ScaleEngine';
-import { sensitivityThreshold } from '../config/sensitivity';
+import { sensitivityThreshold, clarityThreshold } from '../config/sensitivity';
 
 export function useScaleSleuth () {
   const { pitch, clarity, volume, isLowPassEnabled, downsample } = usePitch( { smoothing: 3 } );
@@ -18,7 +18,7 @@ export function useScaleSleuth () {
   watch( pitch, ( newPitch ) => {
     if ( isLocked.value ) return;
 
-    if ( !newPitch || ( clarity.value || 0 ) < 0.6 || volume.value < sensitivityThreshold.value ) {
+    if ( !newPitch || ( clarity.value || 0 ) < clarityThreshold.value || volume.value < sensitivityThreshold.value ) {
       currentNote.value = null;
       return;
     }

@@ -73,13 +73,15 @@ def get_ydl_opts():
         },
     }
 
-    # Nuclear Option: Cookies from Environment Variable
     # If YOUTUBE_COOKIES is set (Netscape format content), write it to a file.
     import os
     if os.environ.get("YOUTUBE_COOKIES"):
+        logger.info("Found YOUTUBE_COOKIES env var. Writing to cookies.txt...")
         with open("cookies.txt", "w") as f:
             f.write(os.environ["YOUTUBE_COOKIES"])
         opts['cookiefile'] = "cookies.txt"
+    else:
+        logger.info("No YOUTUBE_COOKIES found. Attempting unauthenticated access.")
     
     return opts
 

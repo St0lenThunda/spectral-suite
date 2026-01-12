@@ -333,7 +333,7 @@ onUnmounted( () => {
 
 <template>
   <div class="space-y-6">
-    <header class="flex justify-between items-end mb-8">
+    <header class="flex justify-between items-end mb-4">
       <div>
         <button
           @click="emit( 'back' )"
@@ -341,10 +341,13 @@ onUnmounted( () => {
         >
           <span>←</span> Back to Tonic
         </button>
-        <h2 class="text-3xl font-bold text-white mb-2">Frequency <span class="text-sky-400">Flow</span> <span
+        <h2 class="text-3xl font-black text-white italic uppercase tracking-tighter">Frequency <span
+            class="text-sky-400"
+          >Flow</span> <span
             class="text-indigo-400 text-lg"
           >Pro</span></h2>
-        <p class="text-slate-400 text-sm">Real-time spectral analysis and waveform diagnostics.</p>
+        <p class="text-slate-500 text-[10px] font-mono uppercase tracking-[0.2em] mt-1">Real-time spectral analysis and
+          waveform diagnostics.</p>
       </div>
       <div class="flex items-center gap-4">
         <SettingsToggle

@@ -301,7 +301,7 @@ watch( isInitialized, ( newVal ) => {
 
 <template>
   <div class="p-6">
-    <header class="mb-8 flex justify-between items-start">
+    <header class="mb-4 flex justify-between items-end">
       <div>
         <button
           @click="emit( 'back' )"
@@ -309,10 +309,12 @@ watch( isInitialized, ( newVal ) => {
         >
           <span>←</span> Back to Tonic
         </button>
-        <h2 class="text-3xl font-bold text-white mb-2">Scale <span class="text-sky-400">Sleuth</span> <span
+        <h2 class="text-3xl font-black text-white italic uppercase tracking-tighter">Scale <span
+            class="text-sky-400">Sleuth</span> <span
             class="text-indigo-400 text-lg"
           >Pro</span></h2>
-        <p class="text-slate-400 text-sm">Play notes to identify the scale and see it on the fretboard.</p>
+        <p class="text-slate-500 text-[10px] font-mono uppercase tracking-[0.2em] mt-1">Play notes to identify the scale
+          and see it on the fretboard.</p>
       </div>
       <div class="flex flex-col items-end gap-2">
         <div class="flex items-center gap-4">

@@ -29,8 +29,9 @@ export function useAudioEngine () {
   /**
    * Registers a consumer that requires the audio engine to be running.
    * Resumes the engine references go from 0 -> 1.
+   * NON-BLOCKING: Does not await the resume to prevent HMR freezes.
    */
-  const activate = async () => {
+  const activate = () => {
     // Cancel any pending suspension immediately as we have a new consumer
     if ( suspendTimer ) {
       clearTimeout( suspendTimer );
@@ -40,16 +41,17 @@ export function useAudioEngine () {
     activeConsumers.value++;
 
     if ( isInitialized.value ) {
-      // Ensure engine is running (safe to call multiple times)
-      await engine.resume();
+      // Fire-and-forget resume to prevent blocking the main thread
+      engine.resume().catch( e => console.warn( 'Resume failed:', e ) );
     }
   };
 
   /**
    * Unregisters a consumer.
    * Suspends the engine if references drop to 0.
+   * NON-BLOCKING: Uses debounced fire-and-forget suspension.
    */
-  const deactivate = async () => {
+  const deactivate = () => {
     activeConsumers.value = Math.max( 0, activeConsumers.value - 1 );
 
     if ( activeConsumers.value === 0 ) {
@@ -57,10 +59,10 @@ export function useAudioEngine () {
       // without continuously stopping/starting the AudioContext hardware.
       if ( suspendTimer ) clearTimeout( suspendTimer );
 
-      suspendTimer = setTimeout( async () => {
+      suspendTimer = setTimeout( () => {
         // Double check count is still 0 after delay
         if ( activeConsumers.value === 0 && isInitialized.value ) {
-          await engine.suspend();
+          engine.suspend().catch( e => console.warn( 'Suspend failed:', e ) );
         }
         suspendTimer = null;
       }, 500 );

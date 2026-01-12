@@ -39,3 +39,8 @@ build/
 
 # Lock files (optional - keeping package-lock.json for consistency)
 # package-lock.json
+
+# Python
+venv/
+__pycache__/
+*.pyc

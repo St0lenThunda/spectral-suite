@@ -159,7 +159,7 @@ const analyzeUrl = async () => {
     if ( targetUrl.includes( 'youtube.com' ) || targetUrl.includes( 'youtu.be' ) ) {
       // PROXY MODE
       // TODO: Move this URL to environment variable
-      let proxyBase = import.meta.env.VITE_FORENSIC_PROXY_URL || "http://localhost:8000";
+      let proxyBase = import.meta.env.VITE_FORENSIC_PROXY_URL || "http://127.0.0.1:8000";
 
       // Ensure protocol if only host is provided (Render 'host' property)
       if ( !proxyBase.startsWith( 'http' ) ) {
@@ -167,16 +167,21 @@ const analyzeUrl = async () => {
       }
 
       const resolveUrl = `${proxyBase}/resolve?url=${encodeURIComponent( targetUrl )}`;
+      console.log( 'Forensic Proxy Request:', resolveUrl ); // Debug Log
 
       try {
         const resp = await fetch( resolveUrl );
-        if ( !resp.ok ) throw new Error( "Proxy resolution failed" );
+        if ( !resp.ok ) {
+          const txt = await resp.text();
+          throw new Error( `Proxy resolution failed (${resp.status}): ${txt}` );
+        }
 
         const blob = await resp.blob();
         // Convert blob to File object for the analyzer
         const proxyFile = new File( [blob], "youtube_stream.mp3", { type: "audio/mpeg" } );
         result.value = await TrackAnalyzer.analyze( proxyFile );
       } catch ( e: any ) {
+        console.error( "Forensic Proxy Fetch Error:", e );
         throw new Error( "Forensic Proxy Error: " + e.message );
       }
     } else {

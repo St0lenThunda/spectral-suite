@@ -92,14 +92,14 @@ def get_ydl_opts():
     else:
         # Unauthenticated Evasion Strategy (Mobile Clients + IPv4)
         return {
-            'format': 'bestaudio/best',
+            'format': 'bestaudio[ext=m4a]/bestaudio/best[ext=mp4]/best', # More aggressive format finding
             'quiet': True,
             'no_warnings': True,
             'noplaylist': True,
             'force_ipv4': True, 
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['android', 'ios'],
+                    'player_client': ['ios', 'android'], # Try iOS first
                     'player_skip': ['webpage', 'configs', 'js'],
                     'include_fields': ['title', 'thumbnail', 'duration', 'uploader', 'view_count', 'url'],
                 },

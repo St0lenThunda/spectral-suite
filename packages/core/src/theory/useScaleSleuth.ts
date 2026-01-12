@@ -18,7 +18,7 @@ export function useScaleSleuth () {
   watch( pitch, ( newPitch ) => {
     if ( isLocked.value ) return;
 
-    if ( !newPitch || ( clarity.value || 0 ) < 0.7 || volume.value < sensitivityThreshold.value ) {
+    if ( !newPitch || ( clarity.value || 0 ) < 0.6 || volume.value < sensitivityThreshold.value ) {
       currentNote.value = null;
       return;
     }

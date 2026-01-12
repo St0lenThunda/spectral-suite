@@ -1,5 +1,6 @@
 import { ref } from 'vue';
 import { AudioEngine } from './AudioEngine';
+import { PitchNodePool } from './PitchNodePool';
 
 const isInitialized = ref( false );
 const error = ref<string | null>( null );
@@ -16,6 +17,12 @@ export function useAudioEngine () {
       isInitialized.value = true;
       inputGain.value = engine.getGain();
       error.value = null;
+
+      // Pre-warm the pitch worklet module for instant first-use
+      const ctx = engine.getContext();
+      if ( ctx ) {
+        PitchNodePool.warmUp( ctx ).catch( e => console.warn( 'PitchNodePool warmUp failed:', e ) );
+      }
     } catch ( err: any ) {
       error.value = err.message;
     }

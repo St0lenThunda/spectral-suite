@@ -2,7 +2,7 @@ import { ref, watch, onMounted, onUnmounted } from 'vue';
 import { Note, Interval } from 'tonal';
 import { NativePitch } from './NativePitch';
 import { useAudioEngine } from './useAudioEngine';
-import processorUrl from './worklets/pitch-processor.ts?worker&url';
+import { PitchNodePool, poolPitch, poolClarity, poolVolume } from './PitchNodePool';
 import { clarityThreshold } from '../config/sensitivity';
 
 // Global State for Engine Settings (Shared across all instances)
@@ -27,116 +27,67 @@ export function usePitch ( config: { smoothing?: number } = {} ) {
   let nullFrameCount = 0;
   const NULL_GRACE_PERIOD = 10; // Frames to wait before giving up on a note
 
-  // Watch for LPF toggle
-  // Watch for configuration changes
+  // Watch for LPF toggle and config changes
   watch( [isLowPassEnabled, downsample], () => {
-    const config = {
-      type: 'config',
+    // Update pool's worklet node
+    PitchNodePool.configure( {
       lowPass: isLowPassEnabled.value,
       downsample: downsample.value
-    };
+    } );
 
-    // Update Worklet
-    if ( workletNode ) {
-      workletNode.port.postMessage( config );
-    }
-    // Update Legacy
+    // Update Legacy detector if in fallback mode
     if ( legacyDetector ) {
       legacyDetector.useLowPass = isLowPassEnabled.value;
       legacyDetector.downsample = downsample.value;
     }
   } );
 
-  // AudioWorklet URL
-  
-  let workletNode: AudioWorkletNode | null = null;
+  // AudioWorklet state (now managed by PitchNodePool)
+  let isPoolAcquired = false;
   const HISTORY_MS = 5000;
 
   // Legacy main-thread detector for fallback
   let legacyDetector: NativePitch | null = null;
   let legacyBuffer: Float32Array | null = null;
 
+  // Watch pool data and route through our updateState function
+  watch( [poolPitch, poolClarity, poolVolume], ( [p, c, v] ) => {
+    if ( isPoolAcquired ) {
+      updateState( p, c ?? 0, v );
+    }
+  } );
 
-  const initWorklet = async () => {
+  const initFromPool = async () => {
     const context = getContext();
-    if ( !context ) return;
+    const analyser = getAnalyser();
+    if ( !context || !analyser ) return;
 
-    // Resume if suspended (user interaction requirements usually handled upstream)
+    // Resume if suspended
     if ( context.state === 'suspended' ) {
-       await context.resume();
+      await context.resume();
     }
 
     try {
-        await context.audioWorklet.addModule( processorUrl );
-        
-        // Check if node already exists? (Singleton pattern vs Component instance)
-        // Since usePitch might be used multiple times, we should be careful.
-        // Usually usePitch is a singleton or scoped.
-        // Hook logic creates new refs each call.
-        // We should create a new node for this instance? Or share?
-        // Sharing source is cleaner.
-        
-        // But for updatePitch logic... 
-        // Let's create a node per usage for now (easiest refactor), 
-        // but typically AudioEngine should manage a global pitch analyzer node.
-        // Refactoring to global singleton in AudioEngine is better but bigger scope.
-        // Stick to localized node for safey.
+      await PitchNodePool.acquire( context, analyser );
+      isPoolAcquired = true;
 
-        workletNode = new AudioWorkletNode( context, 'pitch-processor' );
-        workletNode.port.onmessage = ( event ) => {
-            const { pitch: p, clarity: c, volume: v } = event.data;
-          updateState( p, c, v );
-        };
-
-      // Init config
-      workletNode.port.postMessage( {
-        type: 'config',
+      // Send initial config to the pool
+      PitchNodePool.configure( {
         lowPass: isLowPassEnabled.value,
         downsample: downsample.value
       } );
-
-        // Connect Source
-        // We need a source from AudioEngine.
-        // getAnalyser() returns an AnalyserNode. We can connect THAT to worklet? 
-        // Or get Source from engine?
-        // useAudioEngine usually exposes input source.
-        
-        // We might need to tap into the input stream again or connect from the Analyser.
-        // AnalyserNode is a pass-through. So we can connect Analyser -> Worklet.
-        // But Analyser might be doing FFT for visuals.
-        // Connecting: Input -> Analyser -> Worklet -> Destination (mute).
-        
-        const analyser = getAnalyser();
-        if ( analyser ) {
-            analyser.connect( workletNode );
-          workletNode.connect( context.destination ); 
-        }
-
     } catch ( e ) {
-      console.warn( 'AudioWorklet failed to load, falling back to Native Main Thread:', e );
+      console.warn( 'PitchNodePool failed, falling back to Native Main Thread:', e );
       startLegacyLoop();
     }
   };
 
-  // Watch for initialization to load or connect the worklet node
+
+
+  // Watch for initialization
   watch( isInitialized, ( initialized ) => {
-    if ( initialized ) {
-      if ( !workletNode && !legacyDetector ) {
-        // Not initialized at all, start the loading process
-        initWorklet();
-      } else if ( workletNode ) {
-        // Node exists but might need reconnection after a context resume
-        const analyser = getAnalyser();
-        const context = getContext();
-        if ( analyser && context ) {
-          try {
-            analyser.connect( workletNode );
-            workletNode.connect( context.destination );
-          } catch ( e ) {
-            // Already connected
-          }
-        }
-      }
+    if ( initialized && !isPoolAcquired && !legacyDetector ) {
+      initFromPool();
     }
   } );
 
@@ -239,15 +190,14 @@ export function usePitch ( config: { smoothing?: number } = {} ) {
   }
 
   onMounted( () => {
-    initWorklet();
+    initFromPool();
   } );
 
   onUnmounted( () => {
     isCanceled.value = true;
-    if ( workletNode ) {
-        workletNode.disconnect(); // Disconnects from destination and inputs?
-        // workletNode.port.close();
-        workletNode = null;
+    if ( isPoolAcquired ) {
+      PitchNodePool.release();
+      isPoolAcquired = false;
     }
   } );
 

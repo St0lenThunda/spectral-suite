@@ -133,6 +133,7 @@ def get_video_info(url: str = Query(..., description="YouTube URL to inspect")):
     Returns metadata for a YouTube video (Title, Duration, Thumbnail) without downloading.
     """
     ydl_opts = get_ydl_opts()
+    ydl_opts['ignoreerrors'] = True # Don't fail completely on minor metadata issues
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)

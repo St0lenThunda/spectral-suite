@@ -1,5 +1,5 @@
 import { computed } from 'vue';
-import { isLowPassEnabled, downsample } from '../audio/useAudioEngine'; // Re-exporting from useAudioEngine or usePitch where they live
+// Re-exporting from useAudioEngine or usePitch where they live
 // Actually, downsample/lowpass live in usePitch currently, but they are global refs.
 // Let's import them from where they are truly defined.
 import { isLowPassEnabled as lpf, downsample as ds } from '../audio/usePitch';

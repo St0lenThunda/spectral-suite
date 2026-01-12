@@ -12,19 +12,33 @@ services:
       - key: PORT
         value: 8000
 
-  # 2. Vue Frontend (Tonic)
-  - type: static
-    name: tonic-frontend
-    env: node
-    region: ohio
-    plan: free
-    # Build command runs from root, installing all deps and building specific workspace
+      - key: PORT
+        value: 8000
+    autoDeploy: true
+    branch: main
+
+# 2. Vue Frontend (Tonic) - Static Site
+staticSites:
+  - name: tonic-frontend
     buildCommand: npm install && npm run build:tonic
     publishDir: apps/tonic/dist
+    branch: main
+    autoDeploy: true
     envVars:
-      # Link to the backend service URL for API calls
       - key: VITE_FORENSIC_PROXY_URL
         fromService:
           type: web
           name: forensic-proxy
           property: url
+    
+    # SPA Routing (History Mode)
+    routes:
+      - type: rewrite
+        source: /**
+        destination: /index.html
+
+    # Performance Caching
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable

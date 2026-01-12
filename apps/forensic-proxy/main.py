@@ -28,6 +28,8 @@ class LogMiddleware(BaseHTTPMiddleware):
         logger.info(f"Incoming Request: {request.method} {request.url}")
         try:
             response = await call_next(request)
+            # PNA Header (Private Network Access) debugging
+            response.headers["Access-Control-Allow-Private-Network"] = "true"
             return response
         except Exception as e:
             logger.error(f"Middleware Error: {e}")

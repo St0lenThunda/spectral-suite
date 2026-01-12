@@ -57,7 +57,7 @@ def get_ydl_opts():
     Returns robust yt-dlp options to bypass bot detection.
     Using 'android' client is often more permissive for datacenter IPs.
     """
-    """
+
     opts = {
         'format': 'bestaudio/best',
         'quiet': True,

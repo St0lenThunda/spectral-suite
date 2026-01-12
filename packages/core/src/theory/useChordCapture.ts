@@ -13,7 +13,7 @@ const globalCurrentNote = ref<string | null>( null );
 // Buffer to store notes played to detect the chord (Hidden from UI)
 const noteBuffer = new Set<string>();
 let bufferTimeout: any = null;
-import { sensitivityThreshold } from '../config/sensitivity';
+import { sensitivityThreshold, clarityThreshold } from '../config/sensitivity';
 const BUFFER_IDLE_TIME = 10000; // 10 seconds of silence to clear the *tray*, but keeps the *visual result*
 // NOISE_FLOOR accessed directly via sensitivityThreshold.value in watch
 
@@ -79,7 +79,7 @@ export function useChordCapture () {
 
   watch( pitch, ( newPitch ) => {
     // Noise Gate: must have pitch, decent clarity (lowered for guitar), and exceed volume threshold
-    if ( !newPitch || ( clarity.value || 0 ) < 0.7 || volume.value < sensitivityThreshold.value ) {
+    if ( !newPitch || ( clarity.value || 0 ) < clarityThreshold.value || volume.value < sensitivityThreshold.value ) {
       currentNote.value = null;
 
       // Start/reset clear timeout if buffer is not empty

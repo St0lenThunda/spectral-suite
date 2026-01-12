@@ -17,7 +17,8 @@ export function usePolyPitch ( config: { threshold?: number; maxNotes?: number }
 
   // We convert the sensitivity threshold (0.0 to 1.0) into a decibel value.
   // We use -60dB as the base floor for "total silence".
-  const THRESHOLD = config.threshold ?? ( -60 + ( sensitivityThreshold.value * 60 ) );
+  // MOVED TO ANALYZE LOOP FOR REACTIVITY
+  // const THRESHOLD = config.threshold ?? ( -60 + ( sensitivityThreshold.value * 60 ) );
   const RELATIVE_THRESHOLD = 25; // dB distance from the strongest peak
   const MAX_NOTES = config.maxNotes ?? 6; // Typical guitar limit
 
@@ -40,6 +41,9 @@ export function usePolyPitch ( config: { threshold?: number; maxNotes?: number }
     const nyquist = context.sampleRate / 2;
     const binSize = nyquist / bufferLength;
 
+    // Dynamic Threshold Calculation
+    const currentThreshold = config.threshold ?? ( -60 + ( sensitivityThreshold.value * 60 ) );
+
     // 1. Peak Detection
     const peaks: Array<{ freq: number; magnitude: number }> = [];
 
@@ -50,7 +54,7 @@ export function usePolyPitch ( config: { threshold?: number; maxNotes?: number }
       const val = dataArray[i]!;
 
       // Local maximum check
-      if ( val > THRESHOLD && val > dataArray[i - 1]! && val > dataArray[i + 1]! ) {
+      if ( val > currentThreshold && val > dataArray[i - 1]! && val > dataArray[i + 1]! ) {
         // Simple parabolic interpolation for better frequency accuracy
         const alpha = dataArray[i - 1]!;
         const beta = dataArray[i]!;

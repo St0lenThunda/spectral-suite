@@ -5,7 +5,7 @@ import { ref } from 'vue';
  * Default 0.05 matches the updated noise floor for chord capture.
  * Users can modify this at runtime (e.g., via a settings UI).
  */
-export const sensitivityThreshold = ref<number>(0.05);
+export const sensitivityThreshold = ref<number>( 0.01 );
 
 /**
  * Global clarity threshold (0.0 - 1.0).

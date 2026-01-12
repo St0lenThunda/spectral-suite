@@ -4,6 +4,10 @@ import { TrackAnalyzer, type AnalysisResult, useAudioRecorder, useAudioEngine } 
 import { useToolInfo } from '../../composables/useToolInfo';
 
 const { openInfo } = useToolInfo();
+const { activate, deactivate } = useAudioEngine();
+
+// Ensure audio engine is awake for playback/recording
+activate();
 
 const fileInput = ref<HTMLInputElement | null>( null );
 const urlInput = ref( "" );
@@ -104,6 +108,7 @@ const startListening = async () => {
 }
 
 onUnmounted( () => {
+  deactivate();
   stopPlayback( true );
   stopWaveform();
   if ( isListening.value ) {

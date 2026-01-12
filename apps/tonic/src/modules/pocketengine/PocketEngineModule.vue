@@ -230,7 +230,14 @@ const reset = () => {
 
 const emit = defineEmits( ['back'] )
 
+import { useAudioEngine } from '@spectralsuite/core';
+const { activate, deactivate } = useAudioEngine();
+
+// Register as an active audio consumer
+activate();
+
 onUnmounted( () => {
+  deactivate();
   stop() // Stop the loop
   metronome.dispose() // Clear all callbacks to prevent memory leaks
 } )

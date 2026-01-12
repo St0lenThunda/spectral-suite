@@ -11,9 +11,6 @@ services:
     envVars:
       - key: PORT
         value: 8000
-
-      - key: PORT
-        value: 8000
     autoDeploy: true
     branch: main
 
@@ -25,12 +22,10 @@ services:
     staticPublishPath: apps/tonic/dist
     branch: main
     autoDeploy: true
-    envVars:
-      - key: VITE_FORENSIC_PROXY_URL
-        fromService:
-          type: web
-          name: forensic-proxy
-          property: url
+    # Env vars must be set manually in Dashboard for public URLs
+    # envVars:
+    #   - key: VITE_FORENSIC_PROXY_URL
+    #     value: https://your-service.onrender.com
     
     # SPA Routing (History Mode)
     routes:

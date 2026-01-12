@@ -57,22 +57,30 @@ def get_ydl_opts():
     Returns robust yt-dlp options to bypass bot detection.
     Using 'android' client is often more permissive for datacenter IPs.
     """
-    return {
+    """
+    opts = {
         'format': 'bestaudio/best',
         'quiet': True,
         'no_warnings': True,
         'noplaylist': True,
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'web'],
+                'player_client': ['android', 'ios', 'web'],
                 'player_skip': ['webpage', 'configs', 'js'],
                 'include_fields': ['title', 'thumbnail', 'duration', 'uploader', 'view_count', 'url'],
             },
         },
-        'http_headers': {
-            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-        }
     }
+
+    # Nuclear Option: Cookies from Environment Variable
+    # If YOUTUBE_COOKIES is set (Netscape format content), write it to a file.
+    import os
+    if os.environ.get("YOUTUBE_COOKIES"):
+        with open("cookies.txt", "w") as f:
+            f.write(os.environ["YOUTUBE_COOKIES"])
+        opts['cookiefile'] = "cookies.txt"
+    
+    return opts
 
 def get_best_audio_url(video_url: str) -> str:
     """

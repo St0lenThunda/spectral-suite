@@ -215,7 +215,7 @@ const emit = defineEmits<{
       class="w-full flex flex-col items-center gap-6 md:gap-12 animate-fade-in"
     >
       <!-- Standard Module Header -->
-      <header class="flex justify-between items-end mb-4">
+      <header class="w-full flex justify-between items-end mb-4">
         <div>
           <button
             @click="emit( 'back' )"

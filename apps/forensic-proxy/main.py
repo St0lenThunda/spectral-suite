@@ -73,6 +73,30 @@ def get_best_audio_url(video_url: str) -> str:
 def health_check():
     return {"status": "operational", "service": "forensic-proxy"}
 
+@app.get("/info")
+def get_video_info(url: str = Query(..., description="YouTube URL to inspect")):
+    """
+    Returns metadata for a YouTube video (Title, Duration, Thumbnail) without downloading.
+    """
+    ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'noplaylist': True,
+    }
+    try:
+        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(url, download=False)
+            return {
+                "title": info.get('title', 'Unknown Title'),
+                "thumbnail": info.get('thumbnail'),
+                "duration": info.get('duration'),
+                "uploader": info.get('uploader'),
+                "view_count": info.get('view_count')
+            }
+    except Exception as e:
+        logger.error(f"Info extraction failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to fetch info: {str(e)}")
+
 @app.get("/resolve")
 def resolve_audio(url: str = Query(..., description="YouTube URL to resolve")):
     """

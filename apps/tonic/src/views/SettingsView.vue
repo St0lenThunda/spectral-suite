@@ -116,22 +116,6 @@ const toggleTool = ( id: string ) => {
     >
       <!-- Reusable Engine Settings Module -->
       <EngineSettings />
-
-      <!-- Placeholder for future engine settings -->
-      <div
-        class="w-full bg-white/5 border border-white/5 rounded-[2rem] p-6 backdrop-blur-sm opacity-50 cursor-not-allowed"
-      >
-        <div class="flex items-center gap-3 mb-4">
-          <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-lg">🎤</div>
-          <div>
-            <h3 class="text-white font-bold text-sm">Input Processor</h3>
-            <p class="text-[10px] text-slate-500 uppercase tracking-widest font-mono">Noise Gate & Gain</p>
-          </div>
-        </div>
-        <div class="h-2 w-full bg-slate-800 rounded-full overflow-hidden">
-          <div class="h-full w-2/3 bg-emerald-500/30"></div>
-        </div>
-      </div>
     </div>
   </div>
 </template>

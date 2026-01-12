@@ -77,13 +77,35 @@ const analyzeUrl = async () => {
 
   try {
     let targetUrl = urlInput.value;
-    if ( targetUrl.includes( 'youtube.com' ) || targetUrl.includes( 'youtu.be' ) ) {
-      error.value = "YouTube direct analysis requires a forensic proxy (CORS). Please upload a file for now.";
-      isAnalyzing.value = false;
-      return;
+
+    // Ensure engine is ready (TrackAnalyzer uses it)
+    if ( !useAudioEngine().isInitialized.value ) {
+      await useAudioEngine().init();
     }
 
-    result.value = await TrackAnalyzer.analyzeUrl( targetUrl );
+    if ( targetUrl.includes( 'youtube.com' ) || targetUrl.includes( 'youtu.be' ) ) {
+      // PROXY MODE
+      let proxyBase = import.meta.env.VITE_FORENSIC_PROXY_URL || "http://localhost:8000";
+
+      if ( !proxyBase.startsWith( 'http' ) ) {
+        proxyBase = `https://${proxyBase}`;
+      }
+
+      const resolveUrl = `${proxyBase}/resolve?url=${encodeURIComponent( targetUrl )}`;
+
+      try {
+        const resp = await fetch( resolveUrl );
+        if ( !resp.ok ) throw new Error( "Proxy resolution failed" );
+
+        const blob = await resp.blob();
+        const proxyFile = new File( [blob], "youtube_stream.mp3", { type: "audio/mpeg" } );
+        result.value = await TrackAnalyzer.analyze( proxyFile );
+      } catch ( e: any ) {
+        throw new Error( "Forensic Proxy Error: " + e.message );
+      }
+    } else {
+      result.value = await TrackAnalyzer.analyzeUrl( targetUrl );
+    }
   } catch ( err: any ) {
     error.value = "URL analysis failed: " + err.message;
   } finally {

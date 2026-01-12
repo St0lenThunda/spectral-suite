@@ -1,4 +1,4 @@
-<script setup lang="ts">
+import { computed, ref } from 'vue';
 import { lessons, type Lesson } from './lessons';
 
 const emit = defineEmits<{
@@ -6,6 +6,22 @@ const emit = defineEmits<{
   ( e: 'start-lesson', lesson: Lesson ): void;
   ( e: 'back' ): void;
 }>();
+
+type SortMode = 'recommended' | 'difficulty' | 'title';
+const currentSort = ref<SortMode>('recommended');
+
+const difficultyOrder = { 'beginner': 1, 'intermediate': 2, 'advanced': 3 };
+
+const sortedLessons = computed(() => {
+  const list = [...lessons];
+  if (currentSort.value === 'difficulty') {
+    return list.sort((a, b) => difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty]);
+  }
+  if (currentSort.value === 'title') {
+    return list.sort((a, b) => a.title.localeCompare(b.title));
+  }
+  return list;
+});
 
 function startLesson ( lesson: Lesson ) {
   emit( 'start-lesson', lesson );
@@ -17,30 +33,72 @@ function startLesson ( lesson: Lesson ) {
 }
 </script>
 
+<style scoped>
+.list-move, /* apply transition to moving elements */
+.list-enter-active,
+.list-leave-active {
+  transition: all 0.5s cubic-bezier(0.55, 0, 0.1, 1);
+}
+
+.list-enter-from,
+.list-leave-to {
+  opacity: 0;
+  transform: scale(0.9);
+}
+
+/* ensure leaving items are taken out of layout flow so that moving
+   items can be calculated correctly. */
+.list-leave-active {
+  position: absolute; 
+}
+</style>
+
 <template>
   <div class="h-full w-full">
 
     <!-- Lesson Catalog -->
     <div class="h-full p-8 overflow-y-auto">
       <div class="max-w-4xl mx-auto">
-        <div class="mb-12">
-          <button
-            @click="emit( 'back' )"
-            class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 hover:text-white transition-colors mb-6 flex items-center gap-2"
-          >
-            <span>←</span> Back to Tonic
-          </button>
-          <h1 class="text-4xl md:text-5xl font-black text-white mb-4 font-outfit uppercase tracking-tighter">
-            Spectral <span class="text-emerald-400">Academy</span>
-          </h1>
-          <p class="text-xl text-slate-400">
-            Master the science of sound through active experimentation.
-          </p>
+        <div class="flex justify-between items-end mb-8">
+          <div>
+            <button
+              @click="emit( 'back' )"
+              class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 hover:text-white transition-colors mb-6 flex items-center gap-2"
+            >
+              <span>←</span> Back to Tonic
+            </button>
+            <h1 class="text-4xl md:text-5xl font-black text-white mb-4 font-outfit uppercase tracking-tighter">
+              Spectral <span class="text-emerald-400">Academy</span>
+            </h1>
+            <p class="text-xl text-slate-400">
+              Master the science of sound through active experimentation.
+            </p>
+          </div>
+
+          <!-- Sort Controls -->
+          <div class="flex flex-col items-end gap-2">
+            <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Sort By</span>
+            <div class="flex bg-slate-800/80 rounded-lg p-1 border border-slate-700/50 backdrop-blur-sm">
+              <button
+                v-for=" sort in ['recommended', 'difficulty', 'title'] "
+                :key="sort"
+                @click="currentSort = sort as any"
+                class="px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all"
+                :class="currentSort === sort ? 'bg-emerald-500 text-slate-900 shadow-lg shadow-emerald-500/25' : 'text-slate-400 hover:text-white hover:bg-slate-700'"
+              >
+                {{ sort }}
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <TransitionGroup
+          name="list"
+          tag="div"
+          class="grid grid-cols-1 md:grid-cols-2 gap-6 relative"
+        >
           <div
-            v-for=" lesson in lessons "
+            v-for=" lesson in sortedLessons "
             :key="lesson.id"
             @click="startLesson( lesson )"
             class="group bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-emerald-500/50 rounded-2xl p-6 cursor-pointer transition-all duration-300 hover:shadow-2xl hover:shadow-emerald-500/10 hover:-translate-y-1"

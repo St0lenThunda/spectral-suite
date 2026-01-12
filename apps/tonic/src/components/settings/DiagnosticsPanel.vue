@@ -150,9 +150,24 @@ const healthLabel = {
       </div>
     </div>
 
-    <!-- Active Issues -->
-    <div v-if="activeIssues.length > 0" class="space-y-3">
-      <h4 class="text-xs font-black uppercase tracking-widest text-rose-400">Active Issues</h4>
+    <!-- Active Issues (Always Visible) -->
+    <div class="space-y-3">
+      <h4
+        class="text-xs font-black uppercase tracking-widest"
+        :class="activeIssues.length > 0 ? 'text-rose-400' : 'text-slate-500'"
+      >Active Issues</h4>
+
+      <!-- No Issues State -->
+      <div
+        v-if=" activeIssues.length === 0 "
+        class="p-4 rounded-xl border bg-emerald-500/5 border-emerald-500/20 flex items-center gap-3"
+      >
+        <div class="w-6 h-6 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400 text-xs">✓
+        </div>
+        <p class="text-sm text-emerald-400 font-medium">No active issues detected.</p>
+      </div>
+
+      <!-- Issue List -->
       <div
         v-for="issue in activeIssues"
         :key="issue.id"

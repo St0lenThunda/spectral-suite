@@ -30,7 +30,7 @@ services:
         fromService:
           type: web
           name: forensic-proxy
-          property: host
+          property: url
     
     # SPA Routing (History Mode)
     routes:

@@ -62,7 +62,7 @@ const updatePreset = ( val: string ) => {
       <div class="flex items-center gap-3 mb-6">
         <div class="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center text-lg">🎛️</div>
         <div>
-          <h3 class="text-white font-bold text-base">Input Processing</h3>
+          <h3 class="text-white font-bold text-base">Input Processing & Gate</h3>
           <p class="text-xs text-slate-500 uppercase tracking-widest font-mono">Audio Analysis Filters</p>
         </div>
       </div>

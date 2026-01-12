@@ -51,6 +51,11 @@ const stealthBarsOn = ref( 4 )
 const stealthBarsOff = ref( 2 )
 const isStealthEnabled = ref( false )
 
+import EngineSettings from '../../components/settings/EngineSettings.vue';
+import { useGlobalEngine } from '@spectralsuite/core';
+
+// ... existing imports ...
+
 const drawerCategories = computed( () => [
   {
     id: 'General',
@@ -59,8 +64,15 @@ const drawerCategories = computed( () => [
     showIndicator: false
   },
   {
+    id: 'Engine',
+    label: 'Engine',
+    description: 'Mic Sensitivity & Gate',
+    showIndicator: useGlobalEngine().isGlobalEngineActive.value
+  },
+  {
     id: 'Accents',
     label: 'Accents',
+    // ...
     description: 'Rhythmic DNA',
     showIndicator: false
   },
@@ -424,8 +436,9 @@ onUnmounted( () => {
 
         </template>
 
-
-
+        <template #Engine>
+          <EngineSettings />
+        </template>
 
         <template #Accents>
           <div class="space-y-8">

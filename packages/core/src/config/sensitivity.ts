@@ -15,3 +15,13 @@ export const sensitivityThreshold = ref<number>( 0.01 );
  * Default 0.6 is a good balance for guitar/voice.
  */
 export const clarityThreshold = ref<number>( 0.6 );
+
+/**
+ * Pro Mode / Raw Audio Mode.
+ * When true, disables browser audio processing (AGC, noise suppression, echo cancellation).
+ * Pro Mode = Purer signal, better for spectral analysis, but requires louder input.
+ * Auto Mode = Browser-normalized signal, easier to use, but less accurate waveforms.
+ * Default: false (Auto Mode / AGC enabled).
+ */
+export const isRawAudioMode = ref<boolean>( false );
+

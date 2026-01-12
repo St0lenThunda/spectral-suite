@@ -1,3 +1,5 @@
+import { isRawAudioMode } from '../config/sensitivity';
+
 export class AudioEngine {
   private static instance: AudioEngine;
   private context: AudioContext | null = null;
@@ -41,11 +43,12 @@ export class AudioEngine {
        * 3. autoGainControl: false - Prevents the volume from "pumping" up and down.
        */
       // Simplified constraints for debugging
+      const rawMode = isRawAudioMode.value;
       const constraints: MediaStreamConstraints = {
         audio: {
-          echoCancellation: true,
-          autoGainControl: true,
-          noiseSuppression: true
+          echoCancellation: !rawMode,
+          autoGainControl: !rawMode,
+          noiseSuppression: !rawMode
         }
       };
 

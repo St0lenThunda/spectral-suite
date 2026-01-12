@@ -7,8 +7,10 @@
  * This component acts as a "View Controller" for the SynthEngine singleton and Global Input State.
  */
 import { ref } from 'vue';
-import { SynthEngine, type TonePreset, isLowPassEnabled, downsample, sensitivityThreshold, clarityThreshold } from '@spectralsuite/core';
+import { SynthEngine, type TonePreset, isLowPassEnabled, downsample, sensitivityThreshold, clarityThreshold, isRawAudioMode, useAudioEngine } from '@spectralsuite/core';
 import PillNav from '../ui/PillNav.vue';
+
+const { init: reinitAudio } = useAudioEngine();
 
 // Access the singleton instance (The "Model")
 const synth = SynthEngine.getInstance();
@@ -158,6 +160,56 @@ const updatePreset = ( val: string ) => {
             accuracy.</p>
         </div>
 
+      </div>
+
+      <!-- Pro Audio Mode Section -->
+      <div class="mt-6 pt-6 border-t border-white/5">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-lg">⚡</div>
+          <div>
+            <h3 class="text-white font-bold text-base">Audio Quality Mode</h3>
+            <p class="text-xs text-slate-500 uppercase tracking-widest font-mono">Browser Processing Control</p>
+          </div>
+        </div>
+
+        <button
+          @click="isRawAudioMode = !isRawAudioMode; reinitAudio()"
+          class="w-full flex flex-col items-start p-4 rounded-xl border transition-all text-left group"
+          :class="isRawAudioMode ? 'bg-amber-500/10 border-amber-500/50' : 'bg-slate-900/50 border-white/5 hover:bg-slate-800'"
+        >
+          <div class="flex items-center justify-between w-full mb-2">
+            <span
+              class="text-xs font-black uppercase tracking-widest"
+              :class="isRawAudioMode ? 'text-amber-400' : 'text-slate-500'"
+            >{{ isRawAudioMode ? 'Pro Mode (Raw)' : 'Auto Mode (AGC)' }}</span>
+            <div
+              class="w-8 h-4 rounded-full relative transition-colors"
+              :class="isRawAudioMode ? 'bg-amber-500' : 'bg-slate-700'"
+            >
+              <div
+                class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform"
+                :class="isRawAudioMode ? 'translate-x-4' : 'translate-x-0'"
+              ></div>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-400 leading-relaxed">
+            <template v-if=" isRawAudioMode ">
+              <span class="text-amber-400 font-bold">Pro Mode:</span> Disables browser processing (AGC, noise
+              suppression). Purer signal for spectral analysis but may require higher input gain or closer mic.
+            </template>
+            <template v-else>
+              <span class="text-emerald-400 font-bold">Auto Mode:</span> Browser normalizes input volume automatically.
+              Easier to use but waveforms may show "pumping" artifacts.
+            </template>
+          </p>
+        </button>
+
+        <p
+          v-if=" isRawAudioMode "
+          class="text-[10px] text-amber-400/80 mt-2 flex items-center gap-1"
+        >
+          <span>⚠️</span> If tools aren't detecting input, try speaking louder or moving closer to the mic.
+        </p>
       </div>
     </div>
   </div>

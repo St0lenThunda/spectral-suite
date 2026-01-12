@@ -221,7 +221,7 @@ const analyzeUrl = async () => {
           downloadProgress.value = receivedLength;
         }
 
-        const blob = new Blob( chunks, { type: "audio/mpeg" } );
+        const blob = new Blob( chunks as BlobPart[], { type: "audio/mpeg" } );
         const proxyFile = new File( [blob], "youtube_stream.mp3", { type: "audio/mpeg" } );
         result.value = await TrackAnalyzer.analyze( proxyFile );
 

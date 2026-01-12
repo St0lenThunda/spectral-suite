@@ -20,7 +20,7 @@
     "clean:modules": "rm -rf node_modules apps/*/node_modules packages/*/node_modules",
     "dev:all": "npm run dev --workspaces --if-present",
     "dev:chord": "npm run dev --workspace apps/02-chordcapture",
-    "dev:tonic": "npm run dev --workspace apps/tonic",
+    "dev:tonic": "npm run dev --workspace apps/tonic -- --host --port 5173",
     "dev:sleuth": "npm run dev --workspace apps/09-scalesleuth",
     "dev:tuner": "npm run dev --workspace apps/01-auratune",
     "install:all": "npm install && npm install --workspaces",

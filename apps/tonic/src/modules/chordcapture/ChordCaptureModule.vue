@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useChordCapture, useAudioEngine, ChordEngine, Fretboard, SynthEngine, type ChordMatch, isLowPassEnabled, downsample } from '@spectralsuite/core'
+import { useChordCapture, useAudioEngine, ChordEngine, Fretboard, SynthEngine, type ChordMatch, useGlobalEngine } from '@spectralsuite/core'
 import { useToolInfo } from '../../composables/useToolInfo';
 import ChordModal from '../../components/ChordModal.vue';
 import CaptureTray from './CaptureTray.vue';
@@ -19,7 +19,7 @@ const drawerCategories = computed( () => [
     id: 'Engine',
     label: 'Engine',
     description: 'Global Audio Processing',
-    showIndicator: isLowPassEnabled.value || downsample.value > 1
+    showIndicator: useGlobalEngine().isGlobalEngineActive.value
   }
 ] );
 

@@ -7,7 +7,7 @@
  * potential scales based on the notes a user plays.
  */
 import { ref, computed, Transition, onMounted, onUnmounted, watch } from 'vue';
-import { useScaleSleuth, useAudioEngine, SynthEngine, Fretboard, Note } from '@spectralsuite/core';
+import { useScaleSleuth, useAudioEngine, SynthEngine, Fretboard, Note, useGlobalEngine } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
@@ -56,7 +56,7 @@ const drawerCategories = computed( () => [
     id: 'Engine',
     label: 'Engine',
     description: 'Global Audio Processing',
-    showIndicator: isLowPassEnabled.value || downsample.value > 1
+    showIndicator: useGlobalEngine().isGlobalEngineActive.value
   }
 ] );
 

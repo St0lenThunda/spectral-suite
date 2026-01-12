@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { useAudioEngine, MagnitudeSpectrum, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion } from '@spectralsuite/core';
+import { useAudioEngine, MagnitudeSpectrum, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion, useGlobalEngine } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
@@ -10,7 +10,7 @@ const { openInfo } = useToolInfo();
 const isSettingsOpen = ref( false );
 
 const drawerCategories = [
-  { id: 'Engine', label: 'Engine', description: 'Global Audio Settings', showIndicator: false },
+  { id: 'Engine', label: 'Engine', description: 'Global Audio Settings', showIndicator: useGlobalEngine().isGlobalEngineActive.value },
   { id: 'Exports', label: 'Exports', description: 'Save Analysis Data', showIndicator: false }
 ];
 // We'll import the same visualizers. In a real monorepo we'd share them more cleanly, 

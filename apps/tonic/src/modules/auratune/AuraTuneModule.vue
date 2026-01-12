@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { usePitch, useAudioEngine, Note } from '@spectralsuite/core'
+import { usePitch, useAudioEngine, Note, useGlobalEngine } from '@spectralsuite/core'
 import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
 import { useToolInfo } from '../../composables/useToolInfo';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
@@ -59,8 +59,8 @@ const drawerCategories = computed( () => [
   {
     id: 'Engine',
     label: 'Engine',
-    description: 'Algorithm Filters & Modes',
-    showIndicator: isLowPassEnabled.value || downsample.value > 1
+    description: 'Global Audio Processing',
+    showIndicator: useGlobalEngine().isGlobalEngineActive.value
   }
 ] );
 

@@ -43,9 +43,9 @@ export class AudioEngine {
       // Simplified constraints for debugging
       const constraints: MediaStreamConstraints = {
         audio: {
-          echoCancellation: false,
-          autoGainControl: false,
-          noiseSuppression: false
+          echoCancellation: true,
+          autoGainControl: true,
+          noiseSuppression: true
         }
       };
 

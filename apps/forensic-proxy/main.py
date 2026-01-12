@@ -12,6 +12,13 @@ logger = logging.getLogger("forensic-proxy")
 
 app = FastAPI(title="Spectral Suite Forensic Proxy")
 
+# DEBUG: Print loaded yt-dlp version
+try:
+    import yt_dlp.version
+    logger.info(f"Loaded yt-dlp version: {yt_dlp.version.__version__}")
+except:
+    logger.info("Could not determine yt-dlp version")
+
 # CORS - Allow all for now (Forensic Tooling is open)
 app.add_middleware(
     CORSMiddleware,
@@ -72,7 +79,6 @@ def resolve_audio(url: str = Query(..., description="YouTube URL to resolve")):
             media_type="audio/mpeg", # Often defaults to webm/opus, but browser handles it generic
             headers={
                 "Content-Disposition": f'attachment; filename="forensic-audio.mp3"',
-                "Access-Control-Allow-Origin": "*",
             }
         )
 

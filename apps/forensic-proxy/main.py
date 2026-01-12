@@ -50,13 +50,35 @@ def get_best_audio_url(video_url: str) -> str:
     """
     Extracts the best available audio stream URL using yt-dlp.
     """
-    ydl_opts = {
+    }
+
+def get_ydl_opts():
+    """
+    Returns robust yt-dlp options to bypass bot detection.
+    Using 'android' client is often more permissive for datacenter IPs.
+    """
+    return {
         'format': 'bestaudio/best',
         'quiet': True,
         'no_warnings': True,
         'noplaylist': True,
-        # 'cookiefile': 'cookies.txt', # If needed for age-restricted
+        'extractor_args': {
+            'youtube': {
+                'player_client': ['android', 'web'],
+                'player_skip': ['webpage', 'configs', 'js'],
+                'include_fields': ['title', 'thumbnail', 'duration', 'uploader', 'view_count', 'url'],
+            },
+        },
+        'http_headers': {
+            'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+        }
     }
+
+def get_best_audio_url(video_url: str) -> str:
+    """
+    Extracts the best available audio stream URL using yt-dlp.
+    """
+    ydl_opts = get_ydl_opts()
 
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -78,11 +100,7 @@ def get_video_info(url: str = Query(..., description="YouTube URL to inspect")):
     """
     Returns metadata for a YouTube video (Title, Duration, Thumbnail) without downloading.
     """
-    ydl_opts = {
-        'quiet': True,
-        'no_warnings': True,
-        'noplaylist': True,
-    }
+    ydl_opts = get_ydl_opts()
     try:
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)

@@ -136,7 +136,6 @@ function startLesson ( lesson: Lesson ) {
               Start Lesson <span>→</span>
             </div>
           </div>
-          </div>
         </TransitionGroup>
       </div>
     </div>

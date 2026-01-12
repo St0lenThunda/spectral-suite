@@ -170,7 +170,11 @@ const analyzeUrl = async () => {
       console.log( 'Forensic Proxy Request:', resolveUrl ); // Debug Log
 
       try {
-        const resp = await fetch( resolveUrl );
+        const resp = await fetch( resolveUrl, {
+          mode: 'cors',
+          credentials: 'omit',
+          cache: 'no-store'
+        } );
         if ( !resp.ok ) {
           const txt = await resp.text();
           throw new Error( `Proxy resolution failed (${resp.status}): ${txt}` );

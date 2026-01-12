@@ -370,8 +370,10 @@ const toneQualityLabel = computed(() => {
                       </p>
                     </div>
  
-                  </div>
+                 </div>
                 </div>
+              </div>
+          </div>
             </Transition>
           </div>
         </div>

@@ -17,11 +17,14 @@ services:
     autoDeploy: true
     branch: main
 
-# 2. Vue Frontend (Tonic) - Static Site
-staticSites:
-  - name: tonic-frontend
+  # 2. Vue Frontend (Tonic) - Static Site
+  - type: web
+    name: tonic-frontend
+    env: static
+    region: ohio
+    plan: free
     buildCommand: npm install && npm run build:tonic
-    publishDir: apps/tonic/dist
+    staticPublishPath: apps/tonic/dist
     branch: main
     autoDeploy: true
     envVars:

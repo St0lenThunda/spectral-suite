@@ -50,7 +50,7 @@ def get_best_audio_url(video_url: str) -> str:
     """
     Extracts the best available audio stream URL using yt-dlp.
     """
-    }
+
 
 def get_ydl_opts():
     """

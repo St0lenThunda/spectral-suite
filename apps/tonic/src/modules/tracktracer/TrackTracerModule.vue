@@ -103,6 +103,14 @@ const startListening = async () => {
   }
 }
 
+onUnmounted( () => {
+  stopPlayback( true );
+  stopWaveform();
+  if ( isListening.value ) {
+    stopListening();
+  }
+} );
+
 
 const analyzeFile = async ( event: Event ) => {
   const input = event.target as HTMLInputElement;
@@ -140,11 +148,7 @@ const analyzeUrl = async () => {
 
   try {
     let targetUrl = urlInput.value;
-    if ( targetUrl.includes( 'youtube.com' ) || targetUrl.includes( 'youtu.be' ) ) {
-      error.value = "YouTube direct analysis requires a forensic proxy (CORS). Please upload a file for now.";
-      isAnalyzing.value = false;
-      return;
-    }
+
 
     // Ensure engine is ready (TrackAnalyzer uses it)
     if ( !useAudioEngine().isInitialized.value ) {

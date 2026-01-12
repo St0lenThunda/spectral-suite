@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { useAudioEngine, MagnitudeSpectrum, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
@@ -155,7 +155,6 @@ const dominantNote = ref( "-" );
 const showInstrumentLabels = ref( true );
 const showHarmonics = ref( false );
 const peakHoldData = ref<Uint8Array | null>( null );
-const PEAK_DECAY_RATE = 0.98; // Multiplier to fade peaks (98% retention per frame)
 
 // Instrument Frequency Ranges
 // instrumentRanges imported from core

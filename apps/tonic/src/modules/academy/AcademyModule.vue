@@ -7,10 +7,14 @@ const emit = defineEmits<{
   ( e: 'back' ): void;
 }>();
 
-type SortMode = 'recommended' | 'difficulty' | 'title';
+type SortMode = 'recommended' | 'difficulty' | 'title' | 'tool';
 const currentSort = ref<SortMode>('recommended');
 
 const difficultyOrder = { 'beginner': 1, 'intermediate': 2, 'advanced': 3 };
+
+function getLessonTool(lesson: Lesson): string {
+  return lesson.steps?.[0]?.targetTool || '';
+}
 
 const sortedLessons = computed(() => {
   const list = [...lessons];
@@ -19,6 +23,9 @@ const sortedLessons = computed(() => {
   }
   if (currentSort.value === 'title') {
     return list.sort((a, b) => a.title.localeCompare(b.title));
+  }
+  if (currentSort.value === 'tool') {
+    return list.sort((a, b) => getLessonTool(a).localeCompare(getLessonTool(b)));
   }
   return list;
 });

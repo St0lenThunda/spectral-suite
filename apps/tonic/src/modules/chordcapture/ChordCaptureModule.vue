@@ -215,7 +215,7 @@ const emit = defineEmits<{
       class="w-full flex flex-col items-center gap-6 md:gap-12 animate-fade-in"
     >
       <!-- Standard Module Header -->
-      <header class="flex justify-between items-end mb-8">
+      <header class="flex justify-between items-end mb-4">
         <div>
           <button
             @click="emit( 'back' )"
@@ -223,8 +223,11 @@ const emit = defineEmits<{
           >
             <span>←</span> Back to Tonic
           </button>
-          <h2 class="text-3xl font-bold text-white mb-2">Chord <span class="text-indigo-400">Capture Pro</span></h2>
-          <p class="text-slate-400 text-sm italic">Harmonic recognition, Roman Numerals & Sequence Ledger.</p>
+          <h2 class="text-3xl font-black text-white italic uppercase tracking-tighter">Chord <span
+              class="text-indigo-400"
+            >Capture Pro</span></h2>
+          <p class="text-slate-500 text-[10px] font-mono uppercase tracking-[0.2em] mt-1">Harmonic recognition &
+            analysis suite</p>
         </div>
 
         <div class="flex items-center gap-4">

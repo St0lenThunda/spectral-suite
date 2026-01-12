@@ -139,16 +139,22 @@ const analyzeFile = async ( event: Event ) => {
   }
 };
 
+const videoMetadata = ref<{ title: string, thumbnail: string, duration: number, uploader: string } | null>( null );
+const downloadProgress = ref( 0 );
+const downloadTotal = ref( 0 ); // Bytes, if available
+
 const analyzeUrl = async () => {
   if ( !urlInput.value ) return;
 
   isAnalyzing.value = true;
   error.value = null;
   result.value = null;
+  videoMetadata.value = null;
+  downloadProgress.value = 0;
+  downloadTotal.value = 0;
 
   try {
     let targetUrl = urlInput.value;
-
 
     // Ensure engine is ready (TrackAnalyzer uses it)
     if ( !useAudioEngine().isInitialized.value ) {
@@ -158,16 +164,26 @@ const analyzeUrl = async () => {
     // Check for YouTube / Proxy requirement
     if ( targetUrl.includes( 'youtube.com' ) || targetUrl.includes( 'youtu.be' ) ) {
       // PROXY MODE
-      // TODO: Move this URL to environment variable
       let proxyBase = import.meta.env.VITE_FORENSIC_PROXY_URL || "http://127.0.0.1:8081";
 
-      // Ensure protocol if only host is provided (Render 'host' property)
+      // Ensure protocol
       if ( !proxyBase.startsWith( 'http' ) ) {
         proxyBase = `https://${proxyBase}`;
       }
 
+      // 1. Fetch Metadata First
+      try {
+        const infoUrl = `${proxyBase}/info?url=${encodeURIComponent( targetUrl )}`;
+        const infoResp = await fetch( infoUrl, { mode: 'cors' } );
+        if ( infoResp.ok ) {
+          videoMetadata.value = await infoResp.json();
+        }
+      } catch ( e ) {
+        console.warn( "Metadata fetch failed, proceeding to download anyway", e );
+      }
+
       const resolveUrl = `${proxyBase}/resolve?url=${encodeURIComponent( targetUrl )}`;
-      console.log( 'Forensic Proxy Request:', resolveUrl ); // Debug Log
+      console.log( 'Forensic Proxy Request:', resolveUrl );
 
       try {
         const resp = await fetch( resolveUrl, {
@@ -175,15 +191,40 @@ const analyzeUrl = async () => {
           credentials: 'omit',
           cache: 'no-store'
         } );
+
         if ( !resp.ok ) {
           const txt = await resp.text();
           throw new Error( `Proxy resolution failed (${resp.status}): ${txt}` );
         }
 
-        const blob = await resp.blob();
-        // Convert blob to File object for the analyzer
+        // 2. Stream Reading with Progress
+        const reader = resp.body?.getReader();
+        const contentLength = +( resp.headers.get( 'Content-Length' ) || '0' );
+        downloadTotal.value = contentLength;
+
+        if ( !reader ) {
+          const blob = await resp.blob(); // Fallback
+          downloadProgress.value = blob.size;
+          const proxyFile = new File( [blob], "youtube_stream.mp3", { type: "audio/mpeg" } );
+          result.value = await TrackAnalyzer.analyze( proxyFile );
+          return;
+        }
+
+        const chunks: Uint8Array[] = [];
+        let receivedLength = 0;
+
+        while ( true ) {
+          const { done, value } = await reader.read();
+          if ( done ) break;
+          chunks.push( value );
+          receivedLength += value.length;
+          downloadProgress.value = receivedLength;
+        }
+
+        const blob = new Blob( chunks, { type: "audio/mpeg" } );
         const proxyFile = new File( [blob], "youtube_stream.mp3", { type: "audio/mpeg" } );
         result.value = await TrackAnalyzer.analyze( proxyFile );
+
       } catch ( e: any ) {
         console.error( "Forensic Proxy Fetch Error:", e );
         throw new Error( "Forensic Proxy Error: " + e.message );
@@ -644,11 +685,50 @@ const exportAnalysis = () => {
         class="lg:col-span-12"
       >
         <div
-          class="h-64 rounded-[3rem] bg-white/5 border border-white/5 backdrop-blur-xl flex flex-col items-center justify-center p-12"
+          class="h-64 rounded-[3rem] bg-white/5 border border-white/5 backdrop-blur-xl flex flex-col items-center justify-center p-12 overflow-hidden relative"
         >
-          <div class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-6"></div>
-          <p class="text-blue-400 font-bold uppercase tracking-widest text-xs animate-pulse">Deconstructing Signal...
-          </p>
+          <!-- Metadata Preview (Absolute Background) -->
+          <div
+            v-if=" videoMetadata "
+            class="absolute inset-0 z-0 opacity-20 bg-cover bg-center blur-md"
+            :style="{ backgroundImage: `url(${videoMetadata.thumbnail})` }"
+          ></div>
+
+          <div class="z-10 flex flex-col items-center w-full max-w-md">
+            <div
+              v-if=" videoMetadata "
+              class="mb-6 text-center animate-in fade-in slide-in-from-bottom-4 duration-700"
+            >
+              <h4 class="text-white font-black text-lg uppercase italic tracking-tight mb-1 drop-shadow-lg">
+                {{ videoMetadata.title }}</h4>
+              <p class="text-blue-300 font-mono text-xs uppercase tracking-widest">{{ videoMetadata.uploader }} •
+                {{ Math.floor( videoMetadata.duration / 60 ) }}:{{ ( videoMetadata.duration % 60 ).toString().padStart( 2, '0' ) }}
+              </p>
+            </div>
+            <div
+              v-else
+              class="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-6"
+            ></div>
+
+            <!-- Progress Bar -->
+            <div
+              v-if=" downloadProgress > 0 "
+              class="w-full bg-black/50 h-2 rounded-full overflow-hidden mb-2 backdrop-blur-md border border-white/10"
+            >
+              <div
+                class="h-full bg-blue-500 transition-all duration-200"
+                :style="{ width: downloadTotal ? ( downloadProgress / downloadTotal * 100 ) + '%' : '100%', opacity: downloadTotal ? 1 : 0.5 }"
+              ></div>
+            </div>
+
+            <p class="text-blue-400 font-bold uppercase tracking-widest text-xs animate-pulse drop-shadow-md">
+              {{ videoMetadata ? 'Deconstructing Signal...' : 'Establishing Link...' }}
+              <span
+                v-if=" downloadProgress > 0 "
+                class="ml-2 font-mono text-white opacity-70"
+              >{{ ( downloadProgress / 1024 / 1024 ).toFixed( 1 ) }} MB</span>
+            </p>
+          </div>
         </div>
       </div>
 

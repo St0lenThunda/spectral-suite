@@ -19,11 +19,27 @@ try:
 except:
     logger.info("Could not determine yt-dlp version")
 
-# CORS - Allow all for now (Forensic Tooling is open)
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
+
+# DEBUG: Log every request
+class LogMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        logger.info(f"Incoming Request: {request.method} {request.url}")
+        try:
+            response = await call_next(request)
+            return response
+        except Exception as e:
+            logger.error(f"Middleware Error: {e}")
+            raise e
+
+app.add_middleware(LogMiddleware)
+
+# CORS - Explicitly allow local dev origins
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origin_regex='https?://.*', # Allow any http/https origin
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -58,32 +58,53 @@ def get_ydl_opts():
     Using 'android' client is often more permissive for datacenter IPs.
     """
 
-    opts = {
-        'format': 'bestaudio/best',
-        'quiet': True,
-        'no_warnings': True,
-        'noplaylist': True,
-        'force_ipv4': True, # Force IPv4 as IPv6 ranges are often blocked
-        'extractor_args': {
-            'youtube': {
-                'player_client': ['android', 'ios'], # Mobile only, no Web
-                'player_skip': ['webpage', 'configs', 'js'],
-                'include_fields': ['title', 'thumbnail', 'duration', 'uploader', 'view_count', 'url'],
-            },
-        },
-    }
-
-    # If YOUTUBE_COOKIES is set (Netscape format content), write it to a file.
+    # Smart Client Selection
+    # If Cookies are present, 'web' client is safest and most reliable.
+    # If NO Cookies, 'android/ios' + IPv4 is the best evasion strategy.
+    
     import os
+    has_cookies = False
+    
     if os.environ.get("YOUTUBE_COOKIES"):
-        logger.info("Found YOUTUBE_COOKIES env var. Writing to cookies.txt...")
+        logger.info("Found YOUTUBE_COOKIES env var. Using WEB client strategy.")
+        has_cookies = True
         with open("cookies.txt", "w") as f:
             f.write(os.environ["YOUTUBE_COOKIES"])
-        opts['cookiefile'] = "cookies.txt"
     else:
-        logger.info("No YOUTUBE_COOKIES found. Attempting unauthenticated access.")
-    
-    return opts
+        logger.info("No YOUTUBE_COOKIES found. Using MOBILE client evasion strategy.")
+
+    if has_cookies:
+        # Authenticated Strategy (Web Client)
+        return {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
+            'noplaylist': True,
+            'cookiefile': 'cookies.txt',
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['web'],
+                    'player_skip': ['configs', 'js'],
+                    'include_fields': ['title', 'thumbnail', 'duration', 'uploader', 'view_count', 'url'],
+                },
+            },
+        }
+    else:
+        # Unauthenticated Evasion Strategy (Mobile Clients + IPv4)
+        return {
+            'format': 'bestaudio/best',
+            'quiet': True,
+            'no_warnings': True,
+            'noplaylist': True,
+            'force_ipv4': True, 
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'ios'],
+                    'player_skip': ['webpage', 'configs', 'js'],
+                    'include_fields': ['title', 'thumbnail', 'duration', 'uploader', 'view_count', 'url'],
+                },
+            },
+        }
 
 def get_best_audio_url(video_url: str) -> str:
     """

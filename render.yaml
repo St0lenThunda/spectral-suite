@@ -21,7 +21,6 @@ services:
   - type: web
     name: tonic-frontend
     env: static
-    plan: free
     buildCommand: npm install && npm run build:tonic
     staticPublishPath: apps/tonic/dist
     branch: main

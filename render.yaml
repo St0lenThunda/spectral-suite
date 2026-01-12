@@ -21,7 +21,6 @@ services:
   - type: web
     name: tonic-frontend
     env: static
-    region: ohio
     plan: free
     buildCommand: npm install && npm run build:tonic
     staticPublishPath: apps/tonic/dist
@@ -32,7 +31,7 @@ services:
         fromService:
           type: web
           name: forensic-proxy
-          property: url
+          property: host
     
     # SPA Routing (History Mode)
     routes:

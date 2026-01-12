@@ -155,8 +155,14 @@ const analyzeUrl = async () => {
     if ( targetUrl.includes( 'youtube.com' ) || targetUrl.includes( 'youtu.be' ) ) {
       // PROXY MODE
       // TODO: Move this URL to environment variable
-      const PROXY_BASE = import.meta.env.VITE_FORENSIC_PROXY_URL || "http://localhost:8000";
-      const resolveUrl = `${PROXY_BASE}/resolve?url=${encodeURIComponent( targetUrl )}`;
+      let proxyBase = import.meta.env.VITE_FORENSIC_PROXY_URL || "http://localhost:8000";
+
+      // Ensure protocol if only host is provided (Render 'host' property)
+      if ( !proxyBase.startsWith( 'http' ) ) {
+        proxyBase = `https://${proxyBase}`;
+      }
+
+      const resolveUrl = `${proxyBase}/resolve?url=${encodeURIComponent( targetUrl )}`;
 
       try {
         const resp = await fetch( resolveUrl );

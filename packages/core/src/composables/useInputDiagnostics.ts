@@ -1,6 +1,5 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useAudioEngine } from '../audio/useAudioEngine';
-import { usePitch } from '../audio/usePitch';
 import { sensitivityThreshold, isRawAudioMode } from '../config/sensitivity';
 
 /**
@@ -22,19 +21,16 @@ export interface DiagnosticIssue {
 /**
  * useInputDiagnostics - Composable for real-time audio input health monitoring.
  * 
- * This composable provides reactive state about the audio input health,
- * allowing tools to display contextual warnings and the global settings
- * to show a comprehensive diagnostics dashboard.
- * 
- * @example
- * const { overallHealth, activeIssues, inputLevel } = useInputDiagnostics();
- * // overallHealth: 'good' | 'warning' | 'error'
- * // activeIssues: DiagnosticIssue[]
- * // inputLevel: 0-100 (percentage)
+ * NOTE: This composable uses direct AnalyserNode access instead of usePitch()
+ * to avoid creating duplicate AudioWorkletNodes which can cause performance issues.
  */
 export function useInputDiagnostics() {
-  const { isInitialized, getContext } = useAudioEngine();
-  const { volume } = usePitch();
+  const { isInitialized, getContext, getAnalyser } = useAudioEngine();
+
+  // Local volume monitoring (lightweight, no worklet)
+  const volume = ref( 0 );
+  let animationFrameId: number | null = null;
+  let analyserBuffer: Float32Array | null = null;
 
   // --- Reactive State ---
 
@@ -209,8 +205,52 @@ export function useInputDiagnostics() {
     }
   };
 
+  // --- Lightweight Volume Polling ---
+  // Uses requestAnimationFrame to read from AnalyserNode without creating worklet nodes
+  const startVolumeMonitoring = () => {
+    const loop = () => {
+      const analyser = getAnalyser();
+      if ( analyser ) {
+        if ( !analyserBuffer || analyserBuffer.length !== analyser.fftSize ) {
+          // Explicit ArrayBuffer to satisfy strict TS typing
+          analyserBuffer = new Float32Array( new ArrayBuffer( analyser.fftSize * 4 ) );
+        }
+        analyser.getFloatTimeDomainData( analyserBuffer as any );
+
+        // Calculate RMS volume
+        let sum = 0;
+        for ( let i = 0; i < analyserBuffer.length; i++ ) {
+          sum += analyserBuffer[i]! * analyserBuffer[i]!;
+        }
+        volume.value = Math.sqrt( sum / analyserBuffer.length );
+      }
+      animationFrameId = requestAnimationFrame( loop );
+    };
+    loop();
+  };
+
+  const stopVolumeMonitoring = () => {
+    if ( animationFrameId ) {
+      cancelAnimationFrame( animationFrameId );
+      animationFrameId = null;
+    }
+    if ( noInputTimer ) {
+      clearTimeout( noInputTimer );
+      noInputTimer = null;
+    }
+    if ( hasInputTimer ) {
+      clearTimeout( hasInputTimer );
+      hasInputTimer = null;
+    }
+  };
+
   onMounted(() => {
     checkMicPermission();
+    startVolumeMonitoring();
+  } );
+
+  onUnmounted( () => {
+    stopVolumeMonitoring();
   });
 
   return {

@@ -7,6 +7,7 @@ export * from './audio/SynthEngine';
 export * from './audio/SpectralAnalysis';
 export * from './audio/usePitch';
 export * from './composables/useAudioRecorder';
+export * from './composables/useInputDiagnostics';
 export * from './stores/rhythm';
 export * from './analysis/TrackAnalyzer';
 export * from './analysis/BpmDetector';

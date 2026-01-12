@@ -60,7 +60,7 @@ const drawerCategories = computed( () => [
   {
     id: 'General',
     label: 'General',
-    description: 'Subdivision, Flash, Poly',
+    description: 'Subdivision, Flash, Poly, Accents',
     showIndicator: false
   },
   {
@@ -68,13 +68,6 @@ const drawerCategories = computed( () => [
     label: 'Engine',
     description: 'Mic Sensitivity & Gate',
     showIndicator: useGlobalEngine().isGlobalEngineActive.value
-  },
-  {
-    id: 'Accents',
-    label: 'Accents',
-    // ...
-    description: 'Rhythmic DNA',
-    showIndicator: false
   },
   {
     id: 'Stability',
@@ -431,6 +424,69 @@ onUnmounted( () => {
                 {{ isFlashEnabled ? 'ENABLED' : 'DISABLED' }}
               </button>
             </div>
+
+            <!-- Accent Programmer (moved from Accents tab) -->
+            <div class="mt-8 pt-8 border-t border-white/5">
+              <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+                <div class="space-y-1">
+                  <label class="text-xs font-black uppercase tracking-[0.4em] text-rose-400 block">
+                    Accent Programmer
+                  </label>
+                  <p class="text-[11px] text-slate-500 italic">Define your rhythmic DNA. Click slots to toggle dynamics.
+                  </p>
+                </div>
+                <div class="flex gap-2">
+                  <button
+                    @click="applyPattern( 'downbeat' )"
+                    class="px-3 py-1 bg-slate-900 border border-white/5 rounded text-[10px] font-black hover:bg-slate-800 transition-colors uppercase text-slate-400 hover:text-white"
+                  >Standard</button>
+                  <button
+                    @click="applyPattern( 'backbeat' )"
+                    class="px-3 py-1 bg-slate-900 border border-white/5 rounded text-[10px] font-black hover:bg-slate-800 transition-colors uppercase text-slate-400 hover:text-white"
+                  >Rock 2&4</button>
+                  <button
+                    @click="applyPattern( 'jazz' )"
+                    class="px-3 py-1 bg-slate-900 border border-white/5 rounded text-[10px] font-black hover:bg-slate-800 transition-colors uppercase text-slate-400 hover:text-white"
+                  >Swing</button>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap gap-2 items-center justify-start pb-4">
+                <div
+                  v-for=" ( level, idx ) in accentPattern "
+                  :key="idx"
+                  class="relative"
+                >
+                  <div
+                    v-if=" isPlaying && ( currentPulse % accentPattern.length === idx ) "
+                    class="absolute -inset-1 rounded-xl bg-rose-500/20 animate-pulse border border-rose-500/30 z-0"
+                  ></div>
+                  <button
+                    @click="cycleAccent( idx )"
+                    class="relative z-10 w-9 h-12 rounded-xl flex flex-col items-center justify-between py-2 transition-all border-2"
+                    :class="[
+                      level === 3 ? 'bg-rose-500 border-rose-300 text-white shadow-lg shadow-rose-500/20' :
+                        level === 2 ? 'bg-slate-800 border-slate-600 text-slate-300' :
+      level === 1 ? 'bg-slate-900 border-slate-800 text-slate-500 opacity-60' :
+        'bg-transparent border-slate-800 text-slate-700 opacity-30 shadow-inner'
+]"
+                  >
+                    <span
+                      class="text-[9px] font-black opacity-50">{{ idx % subdivision === 0 ? Math.floor( idx / subdivision ) + 1 : '' }}</span>
+                    <div
+                      class="w-1 rounded-full transition-all"
+                      :class="[
+                        level === 3 ? 'h-5 bg-white' :
+                          level === 2 ? 'h-3 bg-slate-400' :
+                            level === 1 ? 'h-1.5 bg-slate-600' :
+                              'h-1 bg-slate-800'
+                      ]"
+                    ></div>
+                    <span class="text-[9px] font-black">{{ level === 0 ? '×' : '' }}</span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
 
@@ -440,72 +496,7 @@ onUnmounted( () => {
           <EngineSettings />
         </template>
 
-        <template #Accents>
-          <div class="space-y-8">
-            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-              <div class="space-y-1">
-                <label class="text-xs font-black uppercase tracking-[0.4em] text-rose-400 block">
-                  Accent Programmer
-                </label>
-                <p class="text-[11px] text-slate-500 italic">Define your rhythmic DNA. Click slots to toggle dynamics.
-                </p>
-              </div>
-              <div class="flex gap-2">
-                <button
-                  @click="applyPattern( 'downbeat' )"
-                  class="px-3 py-1 bg-slate-900 border border-white/5 rounded text-[10px] font-black hover:bg-slate-800 transition-colors uppercase text-slate-400 hover:text-white"
-                >Standard</button>
-                <button
-                  @click="applyPattern( 'backbeat' )"
-                  class="px-3 py-1 bg-slate-900 border border-white/5 rounded text-[10px] font-black hover:bg-slate-800 transition-colors uppercase text-slate-400 hover:text-white"
-                >Rock 2&4</button>
-                <button
-                  @click="applyPattern( 'jazz' )"
-                  class="px-3 py-1 bg-slate-900 border border-white/5 rounded text-[10px] font-black hover:bg-slate-800 transition-colors uppercase text-slate-400 hover:text-white"
-                >Swing</button>
-              </div>
-            </div>
 
-            <div class="flex flex-wrap gap-2 items-center justify-start pb-4">
-              <div
-                v-for=" ( level, idx ) in accentPattern "
-                :key="idx"
-                class="relative"
-              >
-
-                <!-- Pulse Indicator -->
-                <div
-                  v-if=" isPlaying && ( currentPulse % accentPattern.length === idx ) "
-                  class="absolute -inset-1 rounded-xl bg-rose-500/20 animate-pulse border border-rose-500/30 z-0"
-                ></div>
-
-                <button
-                  @click="cycleAccent( idx )"
-                  class="relative z-10 w-9 h-12 rounded-xl flex flex-col items-center justify-between py-2 transition-all border-2"
-                  :class="[
-                    level === 3 ? 'bg-rose-500 border-rose-300 text-white shadow-lg shadow-rose-500/20' :
-                      level === 2 ? 'bg-slate-800 border-slate-600 text-slate-300' :
-                        level === 1 ? 'bg-col-slate-900 border-slate-800 text-slate-500 opacity-60' :
-                          'bg-transparent border-slate-800 text-slate-700 opacity-30 shadow-inner'
-                  ]"
-                >
-                  <span
-                    class="text-[9px] font-black opacity-50">{{ idx % subdivision === 0 ? Math.floor( idx / subdivision ) + 1 : '' }}</span>
-                  <div
-                    class="w-1 rounded-full transition-all"
-                    :class="[
-                      level === 3 ? 'h-5 bg-white' :
-                        level === 2 ? 'h-3 bg-slate-400' :
-                          level === 1 ? 'h-1.5 bg-slate-600' :
-                            'h-1 bg-slate-800'
-                    ]"
-                  ></div>
-                  <span class="text-[9px] font-black">{{ level === 0 ? '×' : '' }}</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </template>
 
         <template #Stability>
           <div class="space-y-8">

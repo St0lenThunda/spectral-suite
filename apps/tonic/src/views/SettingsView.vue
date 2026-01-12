@@ -11,6 +11,7 @@
 import { ref } from 'vue';
 import PillNav from '../components/ui/PillNav.vue';
 import EngineSettings from '../components/settings/EngineSettings.vue';
+import DiagnosticsPanel from '../components/settings/DiagnosticsPanel.vue';
 
 // Props to accept tools data passed from App.vue
 // We do this to avoid tightly coupling with App.vue state if not using a Store
@@ -40,7 +41,8 @@ const activeTab = ref( props.initialTab || 'platform' );
 
 const navOptions = [
   { label: 'Platform Modules', value: 'platform', icon: '🧩' },
-  { label: 'Engine Options', value: 'engine', icon: '⚙️' }
+  { label: 'Engine Options', value: 'engine', icon: '⚙️' },
+  { label: 'Diagnostics', value: 'diagnostics', icon: '🩺' }
 ];
 
 const toggleTool = ( id: string ) => {
@@ -116,6 +118,17 @@ const toggleTool = ( id: string ) => {
     >
       <!-- Reusable Engine Settings Module -->
       <EngineSettings />
+    </div>
+
+    <!-- TAB 3: Diagnostics -->
+    <div
+      v-if=" activeTab === 'diagnostics' "
+      class="space-y-6 animate-fade-in"
+    >
+      <div class="bg-white/5 border border-white/5 rounded-[3rem] p-10 backdrop-blur-xl">
+        <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-rose-400 mb-8">Audio Health Dashboard</h3>
+        <DiagnosticsPanel />
+      </div>
     </div>
   </div>
 </template>

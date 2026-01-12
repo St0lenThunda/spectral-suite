@@ -87,7 +87,7 @@ function startLesson ( lesson: Lesson ) {
             <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Sort By</span>
             <div class="flex bg-slate-800/80 rounded-lg p-1 border border-slate-700/50 backdrop-blur-sm">
               <button
-                v-for=" sort in ['recommended', 'difficulty', 'title'] "
+                v-for=" sort in ['recommended', 'difficulty', 'title', 'tool'] "
                 :key="sort"
                 @click="currentSort = sort as any"
                 class="px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wider transition-all"
@@ -135,7 +135,8 @@ function startLesson ( lesson: Lesson ) {
               Start Lesson <span>→</span>
             </div>
           </div>
-        </div>
+          </div>
+        </TransitionGroup>
       </div>
     </div>
   </div>

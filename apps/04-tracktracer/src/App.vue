@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue';
-import { TrackAnalyzer, type AnalysisResult, useAudioRecorder } from '@spectralsuite/core';
+import { TrackAnalyzer, type AnalysisResult, useAudioRecorder, useAudioEngine } from '@spectralsuite/core';
 
 // Standalone specific constants/setup
 const fileInput = ref<HTMLInputElement | null>( null );

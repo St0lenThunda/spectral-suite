@@ -63,9 +63,10 @@ def get_ydl_opts():
         'quiet': True,
         'no_warnings': True,
         'noplaylist': True,
+        'force_ipv4': True, # Force IPv4 as IPv6 ranges are often blocked
         'extractor_args': {
             'youtube': {
-                'player_client': ['android', 'ios', 'web'],
+                'player_client': ['android', 'ios'], # Mobile only, no Web
                 'player_skip': ['webpage', 'configs', 'js'],
                 'include_fields': ['title', 'thumbnail', 'duration', 'uploader', 'view_count', 'url'],
             },

@@ -41,16 +41,47 @@ export function useInputDiagnostics() {
   /** Microphone permission status */
   const isMicGranted = ref<boolean | null>(null);
 
+  /** 
+   * Debounced "no input" state to prevent UI jitter.
+   * True only after sustained silence, false only after sustained input.
+   */
+  const stableNoInput = ref( false );
+  let noInputTimer: any = null;
+  let hasInputTimer: any = null;
+
   /** Is the AudioContext currently running (not suspended)? */
   const isContextRunning = computed(() => {
     const ctx = getContext();
     return ctx ? ctx.state === 'running' : false;
   });
 
-  /** Is any audio volume being detected? */
+  /** Is any audio volume being detected? (raw, not debounced) */
   const isVolumeDetected = computed(() => {
     return volume.value > 0.001;
   });
+
+  // Watch volume changes to update stableNoInput with hysteresis
+  watch( isVolumeDetected, ( hasInput ) => {
+    if ( !hasInput ) {
+      // No input detected - start timer to confirm "no input" after 1s
+      if ( hasInputTimer ) { clearTimeout( hasInputTimer ); hasInputTimer = null; }
+      if ( !noInputTimer ) {
+        noInputTimer = setTimeout( () => {
+          stableNoInput.value = true;
+          noInputTimer = null;
+        }, 1000 ); // 1 second delay before showing "no input"
+      }
+    } else {
+      // Input detected - start timer to confirm "has input" after 0.5s
+      if ( noInputTimer ) { clearTimeout( noInputTimer ); noInputTimer = null; }
+      if ( !hasInputTimer ) {
+        hasInputTimer = setTimeout( () => {
+          stableNoInput.value = false;
+          hasInputTimer = null;
+        }, 500 ); // 0.5 second delay before clearing "no input"
+      }
+    }
+  } );
 
   /** Input level as a percentage (0-100) for UI display */
   const inputLevel = computed(() => {
@@ -94,9 +125,8 @@ export function useInputDiagnostics() {
       });
     }
 
-    // 3. No volume detected at all
-    if (isInitialized.value && isContextRunning.value && !isVolumeDetected.value) {
-      // Only show after a brief delay to avoid false positives during init
+    // 3. No volume detected at all (using debounced state to prevent jitter)
+    if ( isInitialized.value && isContextRunning.value && stableNoInput.value ) {
       issues.push({
         id: 'no-input',
         message: 'No audio input detected.',
@@ -119,7 +149,7 @@ export function useInputDiagnostics() {
     }
 
     // 5. Pro Mode warning (not an error, just informational when + no volume)
-    if (isProModeActive.value && !isVolumeDetected.value) {
+    if ( isProModeActive.value && stableNoInput.value ) {
       // This is often the cause; add a specific hint
       issues.push({
         id: 'pro-mode-weak',

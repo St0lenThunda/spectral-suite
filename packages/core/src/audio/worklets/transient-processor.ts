@@ -60,12 +60,13 @@ class TransientProcessor extends AudioWorkletProcessor {
     }
 
     const rms = Math.sqrt( sum / buffer.length );
-    energy = sum;
+    // Use RMS as the energy metric for threshold comparison (0-1 range)
+    energy = rms;
 
     // Send data back to main thread with the exact hardware clock time
     this.port.postMessage( {
       rms: rms,
-      energy: energy,
+      energy: energy, // Now the same as rms for reliable thresholding
       time: currentAudioTime
     } );
   }

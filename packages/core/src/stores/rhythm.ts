@@ -7,7 +7,7 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
 
   // State (Engine Instances - scoped to Store Lifecycle)
   const metronome = new MetronomeEngine( 120 );
-  const detector = new TransientDetector( 0.3 );
+  const detector = new TransientDetector( 0.1 );
 
   // Reactive State
   const isInitialized = ref( false );

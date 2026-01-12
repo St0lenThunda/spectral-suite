@@ -3,15 +3,18 @@ import { AudioEngine } from '../audio/AudioEngine';
 
 /**
  * TransientDetector - Detects audio transients (peaks) for timing analysis
+ * 
+ * The threshold is compared against RMS (0-1 range).
+ * With AGC enabled, typical voice/instrument RMS is 0.05-0.2.
  */
 export class TransientDetector {
   private workletNode: AudioWorkletNode | null = null
-  private threshold: number = 0.3
+  private threshold: number = 0.1 // Lowered from 0.3 for better sensitivity
   private lastTransientTime: number = 0
   private cooldownMs: number = 50
   private transientCallbacks: Array<( time: number, energy: number ) => void> = []
 
-  constructor( threshold: number = 0.3 ) {
+  constructor( threshold: number = 0.1 ) {
     this.threshold = threshold
   }
 

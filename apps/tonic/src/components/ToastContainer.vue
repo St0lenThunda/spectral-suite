@@ -25,8 +25,8 @@ const typeIcons = {
 </script>
 
 <template>
-  <!-- Fixed container in bottom-right corner -->
-  <div class="fixed bottom-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none">
+  <!-- Fixed container in top-right corner (below navbar) -->
+  <div class="fixed top-20 right-4 z-[9999] flex flex-col gap-2 max-w-sm pointer-events-none">
     <TransitionGroup name="toast">
       <div
         v-for="toast in toasts"

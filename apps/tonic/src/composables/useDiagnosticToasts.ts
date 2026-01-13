@@ -1,4 +1,4 @@
-import { watch, onMounted, onUnmounted, ref } from 'vue';
+import { watch, onUnmounted, ref } from 'vue';
 import { useInputDiagnostics } from '@spectralsuite/core';
 import { useToast } from './useToast';
 
@@ -23,12 +23,18 @@ export function useDiagnosticToasts() {
   // Map issue IDs to toast IDs so we can dismiss them when fixed
   const issueToToastMap = ref<Map<string, string>>(new Map());
 
-  watch(activeIssues, (newIssues, oldIssues) => {
-    const newIssueIds = new Set(newIssues.map(i => i.id));
-    const oldIssueIds = new Set((oldIssues || []).map(i => i.id));
+  // Issues that should NOT show as toasts (they're passive/expected during idle)
+  // These are still visible in the Settings > Diagnostics panel
+  const TOAST_EXCLUDED_ISSUES = new Set( ['no-input', 'gate-high', 'pro-mode-weak'] );
 
-    // Find newly appeared issues
+  watch( activeIssues, ( newIssues ) => {
+    const newIssueIds = new Set( newIssues.map( i => i.id ) );
+
+    // Find newly appeared issues (excluding passive/non-critical ones)
     for (const issue of newIssues) {
+      // Skip non-critical issues that would spam the user
+      if ( TOAST_EXCLUDED_ISSUES.has( issue.id ) ) continue;
+
       if (!shownIssueIds.value.has(issue.id)) {
         // Show toast for this new issue
         const toastFn = issue.severity === 'error' ? showError : showWarning;

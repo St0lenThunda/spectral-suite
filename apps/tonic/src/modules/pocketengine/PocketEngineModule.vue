@@ -5,7 +5,6 @@ import { storeToRefs } from 'pinia';
 import { useToolInfo } from '../../composables/useToolInfo';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
-import DiagnosticBanner from '../../components/settings/DiagnosticBanner.vue';
 
 const { openInfo } = useToolInfo();
 
@@ -303,9 +302,6 @@ onUnmounted( () => {
       v-else
       class="space-y-8"
     >
-      <!-- Inline Diagnostic Banner -->
-      <DiagnosticBanner />
-
       <header class="flex justify-between items-end">
         <div>
           <button

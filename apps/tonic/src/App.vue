@@ -11,7 +11,12 @@ import LessonRunner from './modules/academy/LessonRunner.vue';
 import { type Lesson } from './modules/academy/lessons';
 import ToolInfoModal from './components/ToolInfoModal.vue';
 import SettingsModal from './components/settings/SettingsModal.vue';
+import ToastContainer from './components/ToastContainer.vue';
 import { useAudioEngine, StorageService } from '@spectralsuite/core'
+import { useDiagnosticToasts } from './composables/useDiagnosticToasts';
+
+// Enable global diagnostic toast notifications
+useDiagnosticToasts();
 
 const currentModule = ref( 'dashboard' )
 const activeLesson = ref<Lesson | null>( null )
@@ -311,6 +316,9 @@ const handleGainChange = ( event: Event ) => {
         :enabled-callback="toggleTool"
         @close="showSettingsModal = false"
       />
+
+      <!-- Global Toast Notifications -->
+      <ToastContainer />
 
       <!-- ACADEMY OVERLAY MOVED -->
     </main>

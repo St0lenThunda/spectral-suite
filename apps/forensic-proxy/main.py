@@ -65,6 +65,14 @@ def get_ydl_opts():
     import os
     has_cookies = False
     
+    # Mimic a real Mobile Safari session
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Sec-Fetch-Mode': 'navigate',
+    }
+
     if os.environ.get("YOUTUBE_COOKIES"):
         logger.info("Found YOUTUBE_COOKIES env var. Using WEB client strategy.")
         has_cookies = True
@@ -73,38 +81,38 @@ def get_ydl_opts():
     else:
         logger.info("No YOUTUBE_COOKIES found. Using MOBILE client evasion strategy.")
 
+    base_opts = {
+        'format': 'bestaudio/best',
+        'quiet': True,
+        'no_warnings': True,
+        'noplaylist': True,
+        'http_headers': headers,
+    }
+
     if has_cookies:
         # Authenticated Strategy (Web Client)
-        return {
-            'format': 'bestaudio/best',
-            'quiet': True,
-            'no_warnings': True,
-            'noplaylist': True,
+        base_opts.update({
             'cookiefile': 'cookies.txt',
             'extractor_args': {
                 'youtube': {
                     'player_client': ['web'],
                     'player_skip': ['configs', 'js'],
-                    'include_fields': ['title', 'thumbnail', 'duration', 'uploader', 'view_count', 'url'],
                 },
             },
-        }
+        })
     else:
         # Unauthenticated Evasion Strategy (Mobile Clients + IPv4)
-        return {
-            'format': 'bestaudio[ext=m4a]/bestaudio/best[ext=mp4]/best', # More aggressive format finding
-            'quiet': True,
-            'no_warnings': True,
-            'noplaylist': True,
+        base_opts.update({
             'force_ipv4': True, 
             'extractor_args': {
                 'youtube': {
-                    'player_client': ['ios', 'android'], # Try iOS first
+                    'player_client': ['ios', 'android'], 
                     'player_skip': ['webpage', 'configs', 'js'],
-                    'include_fields': ['title', 'thumbnail', 'duration', 'uploader', 'view_count', 'url'],
                 },
             },
-        }
+        })
+    
+    return base_opts
 
 def get_best_audio_url(video_url: str) -> str:
     """

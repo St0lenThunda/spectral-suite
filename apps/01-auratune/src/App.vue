@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch, computed } from 'vue'
+import { ref, onMounted, onUnmounted, watch, computed } from 'vue'
 import { usePitch, useAudioEngine, InfoPanel, Note } from '@spectralsuite/core'
 
 const {
@@ -14,7 +14,16 @@ const {
   downsample
 } = usePitch()
 
-const { init, isInitialized, error } = useAudioEngine()
+const { init, isInitialized, error, activate, deactivate } = useAudioEngine()
+
+// Audio engine lifecycle for pitch detection
+onMounted( () => activate() )
+onUnmounted( () => deactivate() )
+
+// Watch for initialization to auto-activate
+watch( isInitialized, ( newVal ) => {
+  if ( newVal ) activate();
+} );
 
 const isSettingsOpen = ref( false )
 const activeCategory = ref<string | null>( null )

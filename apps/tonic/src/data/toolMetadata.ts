@@ -56,4 +56,13 @@ export const TOOL_METADATA: Record<string, ToolMetadata> = {
     practicalApplication: 'Quickly map the arrangement of a track for remixing, verify tempo/key of unknown samples, and perform forensic A/B testing using the provided Specimens Gallery.',
     howItWorks: 'TrackTracer uses an Offline Audio Context for high-speed analysis of global features (tempo/key) and a localized energy-density algorithm to identify arrangement boundaries and section changes.'
   },
+  harmonicorbit: {
+    id: 'harmonicorbit',
+    name: 'Harmonic Orbit',
+    whatAmISeeing: 'An interactive Circle of Fifths "Holographic Theory Map" with 60 clickable chord labels. Three concentric rings: Outer (12 Major keys), Middle (36 Minor chords: ii, iii, vi for each key), Inner (12 Diminished vii° chords). The Key Signature badge shows sharps/flats count. Click any chord TEXT LABEL to explore its family.',
+    instructions: '1. Click any chord LABEL (text) on the Orbit to select it.\n2. The Key Family panel shows all 7 diatonic chords with the key signature (♯/♭ count).\n3. Click ii, iii, or vi to see that specific chord selected while staying in the same key family.\n4. Toggle "Degree Family" to show IV/V indicators on neighbor keys.\n5. Each key includes a "Mentor Fact" explaining its character.',
+    practicalApplication: 'Master functional harmony by exploring chord relationships visually. See how ii-V-I progressions connect, understand chord substitutions, and learn key signatures at a glance. Perfect for songwriters needing quick chord family references and theory students learning the Circle of Fifths.',
+    howItWorks: 'The Orbit renders 60 SVG text labels (12 Major + 36 Minor + 12 Dim) positioned on concentric rings. Only text labels are clickable (paths are decorative). Selection stores the specific chord type (ii/iii/vi) for accurate display. The Key Family is calculated using Circle of Fifths neighbor positions (IV = CCW, V = CW).'
+  },
 };
+

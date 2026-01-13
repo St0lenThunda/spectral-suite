@@ -6,6 +6,7 @@ import ChordCaptureModule from './modules/chordcapture/ChordCaptureModule.vue';
 import PocketEngineModule from './modules/pocketengine/PocketEngineModule.vue';
 import FrequencyFlowModule from './modules/frequencyflow/FrequencyFlowModule.vue';
 import TrackTracerModule from './modules/tracktracer/TrackTracerModule.vue';
+import HarmonicOrbitModule from './modules/harmonicorbit/HarmonicOrbitModule.vue';
 import AcademyModule from './modules/academy/AcademyModule.vue';
 import LessonRunner from './modules/academy/LessonRunner.vue';
 import { type Lesson } from './modules/academy/lessons';
@@ -82,6 +83,13 @@ const ALL_TOOLS = [
     description: 'Interactive music theory lessons. Learn via active performance.',
     icon: '🎓',
     color: 'from-emerald-600 to-green-500'
+  },
+  {
+    id: 'harmonicorbit',
+    name: 'Harmonic Orbit',
+    description: 'Explore the colorful world of Musical Families on the Harmony Wheel.',
+    icon: '🎡',
+    color: 'from-indigo-600 to-sky-500'
   }
 ]
 
@@ -92,6 +100,7 @@ const enabledTools = ref<Record<string, boolean>>( {
   pocketengine: true,
   frequencyflow: true,
   tracktracer: true,
+  harmonicorbit: true,
   academy: false
 } )
 
@@ -285,6 +294,10 @@ const handleGainChange = ( event: Event ) => {
       />
       <TrackTracerModule
         v-else-if=" currentModule === 'tracktracer' && enabledTools.tracktracer "
+        @back="currentModule = 'dashboard'"
+      />
+      <HarmonicOrbitModule
+        v-else-if=" currentModule === 'harmonicorbit' && enabledTools.harmonicorbit "
         @back="currentModule = 'dashboard'"
       />
       <AcademyModule

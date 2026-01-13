@@ -1,13 +1,25 @@
-import { ref, watch, onMounted, onUnmounted } from 'vue';
+import { ref, watch, onMounted, onUnmounted, computed } from 'vue';
 import { Note, Interval } from 'tonal';
 import { NativePitch } from './NativePitch';
 import { useAudioEngine } from './useAudioEngine';
 import { PitchNodePool, poolPitch, poolClarity, poolVolume } from './PitchNodePool';
 import { clarityThreshold } from '../config/sensitivity';
+import { usePlatformStore } from '../stores/platform';
 
-// Global State for Engine Settings (Shared across all instances)
-export const isLowPassEnabled = ref( false );
-export const downsample = ref( 1 );
+/**
+ * BACKWARD COMPATIBILITY: 
+ * These settings are now managed by usePlatformStore. 
+ * We mirror them here as computed properties so existing tools don't break.
+ */
+export const isLowPassEnabled = computed( {
+  get: () => usePlatformStore().isLowPassEnabled,
+  set: ( val ) => { usePlatformStore().isLowPassEnabled = val; }
+} );
+
+export const downsample = computed( {
+  get: () => usePlatformStore().downsample,
+  set: ( val ) => { usePlatformStore().downsample = val; }
+} );
 
 export function usePitch ( config: { smoothing?: number } = {} ) {
   const { getAnalyser, getContext, isInitialized } = useAudioEngine();
@@ -27,18 +39,18 @@ export function usePitch ( config: { smoothing?: number } = {} ) {
   let nullFrameCount = 0;
   const NULL_GRACE_PERIOD = 10; // Frames to wait before giving up on a note
 
-  // Watch for LPF toggle and config changes
-  watch( [isLowPassEnabled, downsample], () => {
+  // Watch for LPF toggle and config changes (from global platform store)
+  watch( [() => usePlatformStore().isLowPassEnabled, () => usePlatformStore().downsample], () => {
     // Update pool's worklet node
     PitchNodePool.configure( {
-      lowPass: isLowPassEnabled.value,
-      downsample: downsample.value
+      lowPass: usePlatformStore().isLowPassEnabled,
+      downsample: usePlatformStore().downsample
     } );
 
     // Update Legacy detector if in fallback mode
     if ( legacyDetector ) {
-      legacyDetector.useLowPass = isLowPassEnabled.value;
-      legacyDetector.downsample = downsample.value;
+      legacyDetector.useLowPass = usePlatformStore().isLowPassEnabled;
+      legacyDetector.downsample = usePlatformStore().downsample;
     }
   } );
 

@@ -25,6 +25,9 @@ export class TransientDetector {
       // Ensure engine is initialized
       if ( !engine.getContext() ) {
         await engine.init();
+        // Sync the global reactive state
+        const { isInitialized: globalInit } = await import( '../audio/useAudioEngine' );
+        globalInit.value = true;
       }
 
       const context = engine.getContext();
@@ -109,5 +112,9 @@ export class TransientDetector {
       this.workletNode = null;
     }
     // Do not close context or stop tracks as they are owned by AudioEngine
+  }
+
+  public clearCallbacks () {
+    this.transientCallbacks = [];
   }
 }

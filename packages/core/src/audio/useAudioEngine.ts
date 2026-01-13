@@ -2,7 +2,8 @@ import { ref } from 'vue';
 import { AudioEngine } from './AudioEngine';
 import { PitchNodePool } from './PitchNodePool';
 
-const isInitialized = ref( false );
+// Single source of truth for reactivity across the app
+export const isInitialized = ref( AudioEngine.getInstance().initialized );
 const error = ref<string | null>( null );
 const inputGain = ref( 1.0 );
 const activeConsumers = ref( 0 );

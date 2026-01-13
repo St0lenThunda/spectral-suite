@@ -1,6 +1,6 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 import { useAudioEngine } from '../audio/useAudioEngine';
-import { sensitivityThreshold, isRawAudioMode } from '../config/sensitivity';
+import { usePlatformStore } from '../stores/platform';
 
 /**
  * Diagnostic issue object
@@ -26,6 +26,7 @@ export interface DiagnosticIssue {
  */
 export function useInputDiagnostics() {
   const { isInitialized, getContext, getAnalyser } = useAudioEngine();
+  const platform = usePlatformStore();
 
   // Local volume monitoring (lightweight, no worklet)
   const volume = ref( 0 );
@@ -89,11 +90,11 @@ export function useInputDiagnostics() {
   /** Is the sensitivity gate higher than the current input volume? */
   const isGateTooHigh = computed(() => {
     // Only flag if we ARE getting some audio, but it's below the gate.
-    return isVolumeDetected.value && volume.value < sensitivityThreshold.value;
+    return isVolumeDetected.value && volume.value < platform.sensitivity;
   });
 
   /** Is Pro Mode (raw audio) enabled? */
-  const isProModeActive = computed(() => isRawAudioMode.value);
+  const isProModeActive = computed( () => usePlatformStore().isRawAudioMode );
 
   // --- Issue Detection ---
 
@@ -172,10 +173,10 @@ export function useInputDiagnostics() {
   const applyQuickFix = async (fix: DiagnosticIssue['quickFix']) => {
     switch (fix) {
       case 'lowerGate':
-        sensitivityThreshold.value = 0.01;
+        platform.sensitivity = 0.01;
         break;
       case 'disableProMode':
-        isRawAudioMode.value = false;
+        platform.isRawAudioMode = false;
         // Re-init audio with new settings
         await useAudioEngine().init();
         break;

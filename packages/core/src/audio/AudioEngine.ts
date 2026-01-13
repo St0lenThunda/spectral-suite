@@ -7,6 +7,7 @@ export class AudioEngine {
   private source: MediaStreamAudioSourceNode | null = null;
   private analyser: AnalyserNode | null = null;
   private gainNode: GainNode | null = null;
+  public initialized: boolean = false;
 
   private constructor() { }
 
@@ -65,7 +66,9 @@ export class AudioEngine {
       // source -> gain -> analyser
       this.source.connect( this.gainNode );
       this.gainNode.connect( this.analyser );
+      this.initialized = true;
     } catch ( err ) {
+      this.initialized = false;
       console.error( 'Error accessing microphone:', err );
       throw err;
     }
@@ -75,6 +78,7 @@ export class AudioEngine {
    * Stops the media stream and closes the audio context to release resources.
    */
   public async close (): Promise<void> {
+    this.initialized = false;
     if ( this.stream ) {
       this.stream.getTracks().forEach( track => track.stop() );
       this.stream = null;

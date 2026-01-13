@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
-import { ref, reactive, readonly } from 'vue';
+import { ref, reactive, readonly, watch } from 'vue';
 import { MetronomeEngine } from '../rhythm/MetronomeEngine';
 import { TransientDetector } from '../rhythm/TransientDetector';
+import { useAudioEngine } from '../audio/useAudioEngine';
 
 export const useRhythmStore = defineStore( 'rhythm', () => {
 
@@ -10,13 +11,24 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
   const detector = new TransientDetector( 0.1 );
 
   // Reactive State
-  const isInitialized = ref( false );
+  const { isInitialized: isEngineInitialized } = useAudioEngine();
+  const isRhythmStarted = ref( false );
   const isPlaying = ref( false );
   const tempo = ref( 120 );
   const subdivision = ref( 1 );
   const polySubdivision = ref( 0 );
   const currentPulse = ref( 0 );
   const error = ref<string | null>( null );
+
+  /**
+   * Resilience: If the global engine uninitializes (e.g. after a settings reset),
+   * we must also reset our local initialization state so we re-bind to the new context.
+   */
+  watch( isEngineInitialized, ( isReady: boolean ) => {
+    if ( !isReady ) {
+      isRhythmStarted.value = false;
+    }
+  } );
 
   // Analysis State
   const lastBeatTime = ref( 0 );
@@ -37,10 +49,18 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
 
   // Actions
   const init = async () => {
-    if ( isInitialized.value ) return;
+    if ( isRhythmStarted.value ) return;
 
     try {
-      metronome.init();
+      const { getContext } = useAudioEngine();
+      const ctx = getContext();
+
+      // Resilience: Clear old instances before and after context change
+      metronome.dispose();
+      detector.cleanup();
+      detector.clearCallbacks();
+
+      metronome.init( ctx || undefined );
       await detector.init();
 
       // Hook up Metronome
@@ -103,8 +123,7 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
 
       // Hook up Tempo
       metronome.onTempoChange( ( t ) => tempo.value = t );
-
-      isInitialized.value = true;
+      isRhythmStarted.value = true;
     } catch ( e: any ) {
       error.value = e.message;
       throw e;
@@ -112,7 +131,11 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
   };
 
   const start = () => {
-    if ( !isInitialized.value ) init();
+    if ( !isRhythmStarted.value ) init();
+
+    // Register as an audio consumer so the engine stays active
+    useAudioEngine().activate();
+
     metronome.start();
     detector.start();
     isPlaying.value = true;
@@ -122,6 +145,9 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
     metronome.stop();
     detector.stop();
     isPlaying.value = false;
+
+    // Unregister as an audio consumer
+    useAudioEngine().deactivate();
   };
 
   const toggle = () => {
@@ -163,7 +189,8 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
 
   return {
     // State
-    isInitialized: readonly( isInitialized ),
+    isInitialized: readonly( isRhythmStarted ),
+    isEngineInitialized: readonly( isEngineInitialized ),
     isPlaying: readonly( isPlaying ),
     tempo: readonly( tempo ),
     currentPulse: readonly( currentPulse ),

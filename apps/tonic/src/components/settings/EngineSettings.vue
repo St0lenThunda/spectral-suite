@@ -7,9 +7,10 @@
  * This component acts as a "View Controller" for the SynthEngine singleton and Global Input State.
  */
 import { ref } from 'vue';
-import { SynthEngine, type TonePreset, isLowPassEnabled, downsample, sensitivityThreshold, clarityThreshold, isRawAudioMode, useAudioEngine } from '@spectralsuite/core';
+import { usePlatformStore, SynthEngine, type TonePreset, useAudioEngine } from '@spectralsuite/core';
 import PillNav from '../ui/PillNav.vue';
 
+const platform = usePlatformStore();
 const { init: reinitAudio } = useAudioEngine();
 
 // Access the singleton instance (The "Model")
@@ -72,22 +73,22 @@ const updatePreset = ( val: string ) => {
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <!-- Low Pass Filter Toggle -->
         <button
-          @click="isLowPassEnabled = !isLowPassEnabled"
+          @click="platform.isLowPassEnabled = !platform.isLowPassEnabled"
           class="flex flex-col items-start p-4 rounded-xl border transition-all text-left group"
-          :class="isLowPassEnabled ? 'bg-sky-500/10 border-sky-500/50' : 'bg-slate-900/50 border-white/5 hover:bg-slate-800'"
+          :class="platform.isLowPassEnabled ? 'bg-sky-500/10 border-sky-500/50' : 'bg-slate-900/50 border-white/5 hover:bg-slate-800'"
         >
           <div class="flex items-center justify-between w-full mb-2">
             <span
               class="text-xs font-black uppercase tracking-widest"
-              :class="isLowPassEnabled ? 'text-sky-400' : 'text-slate-500'"
+              :class="platform.isLowPassEnabled ? 'text-sky-400' : 'text-slate-500'"
             >Low-Pass Filter</span>
             <div
               class="w-8 h-4 rounded-full relative transition-colors"
-              :class="isLowPassEnabled ? 'bg-sky-500' : 'bg-slate-700'"
+              :class="platform.isLowPassEnabled ? 'bg-sky-500' : 'bg-slate-700'"
             >
               <div
                 class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform"
-                :class="isLowPassEnabled ? 'translate-x-4' : 'translate-x-0'"
+                :class="platform.isLowPassEnabled ? 'translate-x-4' : 'translate-x-0'"
               ></div>
             </div>
           </div>
@@ -99,22 +100,22 @@ const updatePreset = ( val: string ) => {
 
         <!-- Bass Mode Toggle -->
         <button
-          @click="downsample = downsample === 1 ? 4 : 1"
+          @click="platform.downsample = platform.downsample === 1 ? 4 : 1"
           class="flex flex-col items-start p-4 rounded-xl border transition-all text-left group"
-          :class="downsample > 1 ? 'bg-indigo-500/10 border-indigo-500/50' : 'bg-slate-900/50 border-white/5 hover:bg-slate-800'"
+          :class="platform.downsample > 1 ? 'bg-indigo-500/10 border-indigo-500/50' : 'bg-slate-900/50 border-white/5 hover:bg-slate-800'"
         >
           <div class="flex items-center justify-between w-full mb-2">
             <span
               class="text-xs font-black uppercase tracking-widest"
-              :class="downsample > 1 ? 'text-indigo-400' : 'text-slate-500'"
+              :class="platform.downsample > 1 ? 'text-indigo-400' : 'text-slate-500'"
             >Bass / Deep Mode</span>
             <div
               class="w-8 h-4 rounded-full relative transition-colors"
-              :class="downsample > 1 ? 'bg-indigo-500' : 'bg-slate-700'"
+              :class="platform.downsample > 1 ? 'bg-indigo-500' : 'bg-slate-700'"
             >
               <div
                 class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform"
-                :class="downsample > 1 ? 'translate-x-4' : 'translate-x-0'"
+                :class="platform.downsample > 1 ? 'translate-x-4' : 'translate-x-0'"
               ></div>
             </div>
           </div>
@@ -130,14 +131,14 @@ const updatePreset = ( val: string ) => {
         <div>
           <div class="flex justify-between items-center mb-2">
             <label class="text-xs font-bold uppercase tracking-widest text-slate-500">Microphone Gate</label>
-            <span class="text-xs font-mono text-sky-400">{{ ( sensitivityThreshold * 100 ).toFixed( 0 ) }}%</span>
+            <span class="text-xs font-mono text-sky-400">{{ ( platform.sensitivity * 100 ).toFixed( 0 ) }}%</span>
           </div>
           <input
             type="range"
             min="0.01"
             max="0.2"
             step="0.01"
-            v-model.number="sensitivityThreshold"
+            v-model.number="platform.sensitivity"
             class="w-full accent-sky-500 bg-slate-800 h-2 rounded-lg appearance-none cursor-pointer"
           />
           <p class="text-[10px] text-slate-500 mt-1">Minimum volume required to detect signal.</p>
@@ -146,14 +147,14 @@ const updatePreset = ( val: string ) => {
         <div>
           <div class="flex justify-between items-center mb-2">
             <label class="text-xs font-bold uppercase tracking-widest text-slate-500">Note Clarity</label>
-            <span class="text-xs font-mono text-emerald-400">{{ ( clarityThreshold * 100 ).toFixed( 0 ) }}%</span>
+            <span class="text-xs font-mono text-emerald-400">{{ ( platform.clarity * 100 ).toFixed( 0 ) }}%</span>
           </div>
           <input
             type="range"
             min="0.5"
             max="0.95"
             step="0.05"
-            v-model.number="clarityThreshold"
+            v-model.number="platform.clarity"
             class="w-full accent-emerald-500 bg-slate-800 h-2 rounded-lg appearance-none cursor-pointer"
           />
           <p class="text-[10px] text-slate-500 mt-1">Strictness of pitch detection. Lower for sustain, Higher for
@@ -173,27 +174,27 @@ const updatePreset = ( val: string ) => {
         </div>
 
         <button
-          @click="isRawAudioMode = !isRawAudioMode; reinitAudio()"
+          @click="platform.isRawAudioMode = !platform.isRawAudioMode; reinitAudio()"
           class="w-full flex flex-col items-start p-4 rounded-xl border transition-all text-left group"
-          :class="isRawAudioMode ? 'bg-amber-500/10 border-amber-500/50' : 'bg-slate-900/50 border-white/5 hover:bg-slate-800'"
+          :class="platform.isRawAudioMode ? 'bg-amber-500/10 border-amber-500/50' : 'bg-slate-900/50 border-white/5 hover:bg-slate-800'"
         >
           <div class="flex items-center justify-between w-full mb-2">
             <span
               class="text-xs font-black uppercase tracking-widest"
-              :class="isRawAudioMode ? 'text-amber-400' : 'text-slate-500'"
-            >{{ isRawAudioMode ? 'Pro Mode (Raw)' : 'Auto Mode (AGC)' }}</span>
+              :class="platform.isRawAudioMode ? 'text-amber-400' : 'text-slate-500'"
+            >{{ platform.isRawAudioMode ? 'Pro Mode (Raw)' : 'Auto Mode (AGC)' }}</span>
             <div
               class="w-8 h-4 rounded-full relative transition-colors"
-              :class="isRawAudioMode ? 'bg-amber-500' : 'bg-slate-700'"
+              :class="platform.isRawAudioMode ? 'bg-amber-500' : 'bg-slate-700'"
             >
               <div
                 class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform"
-                :class="isRawAudioMode ? 'translate-x-4' : 'translate-x-0'"
+                :class="platform.isRawAudioMode ? 'translate-x-4' : 'translate-x-0'"
               ></div>
             </div>
           </div>
           <p class="text-[11px] text-slate-400 leading-relaxed">
-            <template v-if=" isRawAudioMode ">
+            <template v-if=" platform.isRawAudioMode ">
               <span class="text-amber-400 font-bold">Pro Mode:</span> Disables browser processing (AGC, noise
               suppression). Purer signal for spectral analysis but may require higher input gain or closer mic.
             </template>
@@ -205,7 +206,7 @@ const updatePreset = ( val: string ) => {
         </button>
 
         <p
-          v-if=" isRawAudioMode "
+          v-if=" platform.isRawAudioMode "
           class="text-[10px] text-amber-400/80 mt-2 flex items-center gap-1"
         >
           <span>⚠️</span> If tools aren't detecting input, try speaking louder or moving closer to the mic.

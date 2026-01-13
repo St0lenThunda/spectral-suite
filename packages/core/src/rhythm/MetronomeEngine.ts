@@ -86,14 +86,23 @@ export class MetronomeEngine {
   private beatCallbacks: Array<( pulse: number, time: number, isMainBeat: boolean, isPoly?: boolean ) => void> = []
   private tempoCallbacks: Array<( bpm: number ) => void> = []
 
-  constructor( initialTempo: number = 120 ) {
+  constructor( initialTempo: number = 120, sharedContext?: AudioContext ) {
     this.tempo = initialTempo
+    if ( sharedContext ) {
+      this.context = sharedContext
+    }
   }
 
   /**
-   * Initializes the AudioContext. Must be called after a user interaction (click).
+   * Initializes the AudioContext. 
+   * @param sharedContext - Optional external context to use instead of creating one.
    */
-  public init () {
+  public init ( sharedContext?: AudioContext ) {
+    if ( sharedContext ) {
+      this.context = sharedContext
+      return
+    }
+
     if ( !this.context ) {
       // Cross-browser compatibility (some older browsers use webkit prefix)
       this.context = new ( window.AudioContext || ( window as any ).webkitAudioContext )()
@@ -141,9 +150,10 @@ export class MetronomeEngine {
     this.stop()
     this.beatCallbacks = []
     this.tempoCallbacks = []
-    if ( this.context && this.context.state !== 'closed' ) {
-      this.context.close()
-    }
+
+    // NOTE: We do NOT close the context here if it's shared.
+    // If we created it, we should close it, but usually this is used
+    // within a store that manages its own lifecycle.
     this.context = null
   }
 

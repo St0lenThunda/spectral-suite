@@ -52,6 +52,20 @@ export const usePlatformStore = defineStore( 'platform', {
      */
     isRawAudioMode: false,
 
+    /**
+     * Low-pass filter for pitch detection.
+     * When true, applies a low-pass filter before pitch analysis.
+     * Can help with noisy environments but may reduce accuracy for high notes.
+     */
+    isLowPassEnabled: false,
+
+    /**
+     * Downsampling factor for pitch detection (1 = no downsampling).
+     * Higher values reduce CPU usage but may miss high-frequency content.
+     * Default: 1 (full resolution).
+     */
+    downsample: 1,
+
     // --- UI Settings ---
 
     /**
@@ -78,7 +92,9 @@ export const usePlatformStore = defineStore( 'platform', {
     isEngineModified: ( state ) => {
       return state.sensitivity !== 0.01 ||
         state.clarity !== 0.6 ||
-        state.isRawAudioMode !== false;
+        state.isRawAudioMode !== false ||
+        state.isLowPassEnabled !== false ||
+        state.downsample !== 1;
     },
   },
 

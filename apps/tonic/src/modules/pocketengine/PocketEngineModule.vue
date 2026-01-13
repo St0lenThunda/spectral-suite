@@ -244,7 +244,6 @@ activate();
 onUnmounted( () => {
   deactivate();
   stop() // Stop the loop
-  metronome.dispose() // Clear all callbacks to prevent memory leaks
 } )
 </script>
 

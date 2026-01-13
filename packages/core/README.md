@@ -11,8 +11,18 @@ The core package provides shared audio processing functionality, reusable UI com
 ### Audio Engine (`/audio`)
 - **AudioEngine** - Web Audio API wrapper with microphone input
 - **SynthEngine** - Triangle-wave synthesizer for tone generation and sequencing
-- **useAudioEngine** - Vue composable for audio initialization
-- **usePitch** - Real-time pitch detection composable
+- **useAudioEngine** - Vue composable for audio initialization with `activate()`/`deactivate()` lifecycle
+- **usePitch** - Real-time pitch detection composable (uses PitchNodePool singleton)
+- **PitchNodePool** - Singleton manager for pitch worklet nodes with reference counting
+
+### Diagnostics (`/composables`)
+- **useInputDiagnostics** - Real-time audio input health monitoring
+- **useGlobalEngine** - Centralized engine state aggregation (plug-and-play pattern)
+
+### Configuration (`/config`)
+- **sensitivityThreshold** - Global microphone gate setting
+- **clarityThreshold** - Pitch detection confidence threshold
+- **isRawAudioMode** - Pro Audio Mode toggle (disables AGC/noise suppression)
 
 ### Music Theory (`/theory`)
 - **ChordEngine** - Chord recognition and analysis
@@ -22,8 +32,9 @@ The core package provides shared audio processing functionality, reusable UI com
 
 ### UI Components (`/ui`)
 - **Fretboard.vue** - Professional 24-fret guitar display with CAGED and playback support
-- **MorphContainer.vue** - Premium shared container for smooth UI state transitions (as seen in Academy)
+- **MorphContainer.vue** - Premium shared container for smooth UI state transitions
 - **InfoPanel.vue** - Slideout documentation panel
+- **PlayButton.vue** - Animated play/pause button
 
 ## 🚀 Usage
 
@@ -197,6 +208,33 @@ interface ScaleSleuth {
   matchingScales: Ref<ScaleMatch[]>
   clearNotes: () => void
 }
+```
+
+### useInputDiagnostics()
+
+Real-time audio health monitoring with quick-fix suggestions.
+
+```typescript
+interface InputDiagnostics {
+  activeIssues: Ref<DiagnosticIssue[]>  // Current problems
+  isContextRunning: Ref<boolean>         // AudioContext state
+  isMicGranted: Ref<boolean | null>      // Permission status
+  volume: Ref<number>                    // Current input level
+  applyQuickFix: (fix: string) => void   // Execute fix action
+}
+```
+
+### Audio Lifecycle
+
+Modules should call `activate()`/`deactivate()` to manage the AudioContext:
+
+```typescript
+import { useAudioEngine } from '@spectralsuite/core'
+
+const { activate, deactivate } = useAudioEngine()
+
+onMounted(() => activate())
+onUnmounted(() => deactivate())
 ```
 
 ## 🔧 Development

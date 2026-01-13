@@ -32,6 +32,23 @@ spectral-suite/
 └── package.json         # Root workspace configuration
 ```
 
+## ✨ Recent Features
+
+### Toast Notification System
+- Non-intrusive fixed-position notifications
+- Automatic dismiss with configurable duration
+- Quick-fix action buttons for common issues
+
+### Audio Diagnostics
+- Real-time input health monitoring
+- Detects: suspended context, mic denied, no input, gate blocking
+- Pro Audio Mode toggle (disables browser audio processing)
+
+### Performance Optimizations
+- **PitchNodePool** - Singleton pitch worklet with reference counting
+- **Debounced lifecycle** - Prevents HMR freezes during development
+- **Lightweight volume polling** - Direct AnalyserNode reads instead of duplicate worklets
+
 ## 🚀 Getting Started
 
 ### Prerequisites

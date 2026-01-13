@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@spectralsuite/core": "^1.0.0",
-    "pinia": "^3.0.4",
+    "pinia": "^2.3.0",
     "vue": "^3.5.24"
   },
   "devDependencies": {

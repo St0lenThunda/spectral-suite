@@ -5,6 +5,7 @@
   "type": "module",
   "main": "./src/index.ts",
   "dependencies": {
+    "pinia-plugin-persistedstate": "^3.2.3",
     "tonal": "^6.3.0"
   },
   "peerDependencies": {

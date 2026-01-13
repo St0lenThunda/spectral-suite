@@ -1,27 +1,42 @@
-import { ref } from 'vue';
+import { computed } from 'vue';
+import { usePlatformStore } from '../stores/platform';
+
+/**
+ * BACKWARD COMPATIBILITY LAYER
+ * 
+ * These exports allow existing code to continue using the same imports:
+ *   import { sensitivityThreshold } from '@spectralsuite/core'
+ * 
+ * Under the hood, they now read/write to the centralized usePlatformStore.
+ * This means settings are now persisted to localStorage automatically!
+ */
 
 /**
  * Global sensitivity threshold used by detection utilities.
- * Default 0.05 matches the updated noise floor for chord capture.
- * Users can modify this at runtime (e.g., via a settings UI).
+ * Default 0.01 is very sensitive, suitable for most use cases.
+ * Users can modify this at runtime via the settings UI.
  */
-export const sensitivityThreshold = ref<number>( 0.01 );
+export const sensitivityThreshold = computed( {
+  get: () => usePlatformStore().sensitivity,
+  set: ( val ) => { usePlatformStore().sensitivity = val; }
+} );
 
 /**
  * Global clarity threshold (0.0 - 1.0).
  * Determines how clear/periodic the signal must be to be considered a note.
- * Lower = More sensitive to messy audio (but more false positives).
- * Higher = Requires pure tone (less false positives, but might miss real notes).
- * Default 0.6 is a good balance for guitar/voice.
+ * Default 0.6 balances accuracy and usability for guitar/voice.
  */
-export const clarityThreshold = ref<number>( 0.6 );
+export const clarityThreshold = computed( {
+  get: () => usePlatformStore().clarity,
+  set: ( val ) => { usePlatformStore().clarity = val; }
+} );
 
 /**
- * Pro Mode / Raw Audio Mode.
- * When true, disables browser audio processing (AGC, noise suppression, echo cancellation).
- * Pro Mode = Purer signal, better for spectral analysis, but requires louder input.
- * Auto Mode = Browser-normalized signal, easier to use, but less accurate waveforms.
- * Default: false (Auto Mode / AGC enabled).
+ * Pro Mode / Raw Audio Mode toggle.
+ * When true, disables browser audio processing (AGC, noise suppression).
+ * Pro Mode = Purer signal, but requires louder input.
  */
-export const isRawAudioMode = ref<boolean>( false );
-
+export const isRawAudioMode = computed( {
+  get: () => usePlatformStore().isRawAudioMode,
+  set: ( val ) => { usePlatformStore().isRawAudioMode = val; }
+} );

@@ -9,6 +9,7 @@ export * from './audio/usePitch';
 export * from './composables/useAudioRecorder';
 export * from './composables/useInputDiagnostics';
 export * from './stores/rhythm';
+export * from './stores/platform';
 export * from './analysis/TrackAnalyzer';
 export * from './analysis/BpmDetector';
 export * from './analysis/KeyDetector';

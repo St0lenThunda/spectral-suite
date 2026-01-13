@@ -1,7 +1,12 @@
 import { createApp } from 'vue'
 import { createPinia } from 'pinia'
+import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import './style.css'
 import '../../../packages/core/src/styles/theme.css'
 import App from './App.vue'
 
-createApp( App ).use( createPinia() ).mount( '#app' )
+// Create Pinia with persistence plugin
+const pinia = createPinia()
+pinia.use( piniaPluginPersistedstate )
+
+createApp( App ).use( pinia ).mount( '#app' )

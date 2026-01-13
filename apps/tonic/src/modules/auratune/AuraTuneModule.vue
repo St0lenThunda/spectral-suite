@@ -14,8 +14,6 @@ const {
   concertA,
   transposition,
   pitchHistory,
-  isLowPassEnabled,
-  downsample
 } = usePitch()
 
 const { init, isInitialized, error: engineError, activate, deactivate } = useAudioEngine()

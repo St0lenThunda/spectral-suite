@@ -33,8 +33,6 @@ const {
   isLocked,
   lockScale,
   clearNotes,
-  isLowPassEnabled,
-  downsample
 } = useScaleSleuth();
 
 // initialization helpers for audio and info panels

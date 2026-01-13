@@ -2,6 +2,8 @@
 import { ref, onUnmounted } from 'vue';
 import { TrackAnalyzer, type AnalysisResult, useAudioRecorder, useAudioEngine } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
+import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
+import SettingsTrigger from '../../components/settings/SettingsTrigger.vue';
 
 const { openInfo } = useToolInfo();
 const { activate, deactivate } = useAudioEngine();
@@ -15,6 +17,11 @@ const isAnalyzing = ref( false );
 const result = ref<AnalysisResult | null>( null );
 const error = ref<string | null>( null );
 const showSpecimens = ref( false );
+const isSettingsOpen = ref( false );
+
+const categories = [
+  { id: 'general', label: 'General', description: 'Module visibility and behavior' }
+];
 
 // Microphone Listening Mode
 const {
@@ -245,14 +252,6 @@ const analyzeUrl = async () => {
   }
 };
 
-const clearUrl = () => {
-  urlInput.value = "";
-};
-
-
-
-
-
 const SPECIMENS = [
   { name: "Viper (EDM)", type: "Quantized Pulse", url: "https://raw.githubusercontent.com/mdn/webaudio-examples/main/audio-analyser/viper.mp3" },
   { name: "Outfoxing", type: "Orchestral", url: "https://raw.githubusercontent.com/mdn/webaudio-examples/main/audio-basics/outfoxing.mp3" }
@@ -366,10 +365,6 @@ const resetFindings = () => {
   stopPlayback( true );
   result.value = null;
 };
-
-onUnmounted( () => {
-  stopPlayback();
-} );
 
 const emit = defineEmits( ['back'] )
 
@@ -504,13 +499,17 @@ const exportAnalysis = () => {
         <p class="text-slate-500 text-xs font-mono uppercase tracking-widest mt-1">Song Deconstruction & Forensic Lab
         </p>
       </div>
-      <div class="flex items-center gap-4">
+      <div class="flex items-center gap-3">
         <button
           @click="openInfo( 'tracktracer' )"
-          class="flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-[10px] font-black uppercase tracking-widest hover:bg-indigo-500/20 transition-all active:scale-95"
+          class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center hover:bg-indigo-500/20 transition-all active:scale-95"
+          title="Intelligence"
         >
-          Intelligence
+          <span class="text-lg font-bold">?</span>
         </button>
+
+        <SettingsTrigger @click="isSettingsOpen = true" />
+
         <div
           v-if=" result "
           class="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20 text-blue-400 text-[10px] font-black uppercase tracking-widest"
@@ -519,6 +518,76 @@ const exportAnalysis = () => {
         </div>
       </div>
     </header>
+
+    <!-- Settings Drawer -->
+    <LocalSettingsDrawer
+      :is-open="isSettingsOpen"
+      :categories="categories"
+      @close="isSettingsOpen = false"
+    >
+      <!-- General Section -->
+      <template #general>
+        <div class="space-y-6">
+          <!-- Visibility Controls -->
+          <div class="space-y-2">
+            <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Visibility</h4>
+            <button
+              @click="showSpecimens = !showSpecimens"
+              class="w-full flex flex-col items-start p-4 rounded-xl border transition-all text-left group"
+              :class="showSpecimens ? 'bg-sky-500/10 border-sky-500/50' : 'bg-slate-900/50 border-white/5 hover:bg-slate-800'"
+            >
+              <div class="flex items-center justify-between w-full mb-2">
+                <span
+                  class="text-xs font-black uppercase tracking-widest transition-colors"
+                  :class="showSpecimens ? 'text-sky-400' : 'text-slate-500 group-hover:text-slate-400'"
+                >Specimen Gallery</span>
+                <div
+                  class="w-8 h-4 rounded-full relative transition-colors"
+                  :class="showSpecimens ? 'bg-sky-500' : 'bg-slate-700'"
+                >
+                  <div
+                    class="absolute top-0.5 left-0.5 w-3 h-3 bg-white rounded-full transition-transform"
+                    :class="showSpecimens ? 'translate-x-4' : 'translate-x-0'"
+                  ></div>
+                </div>
+              </div>
+              <p class="text-[11px] text-slate-500 leading-relaxed group-hover:text-slate-400 transition-colors">
+                Show pre-loaded audio files for testing and algorithm verification.
+              </p>
+            </button>
+          </div>
+
+          <!-- Forensic Remote (Maintenance Mode) -->
+          <div class="space-y-4 pt-6 border-t border-white/5">
+            <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest px-1">Forensic Remote</h4>
+
+            <div class="opacity-50 cursor-not-allowed">
+              <div
+                class="w-full flex flex-col items-start p-4 rounded-xl border bg-slate-900/50 border-white/5 text-left"
+              >
+                <div class="flex items-center justify-between w-full mb-2">
+                  <span class="text-xs font-black uppercase tracking-widest text-slate-500">Remote URL Analysis</span>
+                  <div class="w-8 h-4 rounded-full relative bg-slate-800">
+                    <div class="absolute top-0.5 left-0.5 w-3 h-3 bg-slate-600 rounded-full"></div>
+                  </div>
+                </div>
+                <p class="text-[11px] text-slate-600 leading-relaxed">
+                  Analyze audio from YouTube or external URLs. (Currently Disabled)
+                </p>
+              </div>
+            </div>
+
+            <div
+              class="p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10 text-[11px] text-amber-500/80 italic leading-relaxed flex gap-3"
+            >
+              <span class="text-lg leading-none">⚠️</span>
+              <p>Remote analysis is currently undergoing maintenance to improve bot detection resilience. Use local file
+                uploads for the most reliable results.</p>
+            </div>
+          </div>
+        </div>
+      </template>
+    </LocalSettingsDrawer>
 
     <!-- Lab Interface -->
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -593,94 +662,34 @@ const exportAnalysis = () => {
 
         <!-- URL & Gallery Section (Cyan Theme) -->
         <div class="flex flex-col md:flex-row gap-6 items-stretch">
-          <div :class="[
-            'glass-container transition-all duration-500 overflow-hidden flex flex-col',
-            showSpecimens ? 'flex-[0.4]' : 'w-16'
-          ]">
-            <button
-              @click="showSpecimens = !showSpecimens"
-              class="w-full py-6 flex flex-col items-center justify-center hover:bg-white/5 transition-colors gap-3"
-              :title="showSpecimens ? 'Hide Specimens' : 'Show Specimens'"
-            >
-              <span
-                class="text-xl transition-transform duration-500"
-                :style="{ transform: showSpecimens ? 'rotate(180deg)' : 'rotate(0deg)' }"
-              >🧪</span>
-              <span
-                v-if=" showSpecimens "
-                class="text-[9px] font-black uppercase tracking-[0.2em] text-blue-500 animate-in fade-in slide-in-from-top-1"
-              >Specimens</span>
-              <span
-                v-else
-                class="text-[8px] font-black uppercase tracking-widest text-slate-600 vertical-text py-4"
-              >Gallery</span>
-            </button>
-
-            <div
-              v-if=" showSpecimens "
-              class="pb-8 animate-in fade-in zoom-in-95 duration-500"
-            >
-              <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-blue-500 mb-4 text-center">Sonic
+          <div
+            v-if=" showSpecimens "
+            class="glass-container flex-1 animate-in fade-in slide-in-from-bottom-4 duration-500"
+          >
+            <div class="p-8">
+              <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-blue-500 mb-6 text-center">Sonic
                 Specimens Gallery</h3>
-              <div class="grid grid-cols-1 md:grid-cols-2 gap-3 px-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                 <button
                   v-for=" specimen in SPECIMENS "
                   :key="specimen.name"
                   @click="loadSpecimen( specimen.url )"
-                  class="group p-3 rounded-2xl bg-white/5 border border-white/5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all text-left"
+                  class="group p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-blue-500/30 hover:bg-blue-500/5 transition-all text-left"
                 >
                   <p
-                    class="text-[9px] font-black text-white uppercase tracking-tight group-hover:text-blue-400 transition-colors">
+                    class="text-[10px] font-black text-white uppercase tracking-tight group-hover:text-blue-400 transition-colors">
                     {{ specimen.name }}
                   </p>
-                  <p class="text-[7px] font-mono text-slate-500 uppercase tracking-widest mt-1">{{ specimen.type }}</p>
+                  <p class="text-[8px] font-mono text-slate-500 uppercase tracking-widest mt-1">{{ specimen.type }}</p>
                 </button>
               </div>
-              <p class="text-[7px] text-slate-600 font-mono uppercase tracking-widest mt-4 px-4 text-center italic">
-                Testing requires CORS-enabled URLs. Private links may fail scanning.</p>
+              <p class="text-[8px] text-slate-600 font-mono uppercase tracking-widest mt-6 text-center italic">
+                Pre-selected samples for verifying forensic algorithms.
+              </p>
             </div>
           </div>
 
-          <!-- Remote Link Analysis (Primary) -->
-          <div
-            :class="['glass-container p-10 flex flex-col items-center justify-center gap-6', showSpecimens ? 'flex-[0.6]' : 'flex-1']"
-          >
-            <div
-              v-if=" error "
-              class="text-center text-red-500 text-[10px] font-black uppercase tracking-widest mb-2"
-            >{{ error }}</div>
-            <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-blue-500 mb-2">Remote Link Analysis</h3>
-            <div class="w-full flex gap-4 max-w-2xl px-12">
-              <input
-                v-model="urlInput"
-                type="text"
-                placeholder="Paste YouTube or MP3 URL..."
-                class="flex-1 bg-white/5 border border-white/10 rounded-2xl px-6 py-4 text-sm text-white focus:outline-none focus:border-blue-500 transition-colors"
-                @keyup.enter="analyzeUrl"
-              >
-              <div class="flex gap-2">
-                <button
-                  @click="analyzeUrl"
-                  class="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase italic tracking-tighter px-8 rounded-2xl transition-colors disabled:opacity-50"
-                  :disabled="!urlInput"
-                >
-                  Analyze
-                </button>
-                <button
-                  v-if=" urlInput "
-                  @click="clearUrl"
-                  class="bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white px-4 rounded-2xl transition-all border border-white/5"
-                  title="Clear Input"
-                >
-                  ✕
-                </button>
-              </div>
-            </div>
-            <p class="text-[9px] text-slate-500 font-mono uppercase tracking-[0.2em] italic">Direct YouTube links may
-              require a forensic proxy.</p>
-          </div>
-
-          <!-- Remote Link Analysis (Primary) -->
+          <!-- URL Analysis Hidden by User Request -->
         </div>
       </div>
 

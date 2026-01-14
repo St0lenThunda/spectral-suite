@@ -116,6 +116,32 @@ Shared audio processing library containing:
 
 MIT
 
+## 🚀 Cross-Platform TODO
+
+### Multi-Tool Layout
+- [ ] Implement split-screen layout (Tabbed Panels with Pin feature)
+- [ ] Allow users to run 2+ tools simultaneously (e.g., AuraTune + ChordForge)
+- [ ] Shared audio engine across tools (single mic stream)
+- [ ] Tool communication (pitch detection → chord analysis)
+
+### Audio Engine Enhancements
+- [ ] Per-tool audio settings (optional virtual routing)
+- [ ] Preset layouts for common tool combinations
+- [ ] Mobile-responsive accordion view for multi-tool
+
+### ChordForge Improvements
+- [ ] Expand voicing algorithm to include barre chords
+- [ ] Add "Export to Tab" feature for discovered voicings
+- [ ] Integrate with ChordCapture for real-time voicing suggestions
+
+### Practice Session Recorder (Killer Feature)
+- [ ] Auto-log detected chords, scales, and notes during practice sessions
+- [ ] Export practice data as "Musical Journal" (JSON/PDF/CSV)
+- [ ] Timeline visualization of practice session (what you played, when)
+- [ ] Progress tracking (chord vocabulary growth, scale mastery)
+- [ ] Integration with all tools (AuraTune, ChordForge, ScaleSleuth)
+
 ## 🤝 Contributing
+
 
 Contributions welcome! This is a modular, plug-and-play architecture - add new tools by creating folders in `apps/`.

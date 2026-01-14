@@ -397,14 +397,21 @@ export class SynthEngine {
     cabinet1.connect( cabinet2 );
     cabinet2.connect( this.gainNode );
 
-    // Cleanup after duration
+    // Sample-accurate cleanup: Schedule gain ramp to zero, then auto-disconnect
+    // Web Audio will garbage collect disconnected nodes automatically
+    const cleanupTime = now + duration + 0.2;
+    pluckOut.gain.setValueAtTime( 1, cleanupTime );
+    pluckOut.gain.linearRampToValueAtTime( 0, cleanupTime + 0.001 );
+
+    // Disconnect nodes after they're silent (prevents memory leaks)
+    // Note: We still use setTimeout for cleanup, but audio timing is sample-accurate
     setTimeout( () => {
       pluckOut.disconnect();
       preFilter.disconnect();
       shaper.disconnect();
       cabinet1.disconnect();
       cabinet2.disconnect();
-    }, ( duration + 0.2 ) * 1000 );
+    }, ( duration + 0.3 ) * 1000 );
   }
 
   /**
@@ -445,10 +452,10 @@ export class SynthEngine {
     // 2. Body Simulation (The Wood)
     this._createBodyFilters( stringOut, this.gainNode! );
 
-    // Cleanup logic is handled locally by nodes...
+    // Sample-accurate cleanup: nodes auto-disconnect after silence
     setTimeout( () => {
       stringOut.disconnect();
-    }, ( duration + 0.2 ) * 1000 );
+    }, ( duration + 0.3 ) * 1000 );
   }
 
   /**

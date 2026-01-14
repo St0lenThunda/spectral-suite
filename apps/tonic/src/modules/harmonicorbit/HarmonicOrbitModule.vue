@@ -23,6 +23,12 @@ import EngineSettings from '../../components/settings/EngineSettings.vue';
 const { openInfo } = useToolInfo();
 const { activate, deactivate } = useAudioEngine();
 
+// --- AUDIO ENGINE LIFECYCLE ---
+// Register as an audio consumer when component mounts,
+// unregister when it unmounts to manage the audio context efficiently
+onMounted( () => activate() );
+onUnmounted( () => deactivate() );
+
 // --- STATE MANAGEMENT ---
 
 const isSettingsOpen = ref( false );
@@ -446,14 +452,15 @@ onUnmounted( () => deactivate() );
             <text
               :x="375 + 300 * Math.cos( ( idx * 30 - 90 ) * Math.PI / 180 )"
               :y="375 + 300 * Math.sin( ( idx * 30 - 90 ) * Math.PI / 180 )"
-              class="text-[20px] font-black select-none pointer-events-none transition-all duration-300"
+              class="text-[25px] font-black select-none cursor-pointer transition-all duration-300"
               text-anchor="middle"
               dominant-baseline="middle"
               :style="{
                 fill: getSegmentStyle( key.major ).isFamily ? getSegmentStyle( key.major ).stroke : 'rgba(255,255,255,0.95)',
-                fontSize: selectedKeyIdx === idx && selectedType === 'major' ? '28px' : '22px',
+  fontSize: selectedKeyIdx === idx && selectedType === 'major' ? '35px' : '28px',
                 opacity: getSegmentStyle( key.major ).textOpacity
               }"
+              @click="handleSelection( idx, 'major' )"
             >
               {{ key.major }}
             </text>
@@ -479,7 +486,7 @@ onUnmounted( () => deactivate() );
               <text
                 :x="375 + 215 * Math.cos( ( idx * 30 - 100 ) * Math.PI / 180 )"
                 :y="375 + 215 * Math.sin( ( idx * 30 - 100 ) * Math.PI / 180 )"
-                class="text-[10px] font-bold select-none cursor-pointer"
+                class="text-[13px] font-bold select-none cursor-pointer"
                 :fill="getSegmentStyle( key.ii ).isFamily ? getSegmentStyle( key.ii ).stroke : 'rgba(255,255,255,0.85)'"
                 text-anchor="middle"
                 dominant-baseline="middle"
@@ -507,7 +514,7 @@ onUnmounted( () => deactivate() );
               <text
                 :x="375 + 215 * Math.cos( ( idx * 30 - 90 ) * Math.PI / 180 )"
                 :y="375 + 215 * Math.sin( ( idx * 30 - 90 ) * Math.PI / 180 )"
-                class="text-[10px] font-bold select-none cursor-pointer"
+                class="text-[13px] font-bold select-none cursor-pointer"
                 :fill="getSegmentStyle( key.iii ).isFamily ? getSegmentStyle( key.iii ).stroke : 'rgba(255,255,255,0.85)'"
                 text-anchor="middle"
                 dominant-baseline="middle"
@@ -535,7 +542,7 @@ onUnmounted( () => deactivate() );
               <text
                 :x="375 + 215 * Math.cos( ( idx * 30 - 80 ) * Math.PI / 180 )"
                 :y="375 + 215 * Math.sin( ( idx * 30 - 80 ) * Math.PI / 180 )"
-                class="text-[10px] font-bold select-none cursor-pointer"
+                class="text-[13px] font-bold select-none cursor-pointer"
                 :fill="getSegmentStyle( key.vi ).isFamily ? getSegmentStyle( key.vi ).stroke : 'rgba(255,255,255,0.85)'"
                 text-anchor="middle"
                 dominant-baseline="middle"
@@ -564,7 +571,7 @@ onUnmounted( () => deactivate() );
             <text
               :x="375 + 130 * Math.cos( ( idx * 30 - 90 ) * Math.PI / 180 )"
               :y="375 + 130 * Math.sin( ( idx * 30 - 90 ) * Math.PI / 180 )"
-              class="text-[12px] font-bold select-none cursor-pointer"
+              class="text-[15px] font-bold select-none cursor-pointer"
               text-anchor="middle"
               dominant-baseline="middle"
               :style="{
@@ -580,7 +587,7 @@ onUnmounted( () => deactivate() );
               v-if=" showDegrees && selectedKeyIdx !== null && ( idx === getNeighborIdx( selectedKeyIdx, -1 ) || idx === getNeighborIdx( selectedKeyIdx, 1 ) ) "
               :x="375 + 365 * Math.cos( ( idx * 30 - 90 ) * Math.PI / 180 )"
               :y="375 + 365 * Math.sin( ( idx * 30 - 90 ) * Math.PI / 180 )"
-              class="text-[12px] font-black uppercase tracking-widest pointer-events-none fill-indigo-400 animate-pulse"
+              class="text-[15px] font-black uppercase tracking-widest pointer-events-none fill-indigo-400 animate-pulse"
               text-anchor="middle"
               dominant-baseline="middle"
             >
@@ -656,42 +663,27 @@ onUnmounted( () => deactivate() );
             <!-- Anatomy Header -->
             <div class="flex justify-between items-start">
               <div>
-                <p class="text-[10px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-4">Key Family</p>
+                <p class="text-[13px] font-black text-indigo-400 uppercase tracking-[0.4em] mb-4">Key Family</p>
                 <div class="flex items-center gap-3 mb-2">
-                  <h3 class="text-4xl font-black text-slate-100 italic tracking-tighter">
-                    {{ 
-                      selectedType === 'major' ? activeKeys[selectedKeyIdx]!.major :
-                      selectedType === 'ii' ? activeKeys[selectedKeyIdx]!.ii :
-                      selectedType === 'iii' ? activeKeys[selectedKeyIdx]!.iii :
-                      selectedType === 'vi' ? activeKeys[selectedKeyIdx]!.vi :
-                      selectedType === 'minor' ? activeKeys[selectedKeyIdx]!.vi :
-                      activeKeys[selectedKeyIdx]!.dim
-                    }}
+                  <h3 class="text-5xl font-black text-slate-100 italic tracking-tighter">
+                    {{ activeKeys[selectedKeyIdx]!.major }}
                   </h3>
                   <!-- Key Signature Badge -->
                   <div
                     class="px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center gap-1"
                   >
-                    <span class="text-lg font-black text-indigo-400">
+                    <span class="text-2xl font-black text-indigo-400">
                       {{ activeKeys[selectedKeyIdx]!.signature === '0' ? '♮' : activeKeys[selectedKeyIdx]!.signature }}
                     </span>
-                    <span class="text-[8px] font-black text-slate-500 uppercase">
+                    <span class="text-[10px] font-black text-slate-500 uppercase">
                       {{ activeKeys[selectedKeyIdx]!.signature === '0' ? 'Natural' :
                         activeKeys[selectedKeyIdx]!.signature.includes( '♯' ) ? 'Sharp' + ( activeKeys[selectedKeyIdx]!.signature.charAt( 0 ) !== '1' ? 's' : '' ) :
                           'Flat' + ( activeKeys[selectedKeyIdx]!.signature.charAt( 0 ) !== '1' ? 's' : '' ) }}
                     </span>
                   </div>
                 </div>
-                <p class="text-[11px] text-slate-500 leading-relaxed italic">
-                  Notes and chords belonging to the house of
-                  {{ 
-                      selectedType === 'major' ? activeKeys[selectedKeyIdx]!.major :
-                      selectedType === 'ii' ? activeKeys[selectedKeyIdx]!.ii :
-                      selectedType === 'iii' ? activeKeys[selectedKeyIdx]!.iii :
-                      selectedType === 'vi' ? activeKeys[selectedKeyIdx]!.vi :
-                      selectedType === 'minor' ? activeKeys[selectedKeyIdx]!.vi :
-                      activeKeys[selectedKeyIdx]!.dim
-                    }}.
+                <p class="text-[14px] text-slate-500 leading-relaxed italic">
+                  Notes and chords belonging to the house of {{ activeKeys[selectedKeyIdx]!.major }} Major.
                 </p>
               </div>
 
@@ -771,7 +763,7 @@ onUnmounted( () => deactivate() );
                 </div>
                 <!-- Note Labels (F - A - C) -->
                 <p
-                  class="text-[12px] font-black tracking-[0.3em] text-indigo-400 uppercase bg-indigo-500/5 px-3 py-1 rounded-full border border-indigo-500/10">
+                  class="text-[15px] font-black tracking-[0.3em] text-indigo-400 uppercase bg-indigo-500/5 px-3 py-1 rounded-full border border-indigo-500/10">
                   {{ currentTriadNotes.join( ' - ' ) || '???' }}
                 </p>
               </div>
@@ -787,21 +779,21 @@ onUnmounted( () => deactivate() );
               >
                 <div class="flex items-center justify-between w-full">
                   <div
-                    class="w-8 h-8 rounded-lg bg-black/20 flex items-center justify-center font-black text-[10px]"
+                    class="w-8 h-8 rounded-lg bg-black/20 flex items-center justify-center font-black text-[13px]"
                     :class="chord.color"
                   >
                     {{ chord.degree }}
                   </div>
                   <div
-                    class="text-[8px] font-black uppercase"
+                    class="text-[10px] font-black uppercase"
                     :class="chord.color"
                   >
                     {{ chord.type }}
                   </div>
                 </div>
                 <div>
-                  <p class="text-[13px] font-black text-slate-100 italic leading-tight">{{ chord.name }}</p>
-                  <p class="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">{{ chord.desc }}</p>
+                  <p class="text-[16px] font-black text-slate-100 italic leading-tight">{{ chord.name }}</p>
+                  <p class="text-[10px] font-black text-slate-500 uppercase tracking-widest mt-1">{{ chord.desc }}</p>
                 </div>
               </div>
             </div>
@@ -809,8 +801,8 @@ onUnmounted( () => deactivate() );
             <div class="p-6 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 flex gap-4">
               <span class="text-2xl mt-1">💡</span>
               <div>
-                <h5 class="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1">Mentor Fact</h5>
-                <p class="text-[11px] text-slate-400 leading-relaxed">
+                <h5 class="text-[13px] font-black text-indigo-300 uppercase tracking-widest mb-1">Mentor Fact</h5>
+                <p class="text-[14px] text-slate-400 leading-relaxed">
                   {{ activeKeys[selectedKeyIdx]!.fact }}
                 </p>
               </div>

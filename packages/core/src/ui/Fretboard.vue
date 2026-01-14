@@ -35,8 +35,9 @@ const props = withDefaults( defineProps<Props>(), {
   labels: () => ( {} )
 } );
 
-// Standard 6-string guitar tuning in E Standard: E2, A2, D3, G3, B3, E4
-const strings = ['E', 'B', 'G', 'D', 'A', 'E'];
+// Standard 6-string guitar tuning: high e at top, low E at bottom
+// This matches how guitarists look down at their instrument
+const strings = ['e', 'B', 'G', 'D', 'A', 'E'];
 
 // The chromatic sequence used to calculate notes along a string
 const noteOrder = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
@@ -81,13 +82,46 @@ const getLabel = ( note: string ) => {
 
 /**
  * Calculates the note name for a specific fret on a specific string.
- * @param stringRoot - The open note of the string (e.g., "E")
+ * Uses MIDI-based calculation for accurate chromatic notes.
+ * @param stringRoot - The open note of the string (e.g., "E" or "e")
  * @param fret - The fret number (0 to 24)
  */
 const getNoteAt = ( stringRoot: string, fret: number ): string => {
-  const rootIndex = noteOrder.indexOf( stringRoot );
+  // Normalize string root (e and E are both E)
+  const normalizedRoot = stringRoot.toUpperCase();
+
+  // Map string roots to their MIDI octaves
+  // high e = E4, B = B3, G = G3, D = D3, A = A2, low E = E2
+  const stringOctaves: Record<string, number> = {
+    'E': stringRoot === 'e' ? 4 : 2, // Distinguish high e from low E
+    'B': 3,
+    'G': 3,
+    'D': 3,
+    'A': 2
+  };
+
+  // For high e (lowercase), use octave 4; for low E (uppercase), use octave 2
+  let octave: number;
+  if ( stringRoot === 'e' ) {
+    octave = 4;
+  } else if ( normalizedRoot === 'E' ) {
+    octave = 2;
+  } else {
+    octave = stringOctaves[normalizedRoot] || 3;
+  }
+
+  const openNote = `${normalizedRoot}${octave}`;
+  const openMidi = Note.midi( openNote );
+
+  if ( openMidi !== null ) {
+    const newNote = Note.fromMidi( openMidi + fret );
+    // Return just pitch class for display
+    return Note.pitchClass( newNote || '' ) || normalizedRoot;
+  }
+
+  // Fallback to old method
+  const rootIndex = noteOrder.indexOf( normalizedRoot );
   if ( rootIndex === -1 ) return '';
-  // Each fret is one semi-tone (one step in the noteOrder array)
   return noteOrder[( rootIndex + fret ) % 12]!;
 };
 

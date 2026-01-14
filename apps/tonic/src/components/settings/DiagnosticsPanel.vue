@@ -34,6 +34,38 @@ const healthLabel = {
   warning: 'Potential Issues',
   error: 'Critical Issues',
 };
+
+/**
+ * Quick Speaker Test
+ * Creates a standalone context to verify system output.
+ */
+const testSpeaker = () => {
+  console.log( '[Diagnostics] Testing Speaker...' );
+  try {
+    const ctx = new ( window.AudioContext || ( window as any ).webkitAudioContext )();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.connect( gain );
+    gain.connect( ctx.destination );
+
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime( 440, ctx.currentTime ); // A4
+    osc.frequency.linearRampToValueAtTime( 880, ctx.currentTime + 0.1 ); // Up Sweep
+
+    gain.gain.setValueAtTime( 0.5, ctx.currentTime );
+    gain.gain.exponentialRampToValueAtTime( 0.01, ctx.currentTime + 0.5 );
+
+    osc.start();
+    setTimeout( () => {
+      osc.stop();
+      ctx.close();
+    }, 500 );
+  } catch ( e ) {
+    console.error( '[Diagnostics] Speaker Test Failed:', e );
+    alert( 'Speaker Test Error: ' + e );
+  }
+};
 </script>
 
 <template>
@@ -147,6 +179,20 @@ const healthLabel = {
           <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Pro Mode</span>
         </div>
         <p class="text-xs text-white font-bold">{{ isProModeActive ? 'Enabled' : 'Disabled' }}</p>
+      </div>
+
+      <!-- Output Test (New) -->
+      <div
+        class="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/30 cursor-pointer hover:bg-indigo-500/20 transition-colors active:scale-95 group"
+        @click="testSpeaker"
+      >
+        <div class="flex items-center gap-2 mb-1">
+          <div class="w-2 h-2 rounded-full bg-indigo-400 group-hover:bg-white transition-colors"></div>
+          <span
+            class="text-[10px] font-black uppercase tracking-widest text-indigo-300 group-hover:text-white transition-colors"
+          >Output</span>
+        </div>
+        <p class="text-xs text-white font-bold">Test Speaker 🔊</p>
       </div>
     </div>
 

@@ -64,5 +64,12 @@ export const TOOL_METADATA: Record<string, ToolMetadata> = {
     practicalApplication: 'Master functional harmony by exploring chord relationships visually. See how ii-V-I progressions connect, understand chord substitutions, and learn key signatures at a glance. Perfect for songwriters needing quick chord family references and theory students learning the Circle of Fifths.',
     howItWorks: 'The Orbit renders 60 SVG text labels (12 Major + 36 Minor + 12 Dim) positioned on concentric rings. Only text labels are clickable (paths are decorative). Selection stores the specific chord type (ii/iii/vi) for accurate display. The Key Family is calculated using Circle of Fifths neighbor positions (IV = CCW, V = CW).'
   },
+  chordforge: {
+    id: 'chordforge',
+    name: 'Chord Forge',
+    whatAmISeeing: 'An interactive 6-string guitar fretboard spanning 15 frets. Tap any fret to place a finger, tap the nut (X/O) to mute or open strings. The detected chord name appears above, updating in real-time as you build shapes.',
+    instructions: '1. Tap frets on any string to place fingers.\n2. Tap X at the nut to mute a string, tap O to set it open.\n3. Watch the chord name update automatically above.\n4. Press "Strum" to hear your chord played via synth.\n5. Press "Clear" to reset the fretboard.',
+    practicalApplication: 'Experiment with voicings without picking up a guitar. Discover new chord shapes, test inversions, and learn how moving one note changes the chord quality. Perfect for songwriters and theory students.',
+    howItWorks: 'Uses Tonal.js Chord.detect() to identify chords from selected pitch classes. Each fret tap calculates the note using semitone transposition from the open string. Audio playback uses SynthEngine with staggered note starts for a strum effect.'
+  },
 };
-

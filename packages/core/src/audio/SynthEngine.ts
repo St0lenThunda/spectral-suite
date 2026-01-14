@@ -1,7 +1,7 @@
 import { Note } from 'tonal';
 import { AudioEngine } from './AudioEngine';
 
-export type TonePreset = 'RETRO' | 'PLUCKED' | 'ELECTRIC';
+export type TonePreset = 'RETRO' | 'PLUCKED' | 'ELECTRIC' | 'STEEL_STRING' | 'OVERDRIVE' | 'DISTORTION';
 
 /**
  * SynthEngine
@@ -10,8 +10,11 @@ export type TonePreset = 'RETRO' | 'PLUCKED' | 'ELECTRIC';
  * 
  * It supports multiple "Presets" (Synthesis Strategies):
  * 1. RETRO: Triangle wave (Gameboy/Chiptune style) - Original
- * 2. PLUCKED: Karplus-Strong String Synthesis (Guitar/Harp)
+ * 2. PLUCKED: Karplus-Strong String Synthesis (Nylon/Mellow Guitar)
  * 3. ELECTRIC: FM Synthesis (Rhodes/Bell style)
+ * 4. STEEL_STRING: Karplus-Strong with brighter filtering and longer sustain (Acoustic Guitar)
+ * 5. OVERDRIVE: Plucked string with soft-clipping waveshaper (Blues/Rock tone)
+ * 6. DISTORTION: Plucked string with heavy clipping and "cabinet" filtering (Metal/Lead tone)
  */
 export class SynthEngine {
   private static instance: SynthEngine;
@@ -21,8 +24,8 @@ export class SynthEngine {
   // Default to Retro
   private currentPreset: TonePreset = 'RETRO';
 
-  // Noise buffer for Karplus-Strong (Generated once)
-  private noiseBuffer: AudioBuffer | null = null;
+  // Excitation Buffers (Generated once)
+  private buffers: { [key: string]: AudioBuffer } = {};
 
   // Private constructor ensures only one instance is created (Singleton pattern).
   // This prevents multiple synth engines from fighting for audio hardware resources.
@@ -63,47 +66,95 @@ export class SynthEngine {
       return;
     }
 
-    this.context = currentContext;
+    // Use AudioEngine's context if available, otherwise create our own for output-only use
+    if ( currentContext ) {
+      this.context = currentContext;
+    } else if ( !this.context || this.context.state === 'closed' ) {
+      // Create a standalone context for output-only (no mic needed for synth playback)
+      this.context = new ( window.AudioContext || ( window as any ).webkitAudioContext )();
+    }
     if ( !this.context ) return;
 
     // Create the master gain node.
     // This allows us to control the volume of the entire synth globally.
     this.gainNode = this.context.createGain();
-    this.gainNode.connect( this.context.destination );
     this.gainNode.gain.value = 1.0;
 
-    // Pre-generate white noise for Karplus-Strong if needed.
-    // Why? Generating 2 seconds of random numbers every time a note plays is VERY slow.
-    // Optimization: We do it once here and reuse the buffer.
-    if ( !this.noiseBuffer ) {
-      const fontSize = this.context.sampleRate * 2.0; // 2 seconds of audio buffer
-      const buffer = this.context.createBuffer( 1, fontSize, this.context.sampleRate );
-      const data = buffer.getChannelData( 0 );
+    // Master Low Pass Filter (Removes digital harshness)
+    const masterFilter = this.context.createBiquadFilter();
+    masterFilter.type = 'lowpass';
+    masterFilter.frequency.value = 3500;
+    masterFilter.Q.value = 0.5;
 
-      // Fill the buffer with static (random noise between -1.0 and 1.0)
+    this.gainNode.connect( masterFilter );
+    masterFilter.connect( this.context.destination );
+
+    // Pre-generate colored noise buffers for Karplus-Strong
+    if ( !this.buffers['white'] ) {
+      const fontSize = this.context.sampleRate * 2.0; // 2 seconds
+
+      // 1. White Noise (Random)
+      const whiteBuffer = this.context.createBuffer( 1, fontSize, this.context.sampleRate );
+      const whiteData = whiteBuffer.getChannelData( 0 );
       for ( let i = 0; i < fontSize; i++ ) {
-        data[i] = Math.random() * 2 - 1;
+        whiteData[i] = Math.random() * 2 - 1;
       }
-      this.noiseBuffer = buffer;
+      this.buffers['white'] = whiteBuffer;
+
+      // 2. Pink Noise (1/f) - Paul Kellet's Refined Method
+      // Approx -3dB/octave. Great for steel strings (balanced).
+      const pinkBuffer = this.context.createBuffer( 1, fontSize, this.context.sampleRate );
+      const pinkData = pinkBuffer.getChannelData( 0 );
+      let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+      for ( let i = 0; i < fontSize; i++ ) {
+        const white = Math.random() * 2 - 1;
+        b0 = 0.99886 * b0 + white * 0.0555179;
+        b1 = 0.99332 * b1 + white * 0.0750759;
+        b2 = 0.96900 * b2 + white * 0.1538520;
+        b3 = 0.86650 * b3 + white * 0.3104856;
+        b4 = 0.55000 * b4 + white * 0.5329522;
+        b5 = -0.7616 * b5 - white * 0.0168980;
+        let value = b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362;
+        value *= 0.11; // Compensate for gain
+        pinkData[i] = value;
+        b6 = white * 0.115926;
+      }
+      this.buffers['pink'] = pinkBuffer;
+
+      // 3. Brown Noise (1/f^2)
+      // Integrate white noise. Deep and warm. Great for Nylon.
+      const brownBuffer = this.context.createBuffer( 1, fontSize, this.context.sampleRate );
+      const brownData = brownBuffer.getChannelData( 0 );
+      let lastOut = 0;
+      for ( let i = 0; i < fontSize; i++ ) {
+        const white = Math.random() * 2 - 1;
+        lastOut = ( lastOut + ( 0.02 * white ) ) / 1.02;
+        brownData[i] = lastOut * 3.5; // Compensate to unit gain
+      }
+      this.buffers['brown'] = brownBuffer;
     }
   }
 
   /**
    * Plays a single note at the specified frequency.
    */
-  public playNote ( frequency: number, durationMs: number = 300 ) {
+  public playNote ( frequency: number, durationMs: number = 300, volume: number = 0.25 ) {
     this.init();
-    if ( !this.context || !this.gainNode ) return;
+    if ( !this.context || !this.gainNode ) {
+      console.warn( '[SynthEngine] Context or GainNode missing!' );
+      return;
+    }
 
     if ( this.context.state === 'suspended' ) {
+      console.log( '[SynthEngine] Resuming context...' );
       this.context.resume();
     }
 
     const now = this.context.currentTime;
     const duration = durationMs / 1000;
 
-    // Dispatch to the correct voice generator (Volume 0.2 for single notes)
-    this._dispatchVoice( frequency, 0.2, duration, now );
+    // Dispatch to the correct voice generator
+    this._dispatchVoice( frequency, volume, duration, now );
   }
 
   /**
@@ -145,6 +196,15 @@ export class SynthEngine {
       case 'PLUCKED':
         this._playPluckedVoice( freq, volume, duration, now );
         break;
+      case 'STEEL_STRING':
+        this._playSteelStringVoice( freq, volume, duration, now );
+        break;
+      case 'OVERDRIVE':
+        this._playOverdriveVoice( freq, volume, duration, now );
+        break;
+      case 'DISTORTION':
+        this._playDistortionVoice( freq, volume, duration, now );
+        break;
       case 'ELECTRIC':
         this._playElectricVoice( freq, volume, duration, now );
         break;
@@ -158,11 +218,11 @@ export class SynthEngine {
   // --- VOICE ALGORITHMS ---
 
   /**
-   * 1. RETRO (Original)
-   * A simple Triangle wave with an ADSR envelope.
+   * 1. RETRO (Refined)
+   * A classic analog "Sawtooth" lead.
    * 
-   * "Subtractive" style (though simple): We start with a rich waveform (Triangle)
-   * and shape its volume over time.
+   * "Subtractive" style:
+   * We start with a bright Sawtooth wave and filter it down to make it warm and brassy.
    * 
    * @param freq - Pitch in Hz
    * @param volume - Target loudness (0.0 to 1.0)
@@ -170,185 +230,86 @@ export class SynthEngine {
    * @param now - Current AudioContext time
    */
   private _playRetroVoice ( freq: number, volume: number, duration: number, now: number ) {
-    // Oscillator is the source of sound (the vibrating string/air)
-    const osc = this.context!.createOscillator();
-    // GainNode is the volume knob (the envelope)
-    const env = this.context!.createGain();
+    if ( !this.context || !this.gainNode ) return;
+    const osc = this.context.createOscillator();
+    const env = this.context.createGain();
+    const filter = this.context.createBiquadFilter();
 
-    // Triangle waves sound "flutey" or "gameboy-like".
-    // They have odd harmonics that drop off quickly in volume.
-    osc.type = 'triangle';
+    // Change to Sawtooth for a richer, "vintage" sound
+    osc.type = 'sawtooth';
     osc.frequency.setValueAtTime( freq, now );
 
-    osc.connect( env );
-    env.connect( this.gainNode! );
+    // Low Pass Filter to remove harsh digital "buzz"
+    // We set it relatively low (2000Hz) with some resonance (Q) for character
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime( 2000, now );
+    filter.Q.value = 1.0;
 
-    // ADSR Envelope (Attack, Decay, Sustain, Release)
-    // We manually simulate the "shape" of a musical note.
-    const attack = 0.05; // 50ms fade in (removes "click" at start)
-    const release = 0.1; // 100ms fade out (natural ending)
+    // Routing: Osc -> Filter -> Envelope -> Master
+    osc.connect( filter );
+    filter.connect( env );
+    env.connect( this.gainNode );
 
-    // automation points to draw the volume curve
+    // Slower attack for a "Poly-Synth" feel
+    const attack = 0.08;
+    const release = 0.15;
+
     env.gain.setValueAtTime( 0, now );
-    env.gain.linearRampToValueAtTime( volume, now + attack ); // Fade In
-    env.gain.setValueAtTime( volume, now + duration - release ); // Sustain
-    env.gain.linearRampToValueAtTime( 0, now + duration ); // Fade Out
+    env.gain.linearRampToValueAtTime( volume * 0.8, now + attack ); // Slightly lower volume for saw
+    env.gain.setValueAtTime( volume * 0.8, now + duration - release );
+    env.gain.linearRampToValueAtTime( 0, now + duration );
 
     osc.start( now );
     osc.stop( now + duration );
   }
 
   /**
-   * 2. PLUCKED (Karplus-Strong Algorithm)
-   * Physically models a plucked string using a delay loop.
+   * 3. ELECTRIC (Refined FM Synthesis)
+   * Frequency Modulation (FM) simulates Electric Pianos (DX7 Style).
    * 
-   * The Physics:
-   * 1. A short burst of noise (the "pick" striking the string) travels down the string.
-   * 2. It hits the bridge and reflects back (Delay Loop).
-   * 3. The string material absorbs high frequencies every cycle (LowPass Filter).
-   * 4. This repeating, filtering loop turns noise into a pitched tone.
-   * 
-   * @param freq - The pitch of the string
-   * @param volume - Loudness
-   * @param duration - Length of the note
-   * @param now - Current time
-   */
-  private _playPluckedVoice ( freq: number, volume: number, duration: number, now: number ) {
-    if ( !this.noiseBuffer ) return;
-
-    // 1. Exciter (The Pick): A buffer source playing our pre-generated white noise
-    const source = this.context!.createBufferSource();
-    source.buffer = this.noiseBuffer;
-    source.loop = true;
-
-    // Create a very short "pluck" envelope for the noise.
-    // This GainNode determines how "hard" the string was plucked.
-    const inputGain = this.context!.createGain();
-
-    // The "Excitation Pulse".
-    // 10ms (0.01s) is a standard duration for a plectrum performing a pluck.
-    // Longer bursts sound like a bow or a scrap; shorter sounds like a tap.
-    const burstDuration = 0.01;
-
-    // 2. String Loop (The Physics Model)
-    // The delay node simulates the time it takes for the wave to travel down the string and back.
-    const delayNode = this.context!.createDelay();
-
-    // Delay Time Formula: Time = 1 / Frequency.
-    // Example: A 440Hz 'A' note repeats 440 times a second.
-    // So distinct pulses must be 1/440th of a second apart.
-    delayNode.delayTime.value = 1 / freq;
-
-    const feedbackGain = this.context!.createGain();
-    // Feedback simulates energy loss. 
-    // 0.99 means the string keeps 99% of its energy each cycle. 
-    // Lower values (0.9) sound like a "Banjo" (fast decay).
-    // Higher values (0.999) sound like a "Piano" (long sustain).
-    feedbackGain.gain.value = 0.99;
-
-    const lowPass = this.context!.createBiquadFilter();
-    lowPass.type = 'lowpass';
-    // Cutoff simulates the "brightness" of the string material.
-    // Nylon strings dampen highs quickly (lower cutoff); Steel strings ring longer (higher cutoff).
-    // 2000Hz is a good balanced value for a generic acoustic guitar.
-    lowPass.frequency.value = 2000;
-    lowPass.Q.value = 0; // No resonance peak, we want pure damping.
-
-    // Master Volume for this voice
-    const outGain = this.context!.createGain();
-    // Physical models can be quiet, so we boost the volume (x2.0) to match the other synths.
-    outGain.gain.value = volume * 2.0;
-
-    // Wiring The Loop:
-    // Noise -> InputGain -> Delay -> Output
-    source.connect( inputGain );
-    inputGain.connect( delayNode );
-
-    // The Feedback Loop: Delay -> Feedback -> Filter -> Back into Delay
-    delayNode.connect( feedbackGain );
-    feedbackGain.connect( lowPass );
-    lowPass.connect( delayNode );
-
-    // Output: Tapping the delay line to hear the sound
-    delayNode.connect( outGain );
-    outGain.connect( this.gainNode! );
-
-    // Shaping the "Pick" (Input Envelope)
-    inputGain.gain.setValueAtTime( 0, now );
-    inputGain.gain.linearRampToValueAtTime( 1, now + 0.001 ); // Instant attack
-    // Fast decay to silence. We only need the initial impulse to start the loop.
-    inputGain.gain.exponentialRampToValueAtTime( 0.001, now + burstDuration );
-
-    // Output Safety Envelope
-    // Even though the physics decay naturally, we force a silence at the end 
-    // to prevent any low-level feedback loops from running forever.
-    outGain.gain.setValueAtTime( volume * 2.0, now + duration - 0.1 );
-    outGain.gain.linearRampToValueAtTime( 0, now + duration );
-
-    source.start( now );
-    // Stop the noise source a bit later to catch any tail
-    source.stop( now + duration + 0.1 );
-  }
-
-  /**
-   * 3. ELECTRIC (FM Synthesis)
-   * Frequency Modulation (FM) simulates complex bell-like tones.
-   * 
-   * How it works:
-   * We have two oscillators.
-   * - Carrier: The main pitch we hear.
-   * - Modulator: Vibrates the CARRIER'S pitch very fast.
-   * 
-   * If the Modulator is fast enough, we don't hear "vibrato"—we hear a new "timbre" (tone color).
-   * This is how the famous Yamaha DX7 electric piano worked!
-   * 
+   * Changes:
+   * - Ratio 1:3 (Carrier:Modulator) creates clearer, bell-like harmonics.
+   * - Dynamic Modulation Index ensures consistency across low/high octaves.
+   *
    * @param freq - The note frequency
    * @param volume - Output volume
    * @param duration - Note length
    * @param now - AudioContext time
    */
   private _playElectricVoice ( freq: number, volume: number, duration: number, now: number ) {
-    const carrier = this.context!.createOscillator();
-    const modulator = this.context!.createOscillator();
+    if ( !this.context || !this.gainNode ) return;
+    const carrier = this.context.createOscillator();
+    const modulator = this.context.createOscillator();
+    const modGain = this.context.createGain();
+    const outGain = this.context.createGain();
 
-    // This gain controls "How much" the modulator affects the carrier.
-    // More gain = brighter, harsher metal sound.
-    // Less gain = softer, duller sine wave.
-    const modGain = this.context!.createGain();
-    const outGain = this.context!.createGain();
+    // Ratio 1:3 creates a "glassy" E-Piano tone
+    const ratio = 3.0;
 
-    // The C:M Ratio (Carrier to Modulator Ratio).
-    // Ratio 1:1 = Wood/Flute.
-    // Ratio 1:2 = Hollow square wave.
-    // Ratio 1:14 = Bells/Glockenspiel.
-    // A Ratio of 2.0 (plus slight detuning usually) creates a classic "Rhodes" electric piano tone.
-    const ratio = 2.0;
+    // Modulation Index should be relative to frequency for consistent timbre
+    // Index = Frequency * Intensity
+    const intensity = 2.0;
+    const maxIndex = freq * intensity;
 
     carrier.type = 'sine';
     carrier.frequency.value = freq;
 
     modulator.type = 'sine';
-    // The modulator runs at a harmonic multiple of the carrier
     modulator.frequency.value = freq * ratio;
 
-    // Wiring:
-    // Modulator -> ModGain -> Carrier's Frequency Parameter
     modulator.connect( modGain );
     modGain.connect( carrier.frequency );
 
-    // Carrier -> Out -> Speakers
     carrier.connect( outGain );
-    outGain.connect( this.gainNode! );
+    outGain.connect( this.gainNode );
 
-    // 1. Modulation Envelope (The "Timber" Envelope)
-    // We start with high modulation (bright "tine" hit) and fade to low modulation (warm tone).
-    // This mimics how a real tine vibrates strongly at first, then settles into a hum.
-    const modulationIndex = 300; // 300Hz deviation
+    // FM Envelope (The "Bite")
+    // High index at start (attack), decaying to low index (sustain)
     modGain.gain.setValueAtTime( 0, now );
-    modGain.gain.linearRampToValueAtTime( modulationIndex, now + 0.02 ); // Fast attack
-    modGain.gain.exponentialRampToValueAtTime( 1, now + 0.5 ); // Decay to almost pure sine
+    modGain.gain.linearRampToValueAtTime( maxIndex, now + 0.01 ); // Fast attack
+    modGain.gain.exponentialRampToValueAtTime( freq * 0.5, now + 0.3 ); // Decay to soft sine
 
-    // 2. Amplitude Envelope (The "Volume" Envelope)
+    // Amplitude Envelope
     outGain.gain.setValueAtTime( 0, now );
     outGain.gain.linearRampToValueAtTime( volume * 1.5, now + 0.02 );
     outGain.gain.setValueAtTime( volume * 1.5, now + duration - 0.1 );
@@ -356,8 +317,248 @@ export class SynthEngine {
 
     carrier.start( now );
     modulator.start( now );
-
     carrier.stop( now + duration );
     modulator.stop( now + duration );
+  }
+
+  /**
+   * 4. STEEL_STRING
+   * A variation of the Plucked algorithm optimized for metallic acoustic strings.
+   * 
+   * Changes:
+   * - Brighter LowPass filter (allows more harmonics).
+   * - Longer feedback (simulates more resonant steel).
+   */
+
+
+  /**
+   * 5. OVERDRIVE
+   * Simulates a guitar amp being pushed into "Crunch".
+   * 
+   * We take the Plucked voice and run it through a WaveShaperNode.
+   * Soft-clipping rounds off the peaks of the waveform, adding warmth.
+   */
+  private _playOverdriveVoice ( freq: number, volume: number, duration: number, now: number ) {
+    this._playDistortedVoice( freq, volume, duration, now, 3 );
+  }
+
+  /**
+   * 6. DISTORTION
+   * A "High-Gain" guitar tone. 
+   * 
+   * We use a much steeper clipping curve and a "Cabinet Simulation" filter.
+   * Real guitar cabinets don't play high frequencies well, so we cut them 
+   * off to avoid "fizzy" digital noise.
+   */
+  private _playDistortionVoice ( freq: number, volume: number, duration: number, now: number ) {
+    this._playDistortedVoice( freq, volume, duration, now, 12 );
+  }
+
+  /**
+   * Internal helper to handle distorted guitar voices.
+   * Uses a WaveShaper for "Distortion" and a BiquadFilter for "Cabinet Simulation".
+   */
+  private _playDistortedVoice ( freq: number, volume: number, duration: number, now: number, drive: number ) {
+    if ( !this.context || !this.gainNode ) return;
+
+    // Create the base sound (The String)
+    // RADICAL FIX: Cap feedback at 0.92 to prevent screech
+    const pluckOut = this.context.createGain();
+    this._createPluckSource( freq, volume, duration, now, 0.92, 1200, pluckOut, 'bright' );
+
+    // Pre-Distortion Filter (KEY FIX)
+    // Removing high frequencies *before* clipping prevents the "white noise" fizz.
+    const preFilter = this.context.createBiquadFilter();
+    preFilter.type = 'lowpass';
+    preFilter.frequency.value = 1000;
+    preFilter.Q.value = 0.5;
+
+    // 1. Distortion (The Pedals/Pre-amp)
+    const shaper = this.context.createWaveShaper();
+    shaper.curve = this._makeDistortionCurve( drive * 10 );
+    shaper.oversample = '4x'; // Reduces digital aliasing (harshness)
+
+    // 2. Cabinet Sim (The Speaker)
+    // Lowered cutoff to 1100Hz to simulate a heavy 4x12 cabinet
+    const cabinet1 = this.context.createBiquadFilter();
+    cabinet1.type = 'lowpass';
+    cabinet1.frequency.value = 1100;
+    cabinet1.Q.value = 0.7; // Standard Butterworth-style roll-off
+
+    const cabinet2 = this.context.createBiquadFilter();
+    cabinet2.type = 'lowpass';
+    cabinet2.frequency.value = 1320; // 1.2x tracking
+    cabinet2.Q.value = 0.5;
+
+    // Wiring: Pluck -> PreFilter -> Shaper -> Cab1 -> Cab2 -> Out
+    pluckOut.connect( preFilter );
+    preFilter.connect( shaper );
+    shaper.connect( cabinet1 );
+    cabinet1.connect( cabinet2 );
+    cabinet2.connect( this.gainNode );
+
+    // Cleanup after duration
+    setTimeout( () => {
+      pluckOut.disconnect();
+      preFilter.disconnect();
+      shaper.disconnect();
+      cabinet1.disconnect();
+      cabinet2.disconnect();
+    }, ( duration + 0.2 ) * 1000 );
+  }
+
+  /**
+   * Helper to generate a Sigmoid curve for the WaveShaper.
+   * This math "squashes" any signal that goes too high/low.
+   */
+  private _makeDistortionCurve ( amount: number ) {
+    const k = amount;
+    const n_samples = 44100;
+    const curve = new Float32Array( n_samples );
+
+    for ( let i = 0; i < n_samples; ++i ) {
+      const x = ( i * 2 ) / n_samples - 1;
+      // We use a smoother hyperbolic tangent-like curve to avoid harsh "digital" clipping
+      // this rounds off the waveform peaks instead of "squaring" them.
+      curve[i] = ( ( 3 + k ) * Math.atan( x * k ) ) / ( Math.PI + k * Math.abs( x ) );
+    }
+    return curve;
+  }
+
+  /**
+   * Internal reusable implementation of Plucked String (Karplus-Strong).
+   * Allows specific voices to override feedback and filtering.
+   */
+  private _playPluckedVoice (
+    freq: number,
+    volume: number,
+    duration: number,
+    now: number,
+    feedback: number = 0.88, // RADICAL FIX: 0.98 -> 0.88 (Dead dampening)
+    cutoff: number = 600,     // RADICAL FIX: 1800 -> 600 (Remove zing)
+    pluckColor: 'warm' | 'bright' = 'warm'
+  ) {
+    // 1. Create the Pluck Source (The String)
+    const stringOut = this.context!.createGain();
+    this._createPluckSource( freq, volume, duration, now, feedback, cutoff, stringOut, pluckColor );
+
+    // 2. Body Simulation (The Wood)
+    this._createBodyFilters( stringOut, this.gainNode! );
+
+    // Cleanup logic is handled locally by nodes...
+    setTimeout( () => {
+      stringOut.disconnect();
+    }, ( duration + 0.2 ) * 1000 );
+  }
+
+  /**
+   * 4. STEEL_STRING
+   * A variation of the Plucked algorithm optimized for metallic acoustic strings.
+   * 
+   * Changes:
+   * - RADICAL FIX: Feedback 0.92 (Control sustain), Cutoff 1200 (Warm it up).
+   */
+  private _playSteelStringVoice ( freq: number, volume: number, duration: number, now: number ) {
+    this._playPluckedVoice( freq, volume, duration, now, 0.92, 1200, 'bright' );
+  }
+
+  /**
+   * Creates a chain of filters to simulate the resonant body of a guitar.
+   * Enhances ~100Hz (Air cavity) and ~220Hz (Top plate).
+   */
+  private _createBodyFilters ( input: AudioNode, output: AudioNode ) {
+    if ( !this.context ) return;
+
+    const airFilter = this.context.createBiquadFilter();
+    airFilter.type = 'peaking';
+    airFilter.frequency.value = 110; // "Helmholtz" air resonance
+    airFilter.Q.value = 1.0;
+    airFilter.gain.value = 5.0; // Moderate boost
+
+    const topFilter = this.context.createBiquadFilter();
+    topFilter.type = 'peaking';
+    topFilter.frequency.value = 220; // Main top plate resonance
+    topFilter.Q.value = 1.2;
+    topFilter.gain.value = 3.0;
+
+    input.connect( airFilter );
+    airFilter.connect( topFilter );
+    topFilter.connect( output );
+  }
+
+  /**
+   * The actual implementation logic for the plucked string.
+   */
+  private _createPluckSource (
+    freq: number,
+    volume: number,
+    duration: number,
+    now: number,
+    feedback: number,
+    cutoff: number,
+    destination: AudioNode,
+    pluckColor: 'warm' | 'bright' = 'bright',
+    excitationType: 'white' | 'pink' | 'brown' = 'white'
+  ) {
+    if ( !this.buffers[excitationType] ) return;
+
+    const source = this.context!.createBufferSource();
+    source.buffer = this.buffers[excitationType];
+    source.loop = true;
+
+    // Filter the noise burst to simulate pick vs finger
+    // This "burst" is the initial transient sound (e.g., the plectrum hitting the string)
+    const burstFilter = this.context!.createBiquadFilter();
+
+    if ( pluckColor === 'warm' ) {
+      // Finger/Flesh: Dull attack, remove highs so it sounds rounder/thump-like
+      burstFilter.type = 'lowpass';
+      burstFilter.frequency.value = 2000;
+    } else {
+      // Pick/Nail: Sharp attack, remove mud (lows) so it sounds crisp
+      burstFilter.type = 'highpass';
+      burstFilter.frequency.value = 500;
+    }
+
+    const inputGain = this.context!.createGain();
+    const burstDuration = 0.01;
+
+    const delayNode = this.context!.createDelay();
+    delayNode.delayTime.value = 1 / freq;
+
+    const feedbackGain = this.context!.createGain();
+    feedbackGain.gain.value = feedback;
+
+    const lowPass = this.context!.createBiquadFilter();
+    lowPass.type = 'lowpass';
+    lowPass.frequency.value = cutoff;
+    lowPass.Q.value = 0;
+
+    const outGain = this.context!.createGain();
+    outGain.gain.value = volume * 2.0;
+
+    // Wiring: Source -> BurstFilter -> InputGain -> Karplus Loop
+    source.connect( burstFilter );
+    burstFilter.connect( inputGain );
+    inputGain.connect( delayNode );
+
+    // Karplus Loop
+    delayNode.connect( feedbackGain );
+    feedbackGain.connect( lowPass );
+    lowPass.connect( delayNode );
+
+    // Output
+    delayNode.connect( outGain );
+    outGain.connect( destination );
+
+    inputGain.gain.setValueAtTime( 0, now );
+    inputGain.gain.linearRampToValueAtTime( 1, now + 0.001 );
+    inputGain.gain.exponentialRampToValueAtTime( 0.001, now + burstDuration );
+
+    outGain.gain.setValueAtTime( volume * 2.0, now + duration - 0.1 );
+    outGain.gain.linearRampToValueAtTime( 0, now + duration );
+
+    source.start( now );
+    source.stop( now + duration + 0.1 );
   }
 }

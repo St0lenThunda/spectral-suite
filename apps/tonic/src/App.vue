@@ -7,6 +7,7 @@ import PocketEngineModule from './modules/pocketengine/PocketEngineModule.vue';
 import FrequencyFlowModule from './modules/frequencyflow/FrequencyFlowModule.vue';
 import TrackTracerModule from './modules/tracktracer/TrackTracerModule.vue';
 import HarmonicOrbitModule from './modules/harmonicorbit/HarmonicOrbitModule.vue';
+import ChordForgeModule from './modules/chordforge/ChordForgeModule.vue';
 import AcademyModule from './modules/academy/AcademyModule.vue';
 import LessonRunner from './modules/academy/LessonRunner.vue';
 import { type Lesson } from './modules/academy/lessons';
@@ -90,6 +91,13 @@ const ALL_TOOLS = [
     description: 'Explore the colorful world of Musical Families on the Harmony Wheel.',
     icon: '🎡',
     color: 'from-indigo-600 to-sky-500'
+  },
+  {
+    id: 'chordforge',
+    name: 'Chord Forge',
+    description: 'Build chords on an interactive fretboard. Discover voicings and hear your creations.',
+    icon: '⚒️',
+    color: 'from-amber-600 to-orange-500'
   }
 ]
 
@@ -101,6 +109,7 @@ const enabledTools = ref<Record<string, boolean>>( {
   frequencyflow: true,
   tracktracer: true,
   harmonicorbit: true,
+  chordforge: true,
   academy: false
 } )
 
@@ -298,6 +307,10 @@ const handleGainChange = ( event: Event ) => {
       />
       <HarmonicOrbitModule
         v-else-if=" currentModule === 'harmonicorbit' && enabledTools.harmonicorbit "
+        @back="currentModule = 'dashboard'"
+      />
+      <ChordForgeModule
+        v-else-if=" currentModule === 'chordforge' && enabledTools.chordforge "
         @back="currentModule = 'dashboard'"
       />
       <AcademyModule

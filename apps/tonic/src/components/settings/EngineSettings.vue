@@ -20,9 +20,9 @@ const synth = SynthEngine.getInstance();
 const currentPreset = ref<TonePreset>( synth.getPreset() );
 
 const presetOptions = [
-  { label: 'Retro', value: 'RETRO', icon: '⚡' },
-  { label: 'Plucked', value: 'PLUCKED', icon: '🎸' },
-  { label: 'Keys', value: 'ELECTRIC', icon: '🎹' }
+  { label: 'Electric', value: 'RETRO', icon: '⚡' },
+  { label: 'Nylon', value: 'ELECTRIC', icon: '🎸' },
+  // Hidden: PLUCKED, STEEL_STRING, OVERDRIVE, DISTORTION
 ];
 
 /**

@@ -342,51 +342,56 @@ watch( isInitialized, ( newVal ) => {
     >
       <template #General>
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div>
-            <button
-              @click="showPlayedNotes = !showPlayedNotes"
-              class="w-full px-4 py-3 rounded-xl font-black text-xs border transition-all text-left uppercase tracking-widest flex items-center justify-between"
-              :class="showPlayedNotes ? 'bg-sky-500/10 border-sky-400/30 text-sky-400' : 'bg-slate-900 border-white/5 text-slate-500'"
-            >
-              <span>Show Played Notes</span>
-              <div
-                class="w-2 h-2 rounded-full"
-                :class="showPlayedNotes ? 'bg-sky-400' : 'bg-slate-700'"
-              ></div>
-            </button>
-            <p class="text-[11px] text-slate-500 mt-2 leading-relaxed px-1">
-              Highlight all notes you have played on the fretboard since the last reset.
-            </p>
-          </div>
+          <div class="space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-white font-bold text-base">Show Played Notes</h3>
+                <p class="text-xs text-slate-500 uppercase tracking-widest font-mono">Input Detection</p>
+              </div>
+              <button
+                @click="showPlayedNotes = !showPlayedNotes"
+                class="w-12 h-6 rounded-full transition-colors relative"
+                :class="showPlayedNotes ? 'bg-sky-500' : 'bg-slate-700'"
+              >
+                <div
+                  class="w-4 h-4 rounded-full bg-white absolute top-1 transition-all"
+                  :class="showPlayedNotes ? 'right-1' : 'left-1'"
+                ></div>
+              </button>
+            </div>
 
-          <div>
-            <button
-              @click="showScaleNotes = !showScaleNotes"
-              class="w-full px-4 py-3 rounded-xl font-black text-xs border transition-all text-left uppercase tracking-widest flex items-center justify-between"
-              :class="showScaleNotes ? 'bg-emerald-500/10 border-emerald-400/30 text-emerald-400' : 'bg-slate-900 border-white/5 text-slate-500'"
-            >
-              <span>Show Scale Notes</span>
-              <div
-                class="w-2 h-2 rounded-full"
-                :class="showScaleNotes ? 'bg-emerald-400' : 'bg-slate-700'"
-              ></div>
-            </button>
-            <p class="text-[11px] text-slate-500 mt-2 leading-relaxed px-1">
-              Highlight the notes and patterns of the currently selected scale match.
-            </p>
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-white font-bold text-base">Show Scale Notes</h3>
+                <p class="text-xs text-slate-500 uppercase tracking-widest font-mono">Theoretical Pattern</p>
+              </div>
+              <button
+                @click="showScaleNotes = !showScaleNotes"
+                class="w-12 h-6 rounded-full transition-colors relative"
+                :class="showScaleNotes ? 'bg-emerald-500' : 'bg-slate-700'"
+              >
+                <div
+                  class="w-4 h-4 rounded-full bg-white absolute top-1 transition-all"
+                  :class="showScaleNotes ? 'right-1' : 'left-1'"
+                ></div>
+              </button>
+            </div>
           </div>
 
           <div class="md:col-span-2 border-t border-white/5 pt-6">
-            <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-white font-bold text-base">Enable CAGED Mode</h3>
+                <p class="text-xs text-slate-500 uppercase tracking-widest font-mono">Shape Isolation</p>
+              </div>
               <button
                 @click="showCAGED = !showCAGED"
-                class="px-4 py-3 rounded-xl font-black text-xs border transition-all text-left uppercase tracking-widest flex items-center justify-between gap-4"
-                :class="showCAGED ? 'bg-indigo-500/10 border-indigo-400/30 text-indigo-400' : 'bg-slate-900 border-white/5 text-slate-500'"
+                class="w-12 h-6 rounded-full transition-colors relative"
+                :class="showCAGED ? 'bg-indigo-500' : 'bg-slate-700'"
               >
-                <span>Enable CAGED Mode</span>
                 <div
-                  class="w-2 h-2 rounded-full"
-                  :class="showCAGED ? 'bg-indigo-400' : 'bg-slate-700'"
+                  class="w-4 h-4 rounded-full bg-white absolute top-1 transition-all"
+                  :class="showCAGED ? 'right-1' : 'left-1'"
                 ></div>
               </button>
             </div>

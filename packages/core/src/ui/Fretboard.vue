@@ -1,303 +1,601 @@
 <script setup lang="ts">
 /**
- * Fretboard Component
+ * Unified Fretboard Component
  * 
- * A high-precision visual representation of a guitar fretboard.
- * It maps musical notes onto a 24-fret matrix and supports multilayered 
- * highlighting for played notes, scale patterns, and audio playback.
+ * A high-precision, interactive SVG fretboard visualization.
+ * Supports multiple instruments, alternate tunings, and multi-layered highlighting.
+ * 
+ * Features:
+ * - Instrument modes: guitar (6 strings), bass (4 strings), bass5 (5 strings)
+ * - Tuning presets: standard, dropD, openG, halfStepDown, dadgad
+ * - Interactive mode for chord building (Chord Forge)
+ * - Highlight mode for scales/theory (Scale Sleuth, Chord Capture)
+ * - Compatibility layer for legacy note-based highlighting
+ * 
+ * @module ui/Fretboard.vue
  */
+
 import { computed } from 'vue';
 import { Note } from 'tonal';
 
-/**
- * Prop Definitions
- * 
- * @param activeNotes - Notes currently detected from the user's input (Sky Blue)
- * @param highlightNotes - Theoretical notes from a selected scale/mode (Emerald)
- * @param numFrets - The total number of frets to display (Standard Pro = 24)
- * @param labels - Dictionary mapping notes to custom text (e.g., Roman Numerals)
- * @param fretRange - [start, end] tuple to visually isolate a specific area (CAGED)
- * @param playbackNote - The note currently being played by the SynthEngine (Amber)
- */
+// ============================================================================
+// INSTRUMENT & TUNING CONFIGURATIONS
+// ============================================================================
+
+type InstrumentType = 'guitar' | 'bass' | 'bass5';
+type TuningPreset = 'standard' | 'dropD' | 'openG' | 'halfStepDown' | 'dadgad';
+
+interface StringConfig {
+  string: number;
+  note: string;
+  octave: number;
+  label: string;
+}
+
+const INSTRUMENT_CONFIGS: Record<InstrumentType, {
+  defaultFrets: number;
+  tunings: Record<string, StringConfig[]>;
+}> = {
+  guitar: {
+    defaultFrets: 24,
+    tunings: {
+      standard: [
+        { string: 1, note: 'E', octave: 4, label: 'e' },
+        { string: 2, note: 'B', octave: 3, label: 'B' },
+        { string: 3, note: 'G', octave: 3, label: 'G' },
+        { string: 4, note: 'D', octave: 3, label: 'D' },
+        { string: 5, note: 'A', octave: 2, label: 'A' },
+        { string: 6, note: 'E', octave: 2, label: 'E' }
+      ],
+      dropD: [
+        { string: 1, note: 'E', octave: 4, label: 'e' },
+        { string: 2, note: 'B', octave: 3, label: 'B' },
+        { string: 3, note: 'G', octave: 3, label: 'G' },
+        { string: 4, note: 'D', octave: 3, label: 'D' },
+        { string: 5, note: 'A', octave: 2, label: 'A' },
+        { string: 6, note: 'D', octave: 2, label: 'D' }
+      ],
+      openG: [
+        { string: 1, note: 'D', octave: 4, label: 'd' },
+        { string: 2, note: 'B', octave: 3, label: 'B' },
+        { string: 3, note: 'G', octave: 3, label: 'G' },
+        { string: 4, note: 'D', octave: 3, label: 'D' },
+        { string: 5, note: 'G', octave: 2, label: 'G' },
+        { string: 6, note: 'D', octave: 2, label: 'D' }
+      ],
+      halfStepDown: [
+        { string: 1, note: 'Eb', octave: 4, label: 'eb' },
+        { string: 2, note: 'Bb', octave: 3, label: 'Bb' },
+        { string: 3, note: 'Gb', octave: 3, label: 'Gb' },
+        { string: 4, note: 'Db', octave: 3, label: 'Db' },
+        { string: 5, note: 'Ab', octave: 2, label: 'Ab' },
+        { string: 6, note: 'Eb', octave: 2, label: 'Eb' }
+      ],
+      dadgad: [
+        { string: 1, note: 'D', octave: 4, label: 'd' },
+        { string: 2, note: 'A', octave: 3, label: 'A' },
+        { string: 3, note: 'G', octave: 3, label: 'G' },
+        { string: 4, note: 'D', octave: 3, label: 'D' },
+        { string: 5, note: 'A', octave: 2, label: 'A' },
+        { string: 6, note: 'D', octave: 2, label: 'D' }
+      ]
+    }
+  },
+  bass: {
+    defaultFrets: 20,
+    tunings: {
+      standard: [
+        { string: 1, note: 'G', octave: 2, label: 'G' },
+        { string: 2, note: 'D', octave: 2, label: 'D' },
+        { string: 3, note: 'A', octave: 1, label: 'A' },
+        { string: 4, note: 'E', octave: 1, label: 'E' }
+      ],
+      dropD: [
+        { string: 1, note: 'G', octave: 2, label: 'G' },
+        { string: 2, note: 'D', octave: 2, label: 'D' },
+        { string: 3, note: 'A', octave: 1, label: 'A' },
+        { string: 4, note: 'D', octave: 1, label: 'D' }
+      ]
+    }
+  },
+  bass5: {
+    defaultFrets: 20,
+    tunings: {
+      standard: [
+        { string: 1, note: 'G', octave: 2, label: 'G' },
+        { string: 2, note: 'D', octave: 2, label: 'D' },
+        { string: 3, note: 'A', octave: 1, label: 'A' },
+        { string: 4, note: 'E', octave: 1, label: 'E' },
+        { string: 5, note: 'B', octave: 0, label: 'B' }
+      ]
+    }
+  }
+};
+
+// ============================================================================
+// PROPS DEFINITION
+// ============================================================================
+
 interface Props {
+  // --- New Core / Chord Forge Props ---
+  instrument?: InstrumentType;
+  tuningPreset?: TuningPreset;
+  frets?: number;
+  selectedFrets?: Record<number, number | null>;
+  interactive?: boolean;
+  highlights?: Array<{ string: number; fret: number; color?: string }>;
+
+  // --- Legacy Compatibility Props ---
   activeNotes?: string[];
   highlightNotes?: string[];
-  numFrets?: number;
   labels?: Record<string, string>;
   fretRange?: [number, number];
   playbackNote?: string;
+  numFrets?: number;
 }
 
 const props = withDefaults( defineProps<Props>(), {
+  instrument: 'guitar',
+  tuningPreset: 'standard',
+  selectedFrets: () => ( {} ),
+  interactive: true,
+  highlights: () => [],
   activeNotes: () => [],
   highlightNotes: () => [],
-  numFrets: 24,
-  labels: () => ( {} )
+  labels: () => ( {} ),
+  numFrets: undefined
 } );
 
-// Standard 6-string guitar tuning: high e at top, low E at bottom
-// This matches how guitarists look down at their instrument
-const strings = ['e', 'B', 'G', 'D', 'A', 'E'];
+// ============================================================================
+// EMITS DEFINITION
+// ============================================================================
 
-// The chromatic sequence used to calculate notes along a string
-const noteOrder = ['C', 'C#', 'D', 'Eb', 'E', 'F', 'F#', 'G', 'Ab', 'A', 'Bb', 'B'];
+const emit = defineEmits<{
+  ( e: 'fretClick', stringNum: number, fret: number ): void;
+  ( e: 'nutClick', stringNum: number ): void;
+}>();
 
-/**
- * Fretboard Geography:
- * Fret markers (the dots) are traditionally placed on odd frets,
- * with double dots at the 12th and 24th frets (the octaves).
- */
-const fretMarkers = [3, 5, 7, 9, 12, 15, 17, 19, 21, 23, 24];
-const doubleDotFrets = [12, 24];
+// ============================================================================
+// COMPUTED - INSTRUMENT CONFIGURATION
+// ============================================================================
 
-/**
- * We use computed sets for "Chromas" (pitch classes 0-11).
- * This ensures that "C#" and "Db" are treated as the same visual note
- * on the fretboard (Enharmonic equivalence).
- */
-const activeChromas = computed( () => new Set( props.activeNotes.map( n => Note.chroma( n ) ) ) );
-const highlightChromas = computed( () => new Set( props.highlightNotes.map( n => Note.chroma( n ) ) ) );
+const instrumentConfig = computed( () => INSTRUMENT_CONFIGS[props.instrument] );
 
-// --- Helper Functions for Styling ---
+const currentTuning = computed( () => {
+  const config = instrumentConfig.value;
+  const tuning = config.tunings[props.tuningPreset];
+  return tuning || config.tunings.standard || [];
+} );
 
-const isNoteActive = ( note: string ) => activeChromas.value.has( Note.chroma( note ) );
-const isNoteHighlighted = ( note: string ) => highlightChromas.value.has( Note.chroma( note ) );
+const fretCount = computed( () => {
+  return props.frets ?? props.numFrets ?? instrumentConfig.value.defaultFrets;
+} );
 
-// PlaybackNote has the highest priority and uses the Amber glow
-const isPlaybackNote = ( note: string ) => props.playbackNote && Note.chroma( note ) === Note.chroma( props.playbackNote );
+const stringCount = computed( () => currentTuning.value?.length || 6 );
 
-// Special check for open strings (Fret 0)
-const isOpenActive = ( stringRoot: string ) => isNoteActive( getNoteAt( stringRoot, 0 ) );
-const isOpenHighlighted = ( stringRoot: string ) => isNoteHighlighted( getNoteAt( stringRoot, 0 ) );
+// ============================================================================
+// COMPATIBILITY LAYER - NOTE PROCESSING
+// ============================================================================
 
 /**
- * Resolves the text to display inside a note bubble.
- * If a custom label (like a Roman Numeral) is provided, we use that.
+ * Enhanced matching logic:
+ * We convert note names to Chromas (0-11) to handle enharmonic equivalence (C# == Db).
  */
-const getLabel = ( note: string ) => {
-  const chroma = Note.chroma( note );
+const activeChromas = computed( () => {
+  const notes = props.activeNotes || [];
+  const chromas = notes
+    .map( n => Note.get( n ).pc ) // Get Pitch Class (e.g. "C#")
+    .filter( ( pc ): pc is string => !!pc )
+    .map( pc => Note.chroma( pc ) ) // Get Chroma index (0-11)
+    .filter( ( c ): c is number => c !== undefined && c !== null );
+  return new Set( chromas );
+} );
+
+const highlightChromas = computed( () => {
+  const notes = props.highlightNotes || [];
+  const chromas = notes
+    .map( n => Note.get( n ).pc )
+    .filter( ( pc ): pc is string => !!pc )
+    .map( pc => Note.chroma( pc ) )
+    .filter( ( c ): c is number => c !== undefined && c !== null );
+  return new Set( chromas );
+} );
+
+/**
+ * Resolves the display label for a note (supports custom mapping from 'labels' prop).
+ */
+const getLabel = ( noteName: string ) => {
+  const chroma = Note.chroma( noteName );
   const labelKey = Object.keys( props.labels ).find( k => Note.chroma( k ) === chroma );
-  return ( labelKey && props.labels[labelKey] ) ? props.labels[labelKey] : note;
+  return ( labelKey && props.labels[labelKey] ) ? props.labels[labelKey] : Note.pitchClass( noteName );
 };
 
+// ============================================================================
+// CONSTANTS - SVG DIMENSIONS
+// ============================================================================
+
+const FRETBOARD_WIDTH = 800;
+const NUT_WIDTH = 40;
+const STRING_SPACING = 30;
+const FIRST_STRING_Y = 25;
+
+const FRETBOARD_HEIGHT = computed( () => {
+  return FIRST_STRING_Y + ( stringCount.value - 1 ) * STRING_SPACING + 30;
+} );
+
+const fretMarkers = computed( () => {
+  const markers = [3, 5, 7, 9, 12, 15, 17, 19, 21, 24];
+  return markers.filter( f => f <= fretCount.value );
+} );
+
+const fretLabels = computed( () => {
+  const labels = [1, 3, 5, 7, 9, 12, 15, 17, 19, 21, 24];
+  return labels.filter( f => f <= fretCount.value );
+} );
+
+// ============================================================================
+// METHODS - NOTE CALCULATION
+// ============================================================================
+
 /**
- * Calculates the note name for a specific fret on a specific string.
- * Uses MIDI-based calculation for accurate chromatic notes.
- * @param stringRoot - The open note of the string (e.g., "E" or "e")
- * @param fret - The fret number (0 to 24)
+ * Calculates the note at a specific fret and string.
  */
-const getNoteAt = ( stringRoot: string, fret: number ): string => {
-  // Normalize string root (e and E are both E)
-  const normalizedRoot = stringRoot.toUpperCase();
+const getNoteAtFret = ( stringNum: number, fret: number ): string => {
+  const tuning = currentTuning.value;
+  if ( !tuning ) return '';
+  const stringInfo = tuning.find( s => s.string === stringNum );
+  if ( !stringInfo ) return '';
 
-  // Map string roots to their MIDI octaves
-  // high e = E4, B = B3, G = G3, D = D3, A = A2, low E = E2
-  const stringOctaves: Record<string, number> = {
-    'E': stringRoot === 'e' ? 4 : 2, // Distinguish high e from low E
-    'B': 3,
-    'G': 3,
-    'D': 3,
-    'A': 2
-  };
-
-  // For high e (lowercase), use octave 4; for low E (uppercase), use octave 2
-  let octave: number;
-  if ( stringRoot === 'e' ) {
-    octave = 4;
-  } else if ( normalizedRoot === 'E' ) {
-    octave = 2;
-  } else {
-    octave = stringOctaves[normalizedRoot] || 3;
-  }
-
-  const openNote = `${normalizedRoot}${octave}`;
+  const openNote = `${stringInfo.note}${stringInfo.octave}`;
   const openMidi = Note.midi( openNote );
 
   if ( openMidi !== null ) {
-    const newNote = Note.fromMidi( openMidi + fret );
-    // Return just pitch class for display
-    return Note.pitchClass( newNote || '' ) || normalizedRoot;
+    return Note.fromMidi( openMidi + fret ) || openNote;
   }
 
-  // Fallback to old method
-  const rootIndex = noteOrder.indexOf( normalizedRoot );
-  if ( rootIndex === -1 ) return '';
-  return noteOrder[( rootIndex + fret ) % 12]!;
+  return openNote;
 };
 
-/**
- * Isolation Filter:
- * Checks if a fret is within the active CAGED range.
- */
+// ============================================================================
+// HELPER METHODS - STYLING & FILTERING
+// ============================================================================
+
 const isInsideRange = ( fret: number ) => {
-  if ( !props.fretRange ) return true; // No range = show everything
+  if ( !props.fretRange ) return true;
   const [min, max] = props.fretRange;
   return fret >= min && fret <= max;
+};
+
+const getHighlightStyle = ( stringNum: number, fret: number ) => {
+  const note = getNoteAtFret( stringNum, fret );
+  const chroma = Note.chroma( note );
+
+  // 1. Playback Note (Amber Glow)
+  if ( props.playbackNote && Note.chroma( props.playbackNote ) === chroma && isInsideRange( fret ) ) {
+    return {
+      classes: 'fill-amber-400 stroke-amber-100',
+      style: { filter: 'url(#glow-amber)' }
+    };
+  }
+
+  // 2. Manual highlights array (ChordForge Alt Voicings)
+  // We prioritize this over "selection" so that alt-voicings keep their Rose/Cyan/Emerald colors
+  const manual = props.highlights?.find( h => h.string === stringNum && h.fret === fret );
+  if ( manual ) {
+    const isHex = manual.color?.startsWith( '#' );
+    return {
+      classes: isHex ? 'stroke-white/50' : ( manual.color || 'fill-indigo-500/50 stroke-indigo-300/50' ),
+      style: isHex ? { fill: manual.color } : {}
+    };
+  }
+
+  // 3. Selection from Chord Forge (Amber Solid)
+  if ( props.selectedFrets[stringNum] === fret ) {
+    return {
+      classes: 'fill-amber-500 stroke-amber-200',
+      style: {}
+    };
+  }
+
+  // 4. Active Note from compatibility prop (Sky Blue)
+  // We show active (played) notes everywhere for better feedback, ignoring range
+  if ( activeChromas.value.has( chroma ) ) {
+    return {
+      classes: 'fill-sky-500 stroke-sky-200',
+      style: { filter: 'url(#glow-sky)' }
+    };
+  }
+
+  // 5. Highlight Note from compatibility prop (Emerald / Scale Suggestions)
+  // These stay within the range (e.g. CAGED shapes)
+  if ( highlightChromas.value.has( chroma ) && isInsideRange( fret ) ) {
+    return {
+      classes: 'fill-emerald-600 stroke-emerald-300',
+      style: {}
+    };
+  }
+
+  return null;
+};
+
+const getFretX = ( fret: number ): number => {
+  if ( fret === 0 ) return NUT_WIDTH / 2;
+  const fretWidth = ( FRETBOARD_WIDTH - NUT_WIDTH ) / fretCount.value;
+  return NUT_WIDTH + ( fret - 0.5 ) * fretWidth;
+};
+
+const getStringY = ( stringNum: number ): number => {
+  const tuning = currentTuning.value;
+  if ( !tuning ) return FIRST_STRING_Y;
+  const stringIndex = tuning.findIndex( s => s.string === stringNum );
+  if ( stringIndex === -1 ) return FIRST_STRING_Y;
+  return FIRST_STRING_Y + stringIndex * STRING_SPACING;
+};
+
+// ============================================================================
+// METHODS - INTERACTION
+// ============================================================================
+
+const handleFretAction = ( stringNum: number, fret: number ) => {
+  if ( props.interactive ) {
+    emit( 'fretClick', stringNum, fret );
+  }
+};
+
+const handleNutAction = ( stringNum: number ) => {
+  if ( props.interactive ) {
+    emit( 'nutClick', stringNum );
+  }
 };
 </script>
 
 <template>
-  <div class="bg-slate-900 p-12 rounded-2xl border border-slate-700 overflow-x-auto overflow-y-hidden">
-    <!-- Fretboard Container -->
-    <div
-      class="relative inline-block bg-slate-800 rounded-lg p-4 border-2 border-slate-700"
-      :style="{ width: ( numFrets * 54 + 40 ) + 'px', minHeight: '340px' }"
+  <div class="fretboard-container overflow-x-auto p-4 bg-slate-950 rounded-2xl border border-slate-800">
+    <svg
+      :viewBox="`0 0 ${FRETBOARD_WIDTH} ${FRETBOARD_HEIGHT}`"
+      class="w-full min-w-[600px] h-auto"
+      preserveAspectRatio="xMidYMid meet"
     >
-      <!-- Fret numbers row - NOW INSIDE THE BOARD -->
-      <div class="flex mb-4 relative z-40">
-        <div
-          v-for=" fret in numFrets "
-          :key="'fret-num-' + fret"
-          class="text-center text-[10px] font-mono font-black"
-          :class="fretMarkers.includes( fret ) ? 'text-sky-400' : 'text-slate-600'"
-          style="width: 54px;"
+      <!-- Wood Texture Background -->
+      <rect
+        :x="NUT_WIDTH"
+        y="0"
+        :width="FRETBOARD_WIDTH - NUT_WIDTH"
+        :height="FRETBOARD_HEIGHT"
+        fill="url(#fretboardGrain)"
+        rx="4"
+      />
+
+      <defs>
+        <linearGradient
+          id="fretboardGrain"
+          x1="0%"
+          y1="0%"
+          x2="0%"
+          y2="100%"
         >
-          {{ fret }}
-        </div>
-      </div>
+          <stop
+            offset="0%"
+            stop-color="#2d2218"
+          />
+          <stop
+            offset="50%"
+            stop-color="#1a140f"
+          />
+          <stop
+            offset="100%"
+            stop-color="#2d2218"
+          />
+        </linearGradient>
 
-      <!-- Nut (left edge) - Aligned to padding -->
-      <div
-        class="absolute top-16 bottom-4 bg-slate-100 rounded-sm z-30"
-        style="left: 16px; width: 4px; box-shadow: 0 0 10px rgba(255,255,255,0.5);"
-      ></div>
-
-      <!-- Fret wires (vertical) -->
-      <div
-        v-for=" fret in numFrets "
-        :key="'fret-wire-' + fret"
-        class="absolute top-16 bottom-4 z-20"
-        :style="{
-          left: ( 16 + fret * 54 ) + 'px',
-  width: '3px',
-  background: '#e2e8f0',
-  boxShadow: '0 0 4px rgba(255,255,255,0.2)'
-        }"
-      ></div>
-
-      <!-- Fret marker dots -->
-      <div class="absolute inset-0 flex items-center pointer-events-none z-10">
-        <div
-          v-for=" fret in numFrets "
-          :key="'marker-' + fret"
-          class="absolute flex items-center justify-center h-full"
-          :style="{ left: ( 16 + ( fret - 1 ) * 54 ) + 'px', width: '54px' }"
+        <filter
+          id="glow-amber"
+          x="-50%"
+          y="-50%"
+          width="200%"
+          height="200%"
         >
-          <!-- Single dot -->
-          <div v-if=" fretMarkers.includes( fret ) && !doubleDotFrets.includes( fret ) ">
-            <div class="w-5 h-5 rounded-full bg-slate-500 shadow-inner"></div>
-          </div>
-          <!-- Double dots -->
-          <div
-            v-if=" doubleDotFrets.includes( fret ) "
-            class="flex flex-col gap-24"
+          <feGaussianBlur
+            stdDeviation="3"
+            result="blur"
+          />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter
+          id="glow-sky"
+          x="-50%"
+          y="-50%"
+          width="200%"
+          height="200%"
+        >
+          <feGaussianBlur
+            stdDeviation="3"
+            result="blur"
+          />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      <!-- Nut -->
+      <rect
+        x="0"
+        y="0"
+        :width="NUT_WIDTH"
+        :height="FRETBOARD_HEIGHT"
+        fill="#f5f5f5"
+        rx="2"
+      />
+
+      <!-- Fret Wires -->
+      <line
+        v-for=" fret in fretCount "
+        :key="`wire-${fret}`"
+        :x1="NUT_WIDTH + ( fret * ( ( FRETBOARD_WIDTH - NUT_WIDTH ) / fretCount ) )"
+        y1="0"
+        :x2="NUT_WIDTH + ( fret * ( ( FRETBOARD_WIDTH - NUT_WIDTH ) / fretCount ) )"
+        :y2="FRETBOARD_HEIGHT"
+        stroke="#71717a"
+        stroke-width="2"
+      />
+
+      <!-- Fret Markers -->
+      <circle
+        v-for=" fret in fretMarkers.filter( f => f !== 12 && f !== 24 ) "
+        :key="`marker-${fret}`"
+        :cx="getFretX( fret )"
+        :cy="FRETBOARD_HEIGHT / 2"
+        r="6"
+        fill="rgba(255,255,255,0.1)"
+      />
+
+      <!-- Double Dots -->
+      <template
+        v-for=" fret in [12, 24].filter( f => f <= fretCount ) "
+        :key="`dbl-${fret}`"
+      >
+        <circle
+          :cx="getFretX( fret )"
+          :cy="FRETBOARD_HEIGHT / 2 - 25"
+          r="6"
+          fill="rgba(255,255,255,0.1)"
+        />
+        <circle
+          :cx="getFretX( fret )"
+          :cy="FRETBOARD_HEIGHT / 2 + 25"
+          r="6"
+          fill="rgba(255,255,255,0.1)"
+        />
+      </template>
+
+      <!-- Strings (Back) -->
+      <line
+        v-for=" ( string, idx ) in currentTuning "
+        :key="`s-back-${string.string}`"
+        x1="0"
+        :y1="getStringY( string.string )"
+        :x2="FRETBOARD_WIDTH"
+        :y2="getStringY( string.string )"
+        :stroke="idx > ( stringCount / 2 ) ? '#fbbf24' : '#a1a1aa'"
+        :stroke-width="1 + ( idx * 0.4 )"
+        opacity="0.3"
+      />
+
+      <!-- Note Positions & Interaction Zones -->
+      <g
+        v-for=" string in currentTuning "
+        :key="`notes-${string.string}`"
+      >
+        <!-- Nut Interaction & Highlight -->
+        <g
+          @click="handleNutAction( string.string )"
+          class="cursor-pointer"
+        >
+          <!-- Highlight Circle for Open String -->
+          <circle
+            v-if=" getHighlightStyle( string.string, 0 ) "
+            :cx="NUT_WIDTH / 2"
+            :cy="getStringY( string.string )"
+            r="10"
+            class="stroke-2 transition-all duration-300"
+            :class="getHighlightStyle( string.string, 0 )?.classes"
+            :style="getHighlightStyle( string.string, 0 )?.style"
+          />
+          <!-- X/O or Note Name if highlighted -->
+          <text
+            :x="NUT_WIDTH / 2"
+            :y="getStringY( string.string ) + 5"
+            text-anchor="middle"
+            class="text-[14px] font-black select-none transition-colors"
+            :fill="getHighlightStyle( string.string, 0 )
+              ? '#ffffff'
+              : ( selectedFrets[string.string] === null || selectedFrets[string.string] === undefined ? '#ef4444' : '#22c55e' )"
           >
-            <div class="w-5 h-5 rounded-full bg-slate-500 shadow-inner"></div>
-            <div class="w-5 h-5 rounded-full bg-slate-500 shadow-inner"></div>
-          </div>
-        </div>
-      </div>
+            {{ getHighlightStyle( string.string, 0 )
+              ? getLabel( getNoteAtFret( string.string, 0 ) )
+              : ( selectedFrets[string.string] === null || selectedFrets[string.string] === undefined ? 'X' : 'O' ) }}
+          </text>
+        </g>
 
-      <!-- Strings (horizontal) -->
-      <div class="relative space-y-8 pb-6 pt-4">
-        <div
-          v-for=" ( stringRoot, sIdx ) in strings "
-          :key="'string-' + sIdx"
-          class="relative flex items-center h-6"
+        <!-- Frets -->
+        <g
+          v-for=" fret in fretCount "
+          :key="`f-${string.string}-${fret}`"
         >
-          <!-- String label - Now with 'Pro Selected' state -->
-          <div
-            class="absolute text-sm font-mono font-black transition-all duration-300 px-2 py-1 rounded-md z-30 flex items-center justify-center"
-            :class="[
-              isOpenActive( stringRoot )
-                ? 'bg-sky-500 text-white shadow-[0_0_20px_rgba(56,189,248,0.8)] ring-2 ring-sky-300 scale-110'
-                : isOpenHighlighted( stringRoot )
-                  ? 'bg-emerald-600/40 text-emerald-100 border border-emerald-400/50 scale-105 backdrop-blur-sm'
-                  : 'bg-slate-900/40 text-slate-500 border border-slate-700/50'
-            ]"
-            style="left: -58px; min-width: 44px; transform-origin: center;"
-          >
-            {{ getLabel( getNoteAt( stringRoot, 0 ) ) }}
-          </div>
+          <!-- Interaction Hitbox -->
+          <rect
+            :x="NUT_WIDTH + ( ( fret - 1 ) * ( ( FRETBOARD_WIDTH - NUT_WIDTH ) / fretCount ) )"
+            :y="getStringY( string.string ) - 15"
+            :width="( FRETBOARD_WIDTH - NUT_WIDTH ) / fretCount"
+            height="30"
+            fill="transparent"
+            class="cursor-pointer hover:fill-white/5 transition-colors"
+            @click="handleFretAction( string.string, fret )"
+          />
 
-          <!-- String line (horizontal) - SOLID, THICK, HIGH CONTRAST -->
-          <div
-            class="absolute bg-slate-300 rounded-full z-10"
-            :style="{
-              left: 0,
-              right: 0,
-              height: ( 2 + ( 5 - sIdx ) * 0.6 ) + 'px',
-              top: '50%',
-              transform: 'translateY(-50%)',
-              boxShadow: '0 2px 4px rgba(0,0,0,0.5)'
-            }"
-          ></div>
-
-          <!-- Note positions along this string -->
-          <div class="relative flex w-full z-20">
-            <!-- Fretted positions (Fret 0 shifted to the label) -->
-
-            <!-- Fretted positions -->
-            <div
-              v-for=" fret in numFrets "
-              :key="'note-' + sIdx + '-' + fret"
-              class="flex items-center justify-center"
-              style="width: 54px;"
+          <!-- Note Visual (Legacy Highlights or Selected Dots) -->
+          <template v-if=" selectedFrets[string.string] === fret || getHighlightStyle( string.string, fret ) ">
+            <circle
+              :cx="getFretX( fret )"
+              :cy="getStringY( string.string )"
+              r="10"
+              class="stroke-2 transition-all duration-300"
+              :class="getHighlightStyle( string.string, fret )?.classes || 'fill-indigo-500 stroke-indigo-300'"
+              :style="getHighlightStyle( string.string, fret )?.style"
+            />
+            <text
+              :x="getFretX( fret )"
+              :y="getStringY( string.string ) + 4"
+              text-anchor="middle"
+              class="text-[10px] font-black fill-white select-none pointer-events-none"
             >
-              <div
-                class="rounded-full flex items-center justify-center text-xs font-black transition-all duration-200 cursor-pointer"
-                :class="[
-  isPlaybackNote( getNoteAt( stringRoot, fret ) ) && isInsideRange( fret )
-    ? 'w-10 h-10 bg-amber-400 text-slate-900 shadow-[0_0_30px_rgba(251,191,36,1)] border-4 border-amber-200 scale-125 z-50'
-    : isNoteActive( getNoteAt( stringRoot, fret ) ) && isInsideRange( fret )
-      ? 'w-8 h-8 bg-sky-500 text-white shadow-[0_0_20px_rgba(56,189,248,1)] border-2 border-sky-200'
-      : isNoteHighlighted( getNoteAt( stringRoot, fret ) ) && isInsideRange( fret )
-        ? 'w-7 h-7 bg-emerald-600 text-white border-2 border-emerald-400 hover:scale-110'
-        : 'w-5 h-5 opacity-0 hover:opacity-50 hover:bg-slate-500'
-                ]"
-              >
-                <span
-                  v-if=" ( isPlaybackNote( getNoteAt( stringRoot, fret ) ) || isNoteActive( getNoteAt( stringRoot, fret ) ) || isNoteHighlighted( getNoteAt( stringRoot, fret ) ) ) && isInsideRange( fret ) "
-                >
-                  {{ getLabel( getNoteAt( stringRoot, fret ) ) }}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+              {{ getLabel( getNoteAtFret( string.string, fret ) ) }}
+            </text>
+          </template>
+        </g>
+      </g>
 
-    <!-- Legend -->
-    <div class="mt-6 flex items-center justify-center gap-8 text-sm">
-      <div class="flex items-center gap-2">
-        <div class="w-6 h-6 rounded-full bg-sky-500 border-2 border-sky-200 shadow-lg"></div>
-        <span class="text-slate-300 font-mono">Played Notes</span>
-      </div>
-      <div class="flex items-center gap-2">
-        <div class="w-6 h-6 rounded-full bg-emerald-600 border-2 border-emerald-400 shadow-lg"></div>
-        <span class="text-slate-300 font-mono">Scale Notes</span>
-      </div>
-    </div>
+      <!-- Fret Numbers (Bottom) -->
+      <text
+        v-for=" fret in fretLabels "
+        :key="`fnum-${fret}`"
+        :x="getFretX( fret )"
+        :y="FRETBOARD_HEIGHT - 5"
+        text-anchor="middle"
+        class="text-[9px] font-bold fill-slate-500 select-none"
+      >
+        {{ fret }}
+      </text>
+
+      <!-- String Labels (Right) -->
+      <text
+        v-for=" string in currentTuning "
+        :key="`slabl-${string.string}`"
+        :x="FRETBOARD_WIDTH - 15"
+        :y="getStringY( string.string ) + 4"
+        text-anchor="middle"
+        class="text-[10px] font-black fill-slate-600 select-none"
+      >
+        {{ string.label }}
+      </text>
+    </svg>
   </div>
 </template>
 
 <style scoped>
-div::-webkit-scrollbar {
-  height: 8px;
+.fretboard-container::-webkit-scrollbar {
+  height: 6px;
 }
-
-div::-webkit-scrollbar-track {
-  background: #1e293b;
+.fretboard-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+.fretboard-container::-webkit-scrollbar-thumb {
+  background: #334155;
   border-radius: 10px;
-}
-
-div::-webkit-scrollbar-thumb {
-  background: #475569;
-  border-radius: 10px;
-}
-
-div::-webkit-scrollbar-thumb:hover {
-  background: #64748b;
 }
 </style>

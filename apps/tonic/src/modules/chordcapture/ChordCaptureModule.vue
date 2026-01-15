@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useChordCapture, useAudioEngine, ChordEngine, Fretboard, SynthEngine, type ChordMatch, useGlobalEngine } from '@spectralsuite/core'
+import { useChordCapture, useAudioEngine, ChordEngine, SynthEngine, type ChordMatch, useGlobalEngine } from '@spectralsuite/core'
 import { useToolInfo } from '../../composables/useToolInfo';
-import ChordModal from '../../components/ChordModal.vue';
+import ContextDrawer from '../../components/ui/ContextDrawer.vue';
+import ChordForgePanel from '../chordforge/ChordForgePanel.vue';
+import ScaleSleuthPanel from '../scalesleuth/ScaleSleuthPanel.vue';
 import CaptureTray from './CaptureTray.vue';
 import LiveMonitor from './LiveMonitor.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
@@ -14,7 +16,17 @@ const { openInfo } = useToolInfo();
 // --- UI / Interaction State ---
 const isSettingsOpen = ref( false );
 
+// Visibility toggles for different note layers on the fretboard
+const showInputNotes = ref( true );
+const showChordNotes = ref( true );
+
 const drawerCategories = computed( () => [
+  {
+    id: 'General',
+    label: 'General',
+    description: 'Fretboard & Visuals',
+    showIndicator: !showInputNotes.value || !showChordNotes.value
+  },
   {
     id: 'Engine',
     label: 'Engine',
@@ -75,19 +87,104 @@ const suggestions = computed( () => {
   return ChordEngine.suggestNext( topChord.value.symbol, keyCenter.value );
 } );
 
-/**
- * Modal State Management.
- * Controls the popover that appears when a user clicks a chord to see details.
- * 
- * We track `selectedChord` separately so the modal can display static data
- * even if the live detection engine moves on to a new chord.
- */
 const selectedChord = ref<ChordMatch | null>( null );
-const isModalOpen = ref( false );
+const forgingNotes = ref<string[]>( [] ); // Notes to populate Forge with if no specific chord is selected
+const isForgeOpen = ref( false );
+const isSleuthOpen = ref( false );
+
+
+
+
+// --- Pause/Freeze Logic ---
+
+
+const isPaused = ref( false );
+// Frozen Snapshots
+const frozenCapturedNotes = ref<string[]>( [] );
+const frozenTopChord = ref<ChordMatch | null>( null );
+const frozenCurrentNote = ref<string | null>( null );
+const frozenPitch = ref<number | null>( null );
+const frozenClarity = ref<number | null>( null );
+
+// Effective Data (Switches between Live and Frozen)
+const effectiveCapturedNotes = computed( () => isPaused.value ? frozenCapturedNotes.value : capturedNotes.value );
+const effectiveTopChord = computed( () => isPaused.value ? frozenTopChord.value : topChord.value );
+const effectiveCurrentNote = computed( () => isPaused.value ? frozenCurrentNote.value : currentNote.value );
+const effectivePitch = computed( () => isPaused.value ? frozenPitch.value : pitch.value );
+const effectiveClarity = computed( () => isPaused.value ? frozenClarity.value : clarity.value );
+
+// --- Auto-Capture Logic ---
+const isAutoCaptureEnabled = ref( false );
+const autoCaptureProgress = ref( 0 ); // 0 to 100
+let autoCaptureTimer: ReturnType<typeof setInterval> | null = null;
+const HOLD_DURATION = 2000; // 2 seconds to hold
+const CHECK_INTERVAL = 100; // Check every 100ms
+
+// Watch for stability
+watch( [effectiveTopChord, effectiveClarity], ( [newChord, newClarity], [oldChord] ) => {
+  if ( !isAutoCaptureEnabled.value || isPaused.value ) {
+    resetAutoCapture();
+    return;
+  }
+
+  // 1. Check fail conditions (Silence or Chord Change)
+  if ( ( newClarity || 0 ) < 0.8 || !newChord || ( oldChord && newChord.symbol !== oldChord.symbol ) ) {
+    resetAutoCapture();
+    return;
+  }
+
+  // 2. If stable and timer not running, start it
+  if ( !autoCaptureTimer ) {
+    startAutoCapture();
+  }
+} );
+
+const startAutoCapture = () => {
+  const startTime = Date.now();
+  autoCaptureTimer = setInterval( () => {
+    const elapsed = Date.now() - startTime;
+    autoCaptureProgress.value = Math.min( 100, ( elapsed / HOLD_DURATION ) * 100 );
+
+    if ( elapsed >= HOLD_DURATION ) {
+      // Complete!
+      togglePause();
+      resetAutoCapture();
+      // Optional: Sound feedback?
+      SynthEngine.getInstance().playNote( 880, 100, 0.1 ); // Ding!
+    }
+  }, CHECK_INTERVAL );
+};
+
+const resetAutoCapture = () => {
+  if ( autoCaptureTimer ) {
+    clearInterval( autoCaptureTimer );
+    autoCaptureTimer = null;
+  }
+  autoCaptureProgress.value = 0;
+};
+
+const togglePause = () => {
+  isPaused.value = !isPaused.value;
+  if ( isPaused.value ) {
+    // Snapshot ALL current state
+    frozenCapturedNotes.value = [...capturedNotes.value];
+    frozenTopChord.value = topChord.value ? { ...topChord.value } : null;
+    frozenCurrentNote.value = currentNote.value;
+    frozenPitch.value = pitch.value;
+    frozenClarity.value = clarity.value;
+  }
+};
 
 const openChordDetail = ( chord: ChordMatch ) => {
   selectedChord.value = chord;
-  isModalOpen.value = true;
+  isForgeOpen.value = true;
+};
+
+const handleChordUpdate = ( name: string, notes: string[] ) => {
+  // If the user forged a new voicing, update the history item?
+  // For now, we just log it or maybe update the selected chord in place if we had a proper store.
+  // Ideally useChordCapture would expose an update method.
+  console.log( 'Forged new chord:', name, notes );
 };
 
 /**
@@ -106,6 +203,34 @@ const handleChordCapture = ( chord: ChordMatch ) => {
 
   // Hand off to the theory engine to store in history
   captureChord( chord );
+};
+
+
+
+const handleForge = () => {
+  // Always prioritize raw captured notes (with octaves) for the fretboard mapping
+  forgingNotes.value = [...effectiveCapturedNotes.value];
+
+  // If we have a Top Chord, set it for the Title context ("Forging: C Major")
+  if ( effectiveTopChord.value ) {
+    selectedChord.value = { ...effectiveTopChord.value };
+    // If for some reason captured notes are empty but we have a chord (e.g. manual history selection),
+    // we might want to fallback, but for "Live/Freeze Forge", capturedNotes is the source.
+    if ( forgingNotes.value.length === 0 ) {
+      forgingNotes.value = selectedChord.value.notes;
+    }
+  } else {
+    selectedChord.value = null;
+  }
+
+  // 3. Open the drawer
+  console.log( 'Opening Forge with notes:', forgingNotes.value );
+  if ( forgingNotes.value.length === 0 ) {
+    // If empty, we still open, but we might want to let the user know.
+    // Ideally, we'd flash a message, but for now, just logging.
+    // If the user expects "Persistence" of the last sound, they need to PAUSE first.
+  }
+  isForgeOpen.value = true;
 };
 
 const start = () => {
@@ -223,11 +348,11 @@ const emit = defineEmits<{
           >
             <span>←</span> Back to Tonic
           </button>
-          <h2 class="text-3xl font-black text-white italic uppercase tracking-tighter">Chord <span
+          <h2 class="text-3xl font-black text-white italic uppercase tracking-tighter">Session <span
               class="text-indigo-400"
-            >Capture Pro</span></h2>
-          <p class="text-slate-500 text-[10px] font-mono uppercase tracking-[0.2em] mt-1">Harmonic recognition &
-            analysis suite</p>
+            >View</span></h2>
+          <p class="text-slate-500 text-[10px] font-mono uppercase tracking-[0.2em] mt-1">Harmonic Context &
+            Flow</p>
         </div>
 
         <div class="flex items-center gap-4">
@@ -249,6 +374,51 @@ const emit = defineEmits<{
         :categories="drawerCategories"
         @close="isSettingsOpen = false"
       >
+        <template #General>
+          <div class="p-6 space-y-6">
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-white font-bold text-base">Show Input Notes</h3>
+                <p class="text-xs text-slate-500 uppercase tracking-widest font-mono">Real-time Spectrum</p>
+              </div>
+              <button
+                @click="showInputNotes = !showInputNotes"
+                class="w-12 h-6 rounded-full transition-colors relative"
+                :class="showInputNotes ? 'bg-sky-500' : 'bg-slate-700'"
+              >
+                <div
+                  class="w-4 h-4 rounded-full bg-white absolute top-1 transition-all"
+                  :class="showInputNotes ? 'right-1' : 'left-1'"
+                ></div>
+              </button>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <div>
+                <h3 class="text-white font-bold text-base">Show Chord Voicing</h3>
+                <p class="text-xs text-slate-500 uppercase tracking-widest font-mono">Theoretical Map</p>
+              </div>
+              <button
+                @click="showChordNotes = !showChordNotes"
+                class="w-12 h-6 rounded-full transition-colors relative"
+                :class="showChordNotes ? 'bg-emerald-500' : 'bg-slate-700'"
+              >
+                <div
+                  class="w-4 h-4 rounded-full bg-white absolute top-1 transition-all"
+                  :class="showChordNotes ? 'right-1' : 'left-1'"
+                ></div>
+              </button>
+            </div>
+
+            <div class="p-4 rounded-xl bg-white/5 border border-white/5 text-xs text-slate-400 leading-relaxed">
+              <p>
+                Toggle these layers to isolate incoming audio detection (Sky Blue) from predicted chord voicings
+                (Emerald).
+              </p>
+            </div>
+          </div>
+        </template>
+
         <template #Engine>
           <div class="space-y-6">
             <EngineSettings />
@@ -258,21 +428,56 @@ const emit = defineEmits<{
 
       <!-- Main Interactive Split: Monitor (Left) & Workspace (Right) -->
       <div
-        class="w-full max-w-[100rem] grid grid-cols-1 lg:grid-cols-[35%_65%] gap-8 items-start animate-fade-in px-4 relative"
+        class="w-full max-w-[100rem] grid grid-cols-1 lg:grid-cols-[35%_65%] lg:grid-rows-[auto_1fr] h-auto lg:h-[calc(100vh-220px)] min-h-[600px] gap-8 items-stretch animate-fade-in px-4 relative pb-24 lg:pb-0"
       >
 
         <!-- 1. Live Monitor (Top-Left) -->
-        <LiveMonitor
-          :top-chord="topChord || null"
-          :captured-notes="capturedNotes"
-          :current-note="currentNote"
-          :pitch="pitch"
-          :clarity="clarity"
-          :key-center="keyCenter"
-          @update:key-center="updateKey"
-          @capture-chord="handleChordCapture"
-          @clear-notes="clearNotes"
-        />
+        <div class="relative group">
+          <LiveMonitor
+            :top-chord="effectiveTopChord || null"
+            :captured-notes="effectiveCapturedNotes"
+            :current-note="effectiveCurrentNote"
+            :pitch="effectivePitch"
+            :clarity="effectiveClarity"
+            :key-center="keyCenter"
+            @update:key-center="updateKey"
+            @capture-chord="handleChordCapture"
+            @clear-notes="clearNotes"
+            @forge="handleForge"
+          />
+          <!-- Pause Toggle Button (Absolute Top Right of Monitor) -->
+          <div class="absolute top-4 right-4 z-20 flex flex-col gap-2 items-end">
+            <!-- Auto-Capture Toggle -->
+            <button
+              @click="isAutoCaptureEnabled = !isAutoCaptureEnabled"
+              class="w-8 h-8 rounded-full flex items-center justify-center border transition-all text-xs"
+              :class="isAutoCaptureEnabled ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'"
+              title="Auto-Capture (Hold to Freeze)"
+            >
+              🖐️
+            </button>
+
+            <!-- Main Pause Button -->
+            <button
+              @click="togglePause"
+              class="relative px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center overflow-hidden"
+              :class="isPaused ? 'bg-red-500 border-red-400 text-white shadow-lg shadow-red-500/20 animate-pulse' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white hover:border-slate-500'"
+            >
+              <!-- Progress Fill (Background) -->
+              <div
+                v-if=" autoCaptureProgress > 0 "
+                class="absolute left-0 top-0 bottom-0 bg-indigo-500/50 transition-all duration-100 ease-linear"
+                :style="{ width: autoCaptureProgress + '%' }"
+              ></div>
+              <span class="relative z-10">{{ isPaused ? '⏸ Paused' : 'Live' }}</span>
+            </button>
+          </div>
+          <!-- Frozen Overlay Indicator -->
+          <div
+            v-if=" isPaused "
+            class="absolute inset-0 rounded-[2.5rem] border-4 border-red-500/30 pointer-events-none z-10 transition-all"
+          ></div>
+        </div>
 
         <!-- 2. Harmonic Suggestions (Top-Right) -->
         <div class="w-full flex justify-center h-full">
@@ -300,77 +505,96 @@ const emit = defineEmits<{
         </div>
 
         <!-- 3. Relocated Capture Tray (Bottom-Left) -->
-        <!-- Visible on Desktop, Hidden on Mobile (Mobile uses internal drawer) -->
+        <!-- Visible on Desktop and Mobile -->
         <CaptureTray
-          class="hidden lg:flex h-full"
-          :captured-notes="capturedNotes"
+          class="flex lg:h-full min-h-[150px]"
+          :captured-notes="effectiveCapturedNotes"
           @clear-notes="clearNotes"
         />
 
-        <!-- 4. Fretboard / Voicing Atlas (Bottom-Right) -->
+        <!-- 4. Progression Ledger (Bottom-Right of Grid) -->
         <div
-          class="w-full bg-black/20 rounded-[3rem] p-8 md:p-10 border border-white/5 shadow-2xl flex-1 flex flex-col min-h-[300px]"
+          class="w-full bg-black/20 rounded-[3rem] p-8 md:p-10 border border-white/5 shadow-2xl flex-1 flex flex-col lg:h-full min-h-[400px]"
         >
-          <div class="flex justify-between mb-6 px-2">
-            <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">Guitar Voicing Atlas</span>
+          <div class="flex justify-between items-center mb-6 px-2">
+            <div>
+              <h3 class="text-xs font-black text-white italic uppercase tracking-tighter">Progression <span
+                  class="text-indigo-500"
+                >Ledger</span></h3>
+              <p class="text-[9px] text-slate-500 uppercase font-bold tracking-widest mt-1">Stored Harmonic Flow</p>
+            </div>
+            <div class="flex gap-2">
+              <button
+                v-if=" chordHistory.length > 0 "
+                @click="clearHistory"
+                class="px-2 py-1 text-[9px] font-black text-slate-600 hover:text-red-400 transition-colors uppercase tracking-widest"
+              >Clear</button>
+              <button
+                v-if=" chordHistory.length > 0 "
+                @click="handleExport"
+                class="px-3 py-1 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-black text-indigo-400 hover:bg-indigo-500/20 transition-all uppercase tracking-widest"
+              >Export</button>
+            </div>
           </div>
-          <div class="flex-1 flex flex-col justify-center">
-            <Fretboard
-              :active-notes="topChord ? topChord.notes : capturedNotes"
-              :highlight-notes="topChord ? topChord.notes : capturedNotes"
-              :num-frets="24"
-            />
-          </div>
-        </div>
 
-      </div>
-
-      <!-- Progression Ledger -->
-      <div
-        class="mt-12 w-full max-w-[100rem] bg-slate-900/40 rounded-[3rem] p-10 border border-white/5 backdrop-blur-3xl px-4 mx-auto"
-      >
-        <div class="flex justify-between items-center mb-10 px-4">
-          <div>
-            <h3 class="text-xl font-black text-white italic uppercase tracking-tighter">Progression <span
-                class="text-indigo-500"
-              >Ledger</span></h3>
-            <p class="text-[9px] text-slate-500 uppercase font-bold tracking-widest mt-1">Stored Harmonic Flow</p>
-          </div>
-          <button
-            v-if=" chordHistory.length > 0 "
-            @click="clearHistory"
-            class="px-4 py-2 text-[9px] font-black text-slate-600 hover:text-red-400 transition-colors uppercase tracking-widest"
-          >Clear All</button>
-
-          <div class="flex flex-col gap-2 ml-4">
-            <button
+          <div class="flex-1 overflow-y-auto">
+            <div
               v-if=" chordHistory.length > 0 "
-              @click="handleExport"
-              class="px-6 py-2 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-[9px] font-black text-indigo-400 hover:bg-indigo-500/20 transition-all uppercase tracking-widest flex items-center justify-center gap-2"
+              class="flex flex-wrap gap-4 px-2 pb-4"
             >
-              <span>Export</span>
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-3 w-3"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+              <div
+                v-for=" ( item, idx ) in chordHistory "
+                :key="idx"
+                class="flex items-center gap-3 group transition-all duration-300 rounded-xl p-2"
+                :class="{ 'bg-emerald-500/10 scale-105 shadow-xl shadow-emerald-500/10 ring-1 ring-emerald-500/30': activePlaybackIndex === idx }"
               >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"
-                />
-              </svg>
-            </button>
+                <div
+                  class="flex flex-col items-center cursor-pointer hover:scale-110 transition-transform relative"
+                  @click="openChordDetail( item )"
+                >
+                  <button
+                    @click.stop="auditChord( item )"
+                    class="absolute -top-3 -right-3 w-5 h-5 rounded-full bg-white text-slate-950 flex items-center justify-center translate-y-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all shadow-xl z-20"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      class="h-3 w-3"
+                      fill="currentColor"
+                      viewBox="0 0 24 24"
+                    >
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </button>
+                  <div class="text-xl font-black text-white font-outfit group-hover:text-indigo-400 transition-colors">
+                    {{ item.symbol }}
+                  </div>
+                  <div class="text-[9px] font-black text-indigo-500/60 uppercase tracking-tighter">{{ item.roman }}
+                  </div>
+                </div>
+                <div
+                  v-if=" idx < chordHistory.length - 1 "
+                  class="text-slate-800 font-black text-lg"
+                >→</div>
+              </div>
+            </div>
+            <div
+              v-else
+              class="h-full flex items-center justify-center opacity-20 italic text-xs"
+            >
+              No chords captured yet.
+            </div>
+          </div>
+
+          <div
+            v-if=" chordHistory.length > 0 "
+            class="mt-4 pt-4 border-t border-white/5"
+          >
             <button
-              v-if=" chordHistory.length > 0 "
               @click="playProgression"
               :disabled="isPlayingProgression"
-              class="px-6 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[9px] font-black text-emerald-400 hover:bg-emerald-500/20 transition-all uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              class="w-full py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-black text-emerald-400 hover:bg-emerald-500/20 transition-all uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              <span>{{ isPlayingProgression ? 'Playing...' : 'Play All' }}</span>
+              <span>{{ isPlayingProgression ? 'Playing...' : 'Play Full Sequence' }}</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 class="h-3 w-3"
@@ -395,83 +619,102 @@ const emit = defineEmits<{
           </div>
         </div>
 
-        <div
-          v-if=" chordHistory.length > 0 "
-          class="flex flex-wrap gap-6 px-4"
-        >
-          <div
-            v-for=" ( item, idx ) in chordHistory "
-            :key="idx"
-            class="flex items-center gap-6 group transition-all duration-300 rounded-xl p-2"
-            :class="{ 'bg-emerald-500/10 scale-105 shadow-xl shadow-emerald-500/10 ring-1 ring-emerald-500/30': activePlaybackIndex === idx }"
-          >
-            <div
-              class="flex flex-col items-center cursor-pointer hover:scale-110 transition-transform relative"
-              @click="openChordDetail( item )"
-            >
-              <!-- Play Button Overlay -->
-              <button
-                @click.stop="auditChord( item )"
-                class="absolute -top-4 -right-4 w-6 h-6 rounded-full bg-white text-slate-950 flex items-center justify-center translate-y-2 opacity-0 group-hover:opacity-100 group-hover:translate-y-0 transition-all shadow-xl z-20"
-                title="Audition"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-3 w-3"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </button>
-
-              <!-- Remove Button -->
-              <button
-                @click.stop="removeChord( idx )"
-                class="absolute -top-2 -left-2 w-5 h-5 rounded-full bg-red-500/10 border border-red-500/30 text-red-500 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500/20 z-20"
-                title="Remove Chord"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="h-3 w-3"
-                  viewBox="0 0 20 20"
-                  fill="currentColor"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
-                    clip-rule="evenodd"
-                  />
-                </svg>
-              </button>
-              <div class="text-2xl font-black text-white font-outfit group-hover:text-indigo-400 transition-colors">
-                {{ item.symbol }}
-              </div>
-              <div class="text-[10px] font-black text-indigo-500/60 uppercase tracking-tighter">{{ item.roman }}</div>
-            </div>
-            <div
-              v-if=" idx < chordHistory.length - 1 "
-              class="text-slate-800 font-black text-xl"
-            >→</div>
-          </div>
-        </div>
-        <div
-          v-else
-          class="py-12 text-center opacity-20 italic text-sm"
-        >
-          Your captured progression will appear here.
-        </div>
       </div>
 
+      <!-- 5. Fretboard / Voicing Atlas (Full-Width Bottom) -->
+      <!-- 5. Key Context Footer (Smart Drawer Trigger) -->
+      <!-- 5. Key Context Footer (Smart Drawer Trigger) -->
+      <div class="mt-12 w-full max-w-[100rem] mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 pb-24 lg:pb-0">
+        <!-- Scale Sleuth Trigger -->
+        <button
+          @click="isSleuthOpen = true"
+          class="bg-slate-900/40 hover:bg-slate-900/60 transition-all rounded-[3rem] p-8 border border-white/5 backdrop-blur-3xl px-4 flex items-center justify-between group"
+        >
+          <div class="flex items-center gap-6 px-4">
+            <div
+              class="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors"
+            >
+              <span class="text-3xl">🕵️</span>
+            </div>
+            <div class="text-left">
+              <h3 class="text-2xl font-black text-white italic uppercase tracking-tighter">Scale <span
+                  class="text-indigo-400"
+                >Sleuth</span></h3>
+              <p
+                class="text-xs text-slate-500 uppercase font-bold tracking-widest mt-1 group-hover:text-white transition-colors">
+                Analyze Context</p>
+            </div>
+          </div>
+          <div class="pr-6 opacity-50 group-hover:opacity-100 transition-opacity">
+            <span class="text-xs font-black uppercase tracking-widest text-indigo-400">Open</span>
+          </div>
+        </button>
+
+        <!-- Chord Forge Trigger -->
+        <button
+          @click="handleForge"
+          class="bg-slate-900/40 hover:bg-slate-900/60 transition-all rounded-[3rem] p-8 border border-white/5 backdrop-blur-3xl px-4 flex items-center justify-between group"
+        >
+          <div class="flex items-center gap-6 px-4">
+            <div
+              class="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors"
+            >
+              <span class="text-3xl">⚒️</span>
+            </div>
+            <div class="text-left">
+              <h3 class="text-2xl font-black text-white italic uppercase tracking-tighter">Chord <span
+                  class="text-amber-500"
+                >Forge</span></h3>
+              <p
+                class="text-xs text-slate-500 uppercase font-bold tracking-widest mt-1 group-hover:text-white transition-colors">
+                Edit Voicing</p>
+            </div>
+          </div>
+          <div class="pr-6 opacity-50 group-hover:opacity-100 transition-opacity">
+            <span class="text-xs font-black uppercase tracking-widest text-amber-500">Open</span>
+          </div>
+        </button>
+      </div>
     </main>
 
-    <!-- Detailed Analysis Modal -->
-    <ChordModal
-      v-if=" selectedChord "
-      :is-open="isModalOpen"
-      :chord="selectedChord"
-      @close=" isModalOpen = false"
-    />
+    <!-- SMART CONTEXT DRAWERS -->
+
+    <!-- 1. Forge Drawer (Edit Mode) -->
+    <ContextDrawer
+      :is-open="isForgeOpen"
+      :title="selectedChord ? `Forging: ${selectedChord.symbol}` : 'Chord Forge'"
+      side="right"
+      @close="isForgeOpen = false"
+    >
+      <template #default=" { isMaximized } ">
+        <ChordForgePanel
+          v-if=" isForgeOpen "
+          :initial-notes="forgingNotes"
+          :is-maximized="isMaximized"
+          @update:chord="handleChordUpdate"
+        />
+      </template>
+    </ContextDrawer>
+
+    <!-- 2. Sleuth Drawer (Analysis Mode) -->
+    <!-- 2. Sleuth Drawer (Analysis Mode) -->
+    <ContextDrawer
+      :is-open="isSleuthOpen"
+      :title="isPaused ? 'Scale Detective (Frozen)' : 'Scale Detective'"
+      side="left"
+      @close="isSleuthOpen = false"
+    >
+      <template #default=" { isMaximized } ">
+        <ScaleSleuthPanel
+          :static-notes="isPaused ? frozenCapturedNotes : undefined"
+          :is-maximized="isMaximized"
+          @select:scale="( name ) => { console.log( 'Selected scale:', name ); }"
+        />
+      </template>
+    </ContextDrawer>
+
+
+
   </div>
 </template>
 

@@ -9,17 +9,18 @@
  */
 
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
-import { Chord, Note } from 'tonal';
+import { Chord } from 'tonal';
 import {
   SynthEngine,
   useAudioEngine,
-  useGlobalEngine
+  useGlobalEngine,
+  Fretboard,
+  Note
 } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
-import Fretboard from '../../components/Fretboard.vue';
 
 const emit = defineEmits<{ ( e: 'back' ): void }>();
 const { openInfo } = useToolInfo();
@@ -380,6 +381,22 @@ const clearAll = () => {
   activeVoicings.value = new Set();
 };
 
+const shiftFrets = ( delta: number ) => {
+  const newState = { ...stringState.value };
+  Object.keys( newState ).forEach( key => {
+    const k = Number( key );
+    const val = newState[k];
+    if ( val !== null && val !== undefined && val >= 0 ) {
+      const newVal = val + delta;
+      // Keep within bounds (0-24)
+      if ( newVal >= 0 && newVal <= 24 ) {
+        newState[k] = newVal;
+      }
+    }
+  } );
+  stringState.value = newState;
+};
+
 // ============================================================================
 // ALTERNATE VOICINGS GENERATOR
 // ============================================================================
@@ -459,10 +476,27 @@ const suggestedVoicings = computed( () => {
 } );
 
 const toggleVoicing = ( id: number ) => {
+  const v = suggestedVoicings.value.find( v => v.id === id );
+  if ( !v ) return;
+
   if ( activeVoicings.value.has( id ) ) {
     activeVoicings.value.delete( id );
+    // Optional: Could clear the board, but maybe user wants to keep the notes?
+    // Let's clear ONLY the notes that match this voicing to be truly "togglable"
+    v.notes.forEach( n => {
+      if ( stringState.value[n.string] === n.fret ) {
+        stringState.value[n.string] = null;
+      }
+    } );
   } else {
+    // Clear other active voicings to avoid confusion
+    activeVoicings.value.clear();
     activeVoicings.value.add( id );
+
+    // Apply this voicing to the board
+    v.notes.forEach( n => {
+      stringState.value[n.string] = n.fret;
+    } );
   }
 };
 
@@ -722,6 +756,24 @@ const fretboardHighlights = computed( () => {
               >
                 Clear
               </button>
+
+              <div class="flex items-center gap-2 bg-white/5 p-1 rounded-full border border-white/10 ml-4">
+                <button
+                  @click="shiftFrets( -1 )"
+                  class="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:bg-white/10 hover:text-white transition-all font-black"
+                  title="Shift Frets Down"
+                >
+                  -1
+                </button>
+                <span class="text-[9px] font-black text-slate-500 uppercase tracking-widest px-2">Shift</span>
+                <button
+                  @click="shiftFrets( 1 )"
+                  class="w-10 h-10 rounded-full flex items-center justify-center text-slate-400 hover:bg-white/10 hover:text-white transition-all font-black"
+                  title="Shift Frets Up"
+                >
+                  +1
+                </button>
+              </div>
             </div>
 
             <!-- Suggested Voicings Panel -->

@@ -18,6 +18,7 @@ const emit = defineEmits<{
   ( e: 'captureChord', chord: ChordMatch ): void;
   ( e: 'clearNotes' ): void;
   ( e: 'update:keyCenter', key: string ): void;
+  ( e: 'update:keyCenter', key: string ): void;
 }>();
 
 const isTrayOpen = ref( false );
@@ -172,6 +173,7 @@ const selectKey = ( key: string ) => {
           </svg>
           Capture Chord
         </button>
+
       </template>
 
       <!-- 4. Default Stats (If No Match) -->
@@ -184,6 +186,9 @@ const selectKey = ( key: string ) => {
         <span :class="{ 'text-emerald-400': ( clarity || 0 ) > 0.9 }">{{ ( ( clarity || 0 ) * 100 ).toFixed( 0 ) }}%
           Clarity</span>
       </div>
+
+      <!-- Option to Forge even without a match (Raw Notes) -->
+
     </div>
 
     <!-- Mobile Capture Tray Drawer (Hidden on Desktop) -->

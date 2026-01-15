@@ -26,11 +26,11 @@ export const TOOL_METADATA: Record<string, ToolMetadata> = {
   },
   chordcapture: {
     id: 'chordcapture',
-    name: 'ChordCapture Pro',
-    whatAmISeeing: 'A Forensic Harmonic Diarist. You are seeing a precision 2x2 grid featuring a Live Audio Monitor, Harmonic Suggestions, a Ledger Tray, and a 24-fret Voicing Atlas.',
-    instructions: '1. Set the **Analysis Key** (Top-Right Badge) to match your song\'s tonic for accurate Roman Numerals.\n2. Play chords to see real-time detection in the Live Monitor.\n3. Click "Capture" or use the mobile Tray to log chords into the Ledger (Bottom-Left).\n4. Hover over Ledger items to **Delete**, or click **Export** to copy the full sequence to your clipboard.',
-    practicalApplication: 'Transcribing complex songs, documenting harmonic ideas across the entire fretboard range, and mastering functional harmony with engineering-grade sensitivity.',
-    howItWorks: 'Now powered by a Polyphonic Pitch Engine, it detects multiple notes simultaneously for true strum alignment. The system uses "Transient Protection" to ignore single-note flickers during chord changes and applies functional harmony theory to suggest logically relevant next chords.'
+    name: 'Session View',
+    whatAmISeeing: 'Your central musical workspace. This is "Smart Context": a live audio monitor that intelligently connects to deep-dive analysis tools. Features a "True Freeze" engine, a Chord Ledger, and expandable drawers for "Chord Forge" (Editing) and "Scale Sleuth" (Theory).',
+    instructions: '1. Play freely to see live chord detection.\n2. Click the **Pause (||)** button to "Freeze" the current moment—capturing audio, pitch, and chord context.\n3. Open the **Scale Sleuth** drawer to analyze the frozen scale context.\n4. Click **Forge** to edit the detected chord on a virtual fretboard.\n5. Maximize any drawer (↗) for a full-screen deep dive.',
+    practicalApplication: 'The ultimate practice companion. seamless switching between "Jamming" (Live), "Analyzing" (Frozen/Sleuth), and "Composing" (Forge). Perfect for deconstructing complex harmonies without losing your flow.',
+    howItWorks: 'Session View uses a "Smart Context" architecture. When you Pause, the entire harmonic state is snapshotted. This frozen context is then propagated to all sub-tools (Forge/Sleuth), allowing identical analysis across different visualizers.'
   },
   pocketengine: {
     id: 'pocketengine',

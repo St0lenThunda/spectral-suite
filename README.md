@@ -1,3 +1,38 @@
+# 📌 Project Status: Pinned (Jan 15, 2026)
+
+**Last Active Workflow:** Session View Transformation (ChordCapture)
+
+The project is currently in a stable state with a major refactor of the **ChordCapture** module into a unified **"Session View"**. This view integrates the functionality of *Chord Forge* and *Scale Sleuth* into contextual drawers, creating a seamless "Smart Context" experience.
+
+### ✅ Recent Accomplishments
+1.  **Rebranding to Session View**:
+    -   `ChordCaptureModule` is now the primary interface for harmonic analysis.
+    -   Standalone `ChordForge` and `ScaleSleuth` routes are hidden/deprecated in favor of the integrated panels.
+
+2.  **Smart Context Drawers**:
+    -   **ContextDrawer Component**: A reusable, responsive drawer (Side Panel on Desktop, Bottom Sheet on Mobile).
+    -   **Contextual Integration**:
+        -   **Chord Forge**: Accessible via the "Forge" button or by clicking a chord in the ledger. Used for *Editing* voicings.
+        -   **Scale Sleuth**: Accessible via the "Analysis" footer. Used for *Harmonic Context*.
+
+3.  **Maximize & Advanced Features**:
+    -   Drawers can be maximized to full screen.
+    -   **Restored Functionality**:
+        -   **Scale Sleuth**: CAGED System visualization (Heat Map colors) and Interval/Degree toggles are fully functional in maximized mode.
+        -   **Chord Forge**: Alternate Voicing Algorithm allows generating playable guitar voicings (Rose/Cyan/Emerald themes) in maximized mode.
+
+4.  **Accessible Auto-Capture**:
+    -   Implemented a "Magic Hold" feature for users unable to strum and click simultaneously.
+    -   Holding a stable chord for **2 seconds** automatically triggers "Freeze/Pause", capturing the chord to the ledger.
+    -   Visual progress indicator added to the Pause button.
+
+### 🚧 Next Steps / Known Issues
+-   **Mobile Layout**: While `ContextDrawer` handles mobile well, the main "Session View" grid needs further refinement for small screens (overflow handling).
+-   **Routing Cleanup**: The router still contains standalone routes for Forge/Sleuth that could be removed or strictly redirected.
+-   **Academy Integration**: Spectral Academy was reordered but deep integration with the new "Session View" (e.g., launching a lesson from a detected chord) is a future goal.
+
+---
+
 # Spectral Suite
 
 A modular music analysis suite providing real-time audio processing and visualization tools.
@@ -7,8 +42,7 @@ A modular music analysis suite providing real-time audio processing and visualiz
 Spectral Suite is a comprehensive monorepo containing multiple specialized music analysis tools:
 
 - **AuraTune Pro** - Immersive pitch detection and visual performance tool
-- **ScaleSleuth Pro** - Harmonic forensic lab with CAGED patterns and lock-in playback
-- **ChordCapture Pro** - Real-time harmonic recognition with functional analysis
+- **Session View (formerly ChordCapture)** - Real-time harmonic recognition with integrated Editing (Forge) and Analysis (Sleuth)
 - **Pocket Engine Pro** - Rhythm and timing diagnostics with polyrhythmic grids
 - **Frequency Flow** - Engineering-grade spectral visualization
 - **Track Tracer** - Forensic audio analysis (BPM, key, structure)
@@ -21,12 +55,13 @@ Spectral Suite is a comprehensive monorepo containing multiple specialized music
 spectral-suite/
 ├── apps/                 # Individual applications
 │   ├── 01-auratune/
-│   ├── 02-chordcapture/
+│   ├── 02-chordcapture/ # (Session View)
 │   ├── 03-frequencyflow/
 │   ├── 04-tracktracer/
 │   ├── 07-pocket-engine/
-│   ├── 09-scalesleuth/
-│   └── director/        # Main dashboard app
+│   ├── 09-scalesleuth/  # (Logic only, UI moved to Panels)
+│   ├── tonic/           # Main dashboard app (Unified entry point)
+│   └── director/        # Legacy dashboard
 ├── packages/
 │   └── core/            # Shared audio processing library
 └── package.json         # Root workspace configuration
@@ -69,27 +104,11 @@ npm install
 
 ### Development
 
-Run individual apps:
+Run the unified Tonic dashboard:
 
 ```bash
-# Run the director dashboard
-cd apps/director
-npm run dev
-
-# Run a standalone tool
-cd apps/01-auratune
-npm run dev
-```
-
-Build for production:
-
-```bash
-# Build a specific app
-cd apps/director
-npm run build
-
-# Preview production build
-npm run preview
+# Run Tonic
+npm run dev:tonic
 ```
 
 ## 📦 Packages
@@ -115,33 +134,3 @@ Shared audio processing library containing:
 ## 📝 License
 
 MIT
-
-## 🚀 Cross-Platform TODO
-
-### Multi-Tool Layout
-- [ ] Implement split-screen layout (Tabbed Panels with Pin feature)
-- [ ] Allow users to run 2+ tools simultaneously (e.g., AuraTune + ChordForge)
-- [ ] Shared audio engine across tools (single mic stream)
-- [ ] Tool communication (pitch detection → chord analysis)
-
-### Audio Engine Enhancements
-- [ ] Per-tool audio settings (optional virtual routing)
-- [ ] Preset layouts for common tool combinations
-- [ ] Mobile-responsive accordion view for multi-tool
-
-### ChordForge Improvements
-- [ ] Expand voicing algorithm to include barre chords
-- [ ] Add "Export to Tab" feature for discovered voicings
-- [ ] Integrate with ChordCapture for real-time voicing suggestions
-
-### Practice Session Recorder (Killer Feature)
-- [ ] Auto-log detected chords, scales, and notes during practice sessions
-- [ ] Export practice data as "Musical Journal" (JSON/PDF/CSV)
-- [ ] Timeline visualization of practice session (what you played, when)
-- [ ] Progress tracking (chord vocabulary growth, scale mastery)
-- [ ] Integration with all tools (AuraTune, ChordForge, ScaleSleuth)
-
-## 🤝 Contributing
-
-
-Contributions welcome! This is a modular, plug-and-play architecture - add new tools by creating folders in `apps/`.

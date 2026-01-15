@@ -18,13 +18,15 @@ export function useScaleSleuth () {
   watch( pitch, ( newPitch ) => {
     if ( isLocked.value ) return;
 
-    if ( !newPitch || ( clarity.value || 0 ) < clarityThreshold.value || volume.value < sensitivityThreshold.value ) {
+    // Use a slightly more relaxed threshold for scale detection than the global tuner
+    // to allow for initial plucks or noisy environments.
+    if ( !newPitch || ( clarity.value || 0 ) < 0.4 || volume.value < 0.005 ) {
       currentNote.value = null;
       return;
     }
 
     const note = Note.fromFreq( newPitch );
-    const pc = Note.get( note ).pc; // Pitch Class (e.g., "C" instead of "C4")
+    const pc = Note.get( note ).pc;
 
     if ( pc && pc !== currentNote.value ) {
       currentNote.value = pc;

@@ -43,18 +43,12 @@ const ALL_TOOLS = [
     icon: '✨',
     color: 'from-sky-500 to-blue-600'
   },
-  {
-    id: 'scalesleuth',
-    name: 'ScaleSleuth',
-    description: 'Deep scale analysis engine. Identify modes and melodic structures.',
-    icon: '🔍',
-    color: 'from-emerald-500 to-teal-600'
-  },
+
   {
     id: 'chordcapture',
-    name: 'ChordCapture',
-    description: 'Real-time harmonic recognition and note sequence building.',
-    icon: '🎹',
+    name: 'Session View',
+    description: 'Real-time harmonic recognition, editing, and analysis flow.',
+    icon: '🎙️',
     color: 'from-indigo-500 to-purple-600'
   },
   {
@@ -78,13 +72,7 @@ const ALL_TOOLS = [
     icon: '🧪',
     color: 'from-blue-600 to-cyan-500'
   },
-  {
-    id: 'academy',
-    name: 'Spectral Academy',
-    description: 'Interactive music theory lessons. Learn via active performance.',
-    icon: '🎓',
-    color: 'from-emerald-600 to-green-500'
-  },
+
   {
     id: 'harmonicorbit',
     name: 'Harmonic Orbit',
@@ -93,11 +81,11 @@ const ALL_TOOLS = [
     color: 'from-indigo-600 to-sky-500'
   },
   {
-    id: 'chordforge',
-    name: 'Chord Forge',
-    description: 'Build chords on an interactive fretboard. Discover voicings and hear your creations.',
-    icon: '⚒️',
-    color: 'from-amber-600 to-orange-500'
+    id: 'academy',
+    name: 'Spectral Academy',
+    description: 'Interactive music theory lessons. Learn via active performance.',
+    icon: '🎓',
+    color: 'from-emerald-600 to-green-500'
   }
 ]
 

@@ -17,6 +17,7 @@ import { defineStore } from 'pinia';
  * platform.sensitivity = 0.05;
  * platform.toggleProMode();
  */
+// @ts-ignore: Pinia types don't automatically infer the plugin extension here
 export const usePlatformStore = defineStore( 'platform', {
   /**
    * STATE:

@@ -28,12 +28,19 @@
     "preview:tonic": "npm run preview --workspace apps/tonic",
     "typecheck": "npm run type-check --workspaces --if-present",
     "lint": "npm run type-check --workspaces --if-present",
-    "test": "vitest run"
+    "test": "vitest run",
+    "docs": "npm run docs:api && npm run docs:build",
+    "docs:api": "typedoc --entryPointStrategy packages packages/core --plugin typedoc-plugin-markdown --entryFileName index.md --out docs/api",
+    "docs:build": "vitepress build docs",
+    "docs:dev": "vitepress dev docs"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.16",
     "@vue/test-utils": "^2.4.6",
     "happy-dom": "^20.1.0",
+    "typedoc": "^0.28.16",
+    "typedoc-plugin-markdown": "^4.9.0",
+    "vitepress": "^1.6.4",
     "vitest": "^4.0.16",
     "vue-tsc": "3.1.4"
   },

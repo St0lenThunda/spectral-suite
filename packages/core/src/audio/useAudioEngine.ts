@@ -7,17 +7,79 @@ export const isInitialized = ref( AudioEngine.getInstance().initialized );
 const error = ref<string | null>( null );
 const inputGain = ref( 1.0 );
 const activeConsumers = ref( 0 );
+const availableDevices = ref<MediaDeviceInfo[]>( [] );
+const availableOutputDevices = ref<MediaDeviceInfo[]>( [] );
+const selectedDeviceId = ref<string>( '' );
+const selectedOutputId = ref<string>( '' );
 let suspendTimer: any = null;
 
 export function useAudioEngine () {
   const engine = AudioEngine.getInstance();
 
+  const updateDeviceList = async () => {
+    const devices = await engine.getDevices();
+    availableDevices.value = devices.filter( d => d.kind === 'audioinput' );
+    availableOutputDevices.value = devices.filter( d => d.kind === 'audiooutput' );
+
+    // Try to find current device
+    const stream = engine.getStream();
+    if ( stream ) {
+      const track = stream.getAudioTracks()[0];
+      if ( track ) {
+        selectedDeviceId.value = track.getSettings().deviceId || '';
+      }
+    }
+  };
+
+  const selectDevice = async ( deviceId: string ) => {
+    try {
+      await engine.setDevice( deviceId );
+      selectedDeviceId.value = deviceId;
+      // Pre-warm again on new device
+      const ctx = engine.getContext();
+      if ( ctx ) {
+        PitchNodePool.warmUp( ctx ).catch( console.warn );
+      }
+    } catch ( err: any ) {
+      error.value = err.message;
+    }
+  };
+
+  const selectOutputDevice = async ( deviceId: string ) => {
+    try {
+      await engine.setOutputDevice( deviceId );
+      selectedOutputId.value = deviceId;
+    } catch ( err: any ) {
+      console.warn( 'Output selection error:', err );
+      // Don't set error.value globally as this is often non-fatal (just a warning)
+    }
+  };
+
+  const playGlobalTestTone = () => {
+    const ctx = engine.getContext();
+    if ( !ctx ) return;
+
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.connect( gain );
+    gain.connect( ctx.destination );
+
+    osc.frequency.value = 440; // A4
+    gain.gain.value = 0.3; // Safely moderate volume
+
+    osc.start();
+    osc.stop( ctx.currentTime + 0.3 ); // Short beep
+  };
+
   const init = async () => {
     try {
-      await engine.init();
+      await engine.init( selectedDeviceId.value || undefined );
       isInitialized.value = true;
       inputGain.value = engine.getGain();
       error.value = null;
+
+      await updateDeviceList();
 
       // Pre-warm the pitch worklet module for instant first-use
       const ctx = engine.getContext();
@@ -93,5 +155,13 @@ export function useAudioEngine () {
     resume: () => engine.resume(),
     suspend: () => engine.suspend(),
     close: () => engine.close(),
+    availableDevices,
+    selectedDeviceId,
+    availableOutputDevices,
+    selectedOutputId,
+    updateDeviceList,
+    selectDevice,
+    selectOutputDevice,
+    playGlobalTestTone
   };
 }

@@ -15,6 +15,7 @@ export const useGlobalEngine = () => {
   const platform = usePlatformStore();
   
   // Use the pre-computed getter from the store for a single source of truth
+  // @ts-ignore: Pinia getter type inference issue in TypeDoc environment
   const isGlobalEngineActive = computed( () => platform.isEngineModified );
 
   return {

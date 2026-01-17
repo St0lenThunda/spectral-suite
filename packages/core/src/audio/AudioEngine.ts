@@ -18,19 +18,25 @@ export class AudioEngine {
     return AudioEngine.instance;
   }
 
-  public async init (): Promise<void> {
+  public async init ( deviceId?: string ): Promise<void> {
     // If context exists, ensure it's running and stream is active
     if ( this.context ) {
       if ( this.context.state === 'suspended' ) {
         await this.context.resume();
       }
 
-      // Check if stream is active
+      // Check if stream is active AND if it matches the requested device (if provided)
       if ( this.stream && this.stream.active ) {
-        return;
+        const track = this.stream.getAudioTracks()[0];
+        const currentDeviceId = track?.getSettings().deviceId;
+
+        // If no specific device requested, or current matches request, we are good.
+        if ( !deviceId || deviceId === currentDeviceId ) {
+          return;
+        }
       }
 
-      // If stream is dead, we need to re-initialize everything
+      // If stream is dead or device mismatch, we need to re-initialize everything
       this.close();
     }
 
@@ -47,6 +53,7 @@ export class AudioEngine {
       const rawMode = isRawAudioMode.value;
       const constraints: MediaStreamConstraints = {
         audio: {
+          deviceId: deviceId ? { exact: deviceId } : undefined,
           echoCancellation: !rawMode,
           autoGainControl: !rawMode,
           noiseSuppression: !rawMode
@@ -56,6 +63,7 @@ export class AudioEngine {
       console.log( 'Requesting raw audio input...', constraints );
       const stream = await navigator.mediaDevices.getUserMedia( constraints );
       console.log( 'Audio stream acquired:', stream.id );
+      stream.getTracks().forEach( t => console.log( 'Track:', t.label, t.readyState, t.enabled ) );
       this.stream = stream;
       this.source = this.context.createMediaStreamSource( this.stream );
 
@@ -66,6 +74,7 @@ export class AudioEngine {
       // source -> gain -> analyser
       this.source.connect( this.gainNode );
       this.gainNode.connect( this.analyser );
+      console.log( 'Audio Graph Connected: Source -> Gain -> Analyser' );
       this.initialized = true;
     } catch ( err ) {
       this.initialized = false;
@@ -139,5 +148,45 @@ export class AudioEngine {
 
   public getStream (): MediaStream | null {
     return this.stream;
+  }
+
+  public async getDevices (): Promise<MediaDeviceInfo[]> {
+    try {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      // Returns both inputs and outputs (excluding 'communications' duplicates usually)
+      return devices.filter( d =>
+        ( d.kind === 'audioinput' || d.kind === 'audiooutput' ) &&
+        d.deviceId !== 'default' &&
+        d.deviceId !== 'communications'
+      );
+    } catch ( e ) {
+      console.warn( 'Failed to enumerate devices:', e );
+      return [];
+    }
+  }
+
+  public async setDevice ( deviceId: string ): Promise<void> {
+    console.log( 'Switching Audio Input Device to:', deviceId );
+    await this.init( deviceId );
+  }
+
+  public async setOutputDevice ( deviceId: string ): Promise<void> {
+    if ( !this.context ) return;
+
+    console.log( 'Switching Audio Output Device to:', deviceId );
+
+    // Feature detection for setSinkId (Chrome/Edge/Opera)
+    if ( 'setSinkId' in this.context && typeof ( this.context as any ).setSinkId === 'function' ) {
+      try {
+        await ( this.context as any ).setSinkId( deviceId );
+        console.log( 'Output device set successfully' );
+      } catch ( err ) {
+        console.error( 'Failed to set output device:', err );
+        throw err;
+      }
+    } else {
+      console.warn( 'Browser does not support AudioContext.setSinkId()' );
+      throw new Error( 'Output selection not supported in this browser' );
+    }
   }
 }

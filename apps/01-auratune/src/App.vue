@@ -78,7 +78,12 @@ let droneGain: GainNode | null = null
 
 watch( [isDroneActive, droneVolume, currentNote], () => {
   const context = useAudioEngine().getContext()
-  if ( !context ) return
+  if ( !context ) {
+    console.warn( 'Drone Logic: No AudioContext' );
+    return
+  }
+
+  console.log( 'Drone Watcher:', { active: isDroneActive.value, vol: droneVolume.value, note: currentNote.value, init: isInitialized.value } );
 
   if ( !isDroneActive.value || !currentNote.value || !isInitialized.value ) {
     if ( droneGain ) droneGain.gain.setTargetAtTime( 0, context.currentTime, 0.1 )
@@ -86,6 +91,7 @@ watch( [isDroneActive, droneVolume, currentNote], () => {
   }
 
   if ( !droneOsc ) {
+    console.log( 'Drone: Creating Oscillator' );
     droneOsc = context.createOscillator()
     droneGain = context.createGain()
     droneOsc.type = 'triangle'
@@ -99,10 +105,30 @@ watch( [isDroneActive, droneVolume, currentNote], () => {
   if ( freq && droneOsc ) {
     droneOsc.frequency.setTargetAtTime( freq, context.currentTime, 0.1 )
     if ( droneGain ) {
-      droneGain.gain.setTargetAtTime( droneVolume.value * 0.2, context.currentTime, 0.1 )
+      const targetVol = droneVolume.value * 0.2;
+      console.log( 'Drone: Setting Gain', targetVol );
+      droneGain.gain.setTargetAtTime( targetVol, context.currentTime, 0.1 )
     }
   }
 }, { immediate: true } )
+
+const playTestTone = () => {
+  const ctx = useAudioEngine().getContext();
+  if ( !ctx ) return console.error( 'No Audio Context' );
+
+  console.log( 'Playing Test Tone...' );
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+
+  osc.connect( gain );
+  gain.connect( ctx.destination );
+
+  osc.frequency.value = 440;
+  gain.gain.value = 0.5;
+
+  osc.start();
+  osc.stop( ctx.currentTime + 0.5 );
+}
 
 const toneQuality = computed(() => {
   if (!clarity.value) return 0
@@ -266,12 +292,10 @@ const toneQualityLabel = computed(() => {
                         :class="showVibrato ? 'bg-indigo-500/10 border-indigo-400/30 text-indigo-400' : 'bg-slate-900 border-white/5 text-slate-500'"
                       >
                         <span>Show Vibrato Graph</span>
-                        <div
-                          class="w-2 h-2 rounded-full"
-                          :class="showVibrato ? 'bg-indigo-400' : 'bg-slate-700'"
-                        ></div>
                       </button>
                     </div>
+
+
                     <!-- Tuning Section -->
                     <div
                       v-if=" activeCategory === 'Tuning' "
@@ -344,9 +368,16 @@ const toneQualityLabel = computed(() => {
                         />
                       </div>
  
-                    </div>
+                   </div>
 
 
+
+                    <button
+                      @click="playTestTone"
+                      class="w-full py-3 rounded-xl bg-indigo-500/20 text-indigo-400 font-bold text-xs uppercase tracking-widest hover:bg-indigo-500/30 transition-all border border-indigo-500/50"
+                    >
+                      Test Audio Output (Beep)
+                    </button>
 
                     <!-- Engine Section -->
                     <div
@@ -382,7 +413,7 @@ const toneQualityLabel = computed(() => {
                  </div>
                 </div>
               </div>
-          </div>
+
             </Transition>
           </div>
         </div>
@@ -466,7 +497,7 @@ const toneQualityLabel = computed(() => {
             </div>
           </div>
         </Transition>
-      </div>
+
         <!-- Stats Card -->
       <Transition name="fade-scale">
         <div

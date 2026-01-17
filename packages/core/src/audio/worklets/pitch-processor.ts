@@ -198,18 +198,18 @@ class PitchProcessor extends AudioWorkletProcessor {
     let curMaxPos = 0;
     const len = nsdf.length;
 
-    // 1. Find all peaks > 0
-    // 2. Filter by threshold
+    // 1. Find all local maxima (peaks)
+    const peaks: { pos: number, val: number }[] = [];
 
     // Iterate to find peaks
+    // Skip initial positive slope
     while ( pos < len - 1 && nsdf[pos]! > 0 ) {
-      pos++; // Skip initial positive slope
+      pos++; 
     }
-
+    // Skip negative section
     while ( pos < len - 1 && nsdf[pos]! <= 0 ) {
-      pos++; // Skip negative section
+      pos++; 
     }
-
     if ( pos === 0 ) pos = 1;
 
     while ( pos < len - 1 ) {
@@ -227,20 +227,39 @@ class PitchProcessor extends AudioWorkletProcessor {
       // Once we cross zero (or dip significantly), we found a 'lobe'
       if ( pos < len - 1 && nsdf[pos]! <= 0 ) {
         // Finish this lobe
-        if ( curMaxPos > 0 && nsdf[curMaxPos]! >= this._cutoff ) {
-          maxPositions.push( curMaxPos );
+        if ( curMaxPos > 0 ) {
+          peaks.push( { pos: curMaxPos, val: nsdf[curMaxPos]! } );
         }
         curMaxPos = 0;
       }
     }
 
-    // If we found NO peaks above high cutoff, try lower
-    // (Simplified: just stick to high cutoff for now to avoid false positives)
+    // 2. Heuristic: Pick the true fundamental
+    // Pure Greedy (previous): First peak > 0.5. Problem: Picked 110Hz (ghost) instead of 82Hz (true).
+    // Robust: Find highest peak. Then pick the FIRST peak that is "strong enough" relative to highest.
 
-    // Note: MPM logic usually requires finding the *first* peak that is within a factor k of the overall max.
-    // Here we just take all peaks > cutoff.
+    if ( peaks.length === 0 ) return [];
 
-    return maxPositions;
+    // Find global maximum
+    let globalMaxVal = 0;
+    for ( const p of peaks ) {
+      if ( p.val > globalMaxVal ) globalMaxVal = p.val;
+    }
+
+    // Define acceptance threshold.
+    // k = 0.9 is standard for MPM (very strict, prefers fundamental).
+    // If we set it too low, we get octave errors (high pitch).
+    // If we set it too high, we might miss the first peak if it's slightly quieter than the second (octave low error).
+    const k = 0.85;
+    const threshold = globalMaxVal * k;
+
+    // Also enforce absolute minimum quality (cutoff)
+    const absoluteThreshold = Math.max( threshold, this._cutoff );
+
+    const validPeaks = peaks.filter( p => p.val >= absoluteThreshold );
+
+    // Return indices of accepted peaks
+    return validPeaks.map( p => p.pos );
   }
 
   private parabolicInterpolation ( nsdf: Float32Array, peakIndex: number ): number {

@@ -3,6 +3,24 @@ import type { ChordMatch } from '@spectralsuite/core';
 import { ref } from 'vue';
 import CaptureTray from './CaptureTray.vue';
 
+/**
+ * LiveMonitor Component
+ * 
+ * The visual centerpiece of the Session View.
+ * Displays real-time pitch data, chord names, and contains the "Transport Controls" 
+ * (Pause, Auto-Capture, Key).
+ * 
+ * It uses a "Center-Out" design where the most important info (Current Chord)
+ * is big and central, with secondary controls pushed to the edges.
+ */
+
+/**
+ * Props Definition
+ * 
+ * We use a strict interface here to document exactly what data this monitor needs.
+ * This pattern (lifting state up) keeps this component "dumb" and presentational.
+ * Logic lives in the parent (ChordCaptureModule) or composables.
+ */
 interface Props {
   topChord?: ChordMatch | null;
   capturedNotes: string[];
@@ -10,6 +28,9 @@ interface Props {
   pitch: number | null;
   clarity: number | null;
   keyCenter: string;
+  isPaused: boolean;
+  isAutoCaptureEnabled: boolean;
+  autoCaptureProgress: number;
 }
 
 defineProps<Props>();
@@ -18,8 +39,10 @@ const emit = defineEmits<{
   ( e: 'captureChord', chord: ChordMatch ): void;
   ( e: 'clearNotes' ): void;
   ( e: 'update:keyCenter', key: string ): void;
-  ( e: 'update:keyCenter', key: string ): void;
+  ( e: 'togglePause' ): void;
+  ( e: 'toggleAutoCapture' ): void;
 }>();
+
 
 const isTrayOpen = ref( false );
 const isKeySelectorOpen = ref( false );
@@ -36,57 +59,106 @@ const selectKey = ( key: string ) => {
 </script>
 
 <template>
+  <!-- 
+    The Main Monitor Container
+    
+    Layout Strategy: "Z-Layering"
+    1. Background Gradient (absolute inset-0)
+    2. Pulsing Rings (absolute inset-0)
+    3. Top Control Bar (absolute top-8)
+    4. Central Data Display (relative z-10) -> This sits "on top" of everything
+  -->
   <div
     class="monitor-container min-w-0 relative w-full aspect-square md:aspect-[4/3] rounded-[3rem] md:rounded-[4rem] bg-black/40 border border-white/10 backdrop-blur-sm flex flex-col items-center justify-center overflow-hidden shadow-2xl p-8"
   >
     <div class="absolute inset-0 bg-gradient-to-t from-indigo-500/5 to-transparent"></div>
 
-    <!-- Mobile Tray Toggle (Hidden on Desktop) -->
-    <button
-      @click="toggleTray"
-      class="lg:hidden absolute top-8 left-8 z-30 px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all flex items-center gap-3 active:scale-95"
-    >
-      <div class="flex flex-col gap-1 w-4">
-        <div
-          class="h-0.5 w-full bg-indigo-400 rounded-full transition-all"
-          :class="{ 'rotate-45 translate-y-1.5': isTrayOpen }"
-        ></div>
-        <div
-          class="h-0.5 w-full bg-indigo-400 rounded-full transition-all"
-          :class="{ 'opacity-0': isTrayOpen }"
-        ></div>
-        <div
-          class="h-0.5 w-full bg-indigo-400 rounded-full transition-all"
-          :class="{ '-rotate-45 -translate-y-1.5': isTrayOpen }"
-        ></div>
-      </div>
-      <span class="text-[9px] font-black uppercase tracking-widest text-indigo-300">Tray</span>
-    </button>
-
-    <!-- Key Context Selector (Top Right) -->
-    <div class="absolute top-8 right-8 z-30 flex flex-col items-end gap-2">
+    <div class="absolute inset-x-8 top-8 z-30 flex items-start justify-between">
+      <!-- Left: Mobile Tray Toggle -->
       <button
-        @click="toggleKeySelector"
-        class="px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all flex items-center gap-3 active:scale-95"
+        @click="toggleTray"
+        class="lg:hidden px-4 py-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all flex items-center gap-3 active:scale-95"
       >
-        <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">Key</span>
-        <span class="text-sm font-black text-indigo-400 w-4 text-center">{{ keyCenter }}</span>
+        <div class="flex flex-col gap-1 w-4">
+          <div
+            class="h-0.5 w-full bg-indigo-400 rounded-full transition-all"
+            :class="{ 'rotate-45 translate-y-1.5': isTrayOpen }"
+          ></div>
+          <div
+            class="h-0.5 w-full bg-indigo-400 rounded-full transition-all"
+            :class="{ 'opacity-0': isTrayOpen }"
+          ></div>
+          <div
+            class="h-0.5 w-full bg-indigo-400 rounded-full transition-all"
+            :class="{ '-rotate-45 -translate-y-1.5': isTrayOpen }"
+          ></div>
+        </div>
+        <span class="text-[9px] font-black uppercase tracking-widest text-indigo-300">Tray</span>
       </button>
 
-      <!-- Key Grid Dropdown -->
-      <div
-        v-if=" isKeySelectorOpen "
-        class="absolute top-12 right-0 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-3 grid grid-cols-4 gap-2 shadow-2xl w-48 animate-fade-in"
-      >
+      <!-- Center-Left: Monitor Status Title -->
+      <div class="hidden lg:block">
+        <span class="block font-black uppercase tracking-[0.2em] text-white/40 text-[10px]">
+          {{ topChord ? 'Harmonic Match' : 'Live Monitor' }}
+        </span>
+      </div>
+
+      <!-- Right: Control Group -->
+      <div class="flex items-start gap-2 ml-auto">
+        
+        <!-- Auto-Capture Toggle -->
         <button
-          v-for=" k in keys "
-          :key="k"
-          @click="selectKey( k )"
-          class="aspect-square rounded-lg flex items-center justify-center text-xs font-bold transition-all"
-          :class="k === keyCenter ? 'bg-indigo-500 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'"
+          @click="emit('toggleAutoCapture')"
+          class="h-9 w-9 rounded-xl flex items-center justify-center border transition-all text-sm"
+          :class="isAutoCaptureEnabled ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' : 'bg-white/5 border-white/10 text-slate-500 hover:text-white hover:bg-white/10'"
+          title="Auto-Capture (Hold to Freeze)"
         >
-          {{ k }}
+          🖐️
         </button>
+
+        <!-- Main Pause Button -->
+        <button
+          @click="emit('togglePause')"
+          class="relative h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center overflow-hidden gap-2"
+          :class="isPaused ? 'bg-red-500 border-red-400 text-white shadow-lg shadow-red-500/20' : 'bg-white/5 border-white/10 text-slate-400 hover:text-white hover:bg-white/10'"
+        >
+          <!-- Progress Fill (Background) -->
+          <div
+            v-if=" autoCaptureProgress > 0 "
+            class="absolute left-0 top-0 bottom-0 bg-indigo-500/50 transition-all duration-100 ease-linear"
+            :style="{ width: autoCaptureProgress + '%' }"
+          ></div>
+          <span class="relative z-10">{{ isPaused ? 'Paused' : 'Live' }}</span>
+          <div v-if="isPaused" class="w-2 h-2 rounded-full bg-white animate-pulse"></div>
+        </button>
+
+        <!-- Key Context Selector -->
+        <div class="flex flex-col items-end gap-2 relative">
+          <button
+            @click="toggleKeySelector"
+            class="h-9 px-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 transition-all flex items-center gap-3 active:scale-95"
+          >
+            <span class="text-[9px] font-black uppercase tracking-widest text-slate-500">Key</span>
+            <span class="text-sm font-black text-indigo-400 w-4 text-center">{{ keyCenter }}</span>
+          </button>
+
+          <!-- Key Grid Dropdown -->
+          <div
+            v-if=" isKeySelectorOpen "
+            class="absolute top-10 right-0 bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-3 grid grid-cols-4 gap-2 shadow-2xl w-48 animate-fade-in z-50"
+          >
+            <button
+              v-for=" k in keys "
+              :key="k"
+              @click="selectKey( k )"
+              class="aspect-square rounded-lg flex items-center justify-center text-xs font-bold transition-all"
+              :class="k === keyCenter ? 'bg-indigo-500 text-white' : 'bg-white/5 text-slate-400 hover:bg-white/10 hover:text-white'"
+            >
+              {{ k }}
+            </button>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -107,13 +179,8 @@ const selectKey = ( key: string ) => {
       class="relative z-10 flex flex-col items-center text-center transition-all duration-300 w-full"
       :class="{ 'scale-105': currentNote }"
     >
-      <!-- 1. Header / Status -->
-      <span
-        class="block font-black uppercase tracking-[0.4em] text-indigo-400/40 mb-4"
-        style="font-size: 3cqw;"
-      >
-        {{ topChord ? 'Harmonic Match' : 'Live Monitor' }}
-      </span>
+      <!-- 1. Header / Status (Now in Top Bar, visually hidden here but logic remains if desired, or remove) -->
+      <!-- Removed duplicate header -->
 
       <!-- 2. Main Symbol / Notes -->
       <!-- Fluid Typography using cqw (Container Query Width) -->

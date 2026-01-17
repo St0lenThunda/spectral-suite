@@ -14,7 +14,22 @@ const globalCurrentNote = ref<string | null>( null );
 const noteBuffer = new Set<string>();
 let bufferTimeout: any = null;
 import { sensitivityThreshold, clarityThreshold } from '../config/sensitivity';
-const BUFFER_IDLE_TIME = 10000; // 10 seconds of silence to clear the *tray*, but keeps the *visual result*
+const BUFFER_IDLE_TIME = 3000; // 3 seconds of silence to clear the *tray*, but keeps the *visual result*
+
+// Persistence / Debounce Config
+/**
+ * PERSISTENCE_THRESHOLD (80ms):
+ * The amount of time a set of notes must remain unchanged before we trust it.
+ * 
+ * WHY IS THIS NEEDED?
+ * When you strum a guitar, the pick hits strings one by one (transients).
+ * This creates a chaotic 50-100ms window where notes appear and disappear rapidly.
+ * By waiting 80ms, we ignore this chaos and only capture the "sustain" phase 
+ * of the chord.
+ */
+const PERSISTENCE_THRESHOLD = 80;
+let persistenceTimer: any = null;
+
 // NOISE_FLOOR accessed directly via sensitivityThreshold.value in watch
 
 // Initialize from localStorage if available
@@ -34,6 +49,17 @@ if ( typeof window !== 'undefined' ) {
 
 import { usePolyPitch } from '../audio/usePolyPitch';
 
+/**
+ * useChordCapture Composable
+ * 
+ * The "Brain" of the Session View.
+ * this module orchestrates the interaction between:
+ * 1. The Audio Engine (Pitch/Volume/Clarity)
+ * 2. The Polyphonic Detector (Multi-note analysis)
+ * 3. The Chord Theory Engine (Naming chords)
+ * 
+ * It manages the "Tray" (captured notes) and the "Ledger" (history of chords).
+ */
 export function useChordCapture () {
   const { pitch, clarity, volume } = usePitch( { smoothing: 3 } );
   const { detectedNotes: polyNotes } = usePolyPitch();
@@ -46,35 +72,39 @@ export function useChordCapture () {
 
   // Polyphonic Integration
   watch( polyNotes, ( newPoly ) => {
-    if ( newPoly.length >= 2 ) {
-      /**
-       * Strum-Sync Logic:
-       * If we see 3 or more notes at once, we assume a "Strum Event".
-       * Instead of adding to the tray (which might contain old transients),
-       * we SYNC the tray to exactly what the spectral engine sees.
-       */
-      if ( newPoly.length >= 3 ) {
-        noteBuffer.clear();
-        newPoly.forEach( pc => noteBuffer.add( pc ) );
-        capturedNotes.value = Array.from( noteBuffer );
-        detectedChords.value = ChordEngine.detectChords( capturedNotes.value, keyCenter.value );
-        return;
-      }
+    // Debounce Logic:
+    // If input changes, we wait PERSISTENCE_THRESHOLD ms.
+    // If it changes again within that time, we reset the timer.
+    // Only commit if strictly stable.
 
-      // For 2 notes, we stick to "Additive Mode" so the user can build a chord slowly.
-      let changed = false;
-      newPoly.forEach( pc => {
-        if ( !noteBuffer.has( pc ) ) {
-          noteBuffer.add( pc );
-          changed = true;
+    if ( persistenceTimer ) clearTimeout( persistenceTimer );
+
+    persistenceTimer = setTimeout( () => {
+    // Logic inside timeout: executes only after input is stable (The "Debounce" effect)
+
+
+      if ( newPoly.length >= 2 ) {
+        /**
+         * Smart Sync Logic:
+         * If we detect a stable chord (>= 2 notes), we assume this is the INTENDED chord.
+         * We sync the tray to match exactly these notes.
+         * This allows changing chords (e.g. C -> F) to instantly clear the old notes (C, E, G)
+         * and register the new ones (F, A, C) without "accumulation" artifacts.
+         */
+
+        // Check for difference to avoid redundant computation
+        const currentNotes = Array.from( noteBuffer );
+        const isDifferent = newPoly.length !== currentNotes.length ||
+          !newPoly.every( n => noteBuffer.has( n ) );
+
+        if ( isDifferent ) {
+          noteBuffer.clear();
+          newPoly.forEach( pc => noteBuffer.add( pc ) );
+          capturedNotes.value = Array.from( noteBuffer );
+          detectedChords.value = ChordEngine.detectChords( capturedNotes.value, keyCenter.value );
         }
-      } );
-
-      if ( changed ) {
-        capturedNotes.value = Array.from( noteBuffer );
-        detectedChords.value = ChordEngine.detectChords( capturedNotes.value, keyCenter.value );
       }
-    }
+    }, PERSISTENCE_THRESHOLD );
   } );
 
   watch( pitch, ( newPitch ) => {

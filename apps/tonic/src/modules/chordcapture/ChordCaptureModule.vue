@@ -440,44 +440,23 @@ const emit = defineEmits<{
             :pitch="effectivePitch"
             :clarity="effectiveClarity"
             :key-center="keyCenter"
+            :is-paused="isPaused"
+            :is-auto-capture-enabled="isAutoCaptureEnabled"
+            :auto-capture-progress="autoCaptureProgress"
             @update:key-center="updateKey"
             @capture-chord="handleChordCapture"
             @clear-notes="clearNotes"
-            @forge="handleForge"
+            @toggle-pause="togglePause"
+            @toggle-auto-capture="isAutoCaptureEnabled = !isAutoCaptureEnabled"
           />
-          <!-- Pause Toggle Button (Absolute Top Right of Monitor) -->
-          <div class="absolute top-4 right-4 z-20 flex flex-col gap-2 items-end">
-            <!-- Auto-Capture Toggle -->
-            <button
-              @click="isAutoCaptureEnabled = !isAutoCaptureEnabled"
-              class="w-8 h-8 rounded-full flex items-center justify-center border transition-all text-xs"
-              :class="isAutoCaptureEnabled ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'"
-              title="Auto-Capture (Hold to Freeze)"
-            >
-              🖐️
-            </button>
-
-            <!-- Main Pause Button -->
-            <button
-              @click="togglePause"
-              class="relative px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border transition-all flex items-center justify-center overflow-hidden"
-              :class="isPaused ? 'bg-red-500 border-red-400 text-white shadow-lg shadow-red-500/20 animate-pulse' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white hover:border-slate-500'"
-            >
-              <!-- Progress Fill (Background) -->
-              <div
-                v-if=" autoCaptureProgress > 0 "
-                class="absolute left-0 top-0 bottom-0 bg-indigo-500/50 transition-all duration-100 ease-linear"
-                :style="{ width: autoCaptureProgress + '%' }"
-              ></div>
-              <span class="relative z-10">{{ isPaused ? '⏸ Paused' : 'Live' }}</span>
-            </button>
-          </div>
+          
           <!-- Frozen Overlay Indicator -->
           <div
             v-if=" isPaused "
             class="absolute inset-0 rounded-[2.5rem] border-4 border-red-500/30 pointer-events-none z-10 transition-all"
           ></div>
         </div>
+
 
         <!-- 2. Harmonic Suggestions (Top-Right) -->
         <div class="w-full flex justify-center h-full">

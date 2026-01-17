@@ -14,7 +14,7 @@ const {
   concertA,
   transposition,
   pitchHistory,
-} = usePitch()
+} = usePitch( { averagingWindowMs: 2500 } )
 
 const { init, isInitialized, error: engineError, activate, deactivate } = useAudioEngine()
 const { openInfo } = useToolInfo();
@@ -116,7 +116,12 @@ let droneGain: GainNode | null = null
 
 watch( [isDroneActive, droneVolume, currentNote], () => {
   const context = useAudioEngine().getContext()
-  if ( !context ) return
+  if ( !context ) {
+    console.warn( 'Drone Logic: No AudioContext' );
+    return
+  }
+
+  console.log( 'Drone Watcher:', { active: isDroneActive.value, vol: droneVolume.value, note: currentNote.value, init: isInitialized.value } );
 
   if ( !isDroneActive.value || !currentNote.value || !isInitialized.value ) {
     if ( droneGain ) droneGain.gain.setTargetAtTime( 0, context.currentTime, 0.1 )
@@ -124,20 +129,23 @@ watch( [isDroneActive, droneVolume, currentNote], () => {
   }
 
   if ( !droneOsc ) {
+    console.log( 'Drone: Creating Oscillator' );
     droneOsc = context.createOscillator()
     droneGain = context.createGain()
-    droneOsc.type = 'triangle' // Softer than saw, richer than sine
+    droneOsc.type = 'triangle'
     droneOsc.connect( droneGain )
     droneGain.connect( context.destination )
     droneGain.gain.value = 0
     droneOsc.start()
   }
 
-  const freq = Note.get( currentNote.value ).freq
+  const freq = Note.get( currentNote.value ).freq 
   if ( freq && droneOsc ) {
     droneOsc.frequency.setTargetAtTime( freq, context.currentTime, 0.1 )
     if ( droneGain ) {
-      droneGain.gain.setTargetAtTime( droneVolume.value * 0.2, context.currentTime, 0.1 )
+      const targetVol = droneVolume.value * 0.2;
+      console.log( 'Drone: Setting Gain', targetVol );
+      droneGain.gain.setTargetAtTime( targetVol, context.currentTime, 0.1 )
     }
   }
 }, { immediate: true } )

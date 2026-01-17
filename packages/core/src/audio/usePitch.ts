@@ -21,7 +21,15 @@ export const downsample = computed( {
   set: ( val ) => { usePlatformStore().downsample = val; }
 } );
 
-export function usePitch ( config: { smoothing?: number } = {} ) {
+
+export interface PitchConfig {
+  smoothing?: number;
+  averagingWindowMs?: number;
+  dynamicsResetThreshold?: number;
+}
+
+export function usePitch ( config: PitchConfig = {} ) {
+
   const { getAnalyser, getContext, isInitialized } = useAudioEngine();
   const pitch = ref<number | null>( null );
   const clarity = ref<number | null>( null );
@@ -38,6 +46,13 @@ export function usePitch ( config: { smoothing?: number } = {} ) {
   const MEDIAN_SIZE = config.smoothing ?? 7; // Default to stable (7), allow agile (1-3)
   let nullFrameCount = 0;
   const NULL_GRACE_PERIOD = 10; // Frames to wait before giving up on a note
+
+  // Averaging Buffer for long-term stability
+  // default to 0 (disabled) unless configured
+  const AVERAGING_WINDOW = config.averagingWindowMs ?? 0;
+  const DYNAMICS_THRESHOLD = config.dynamicsResetThreshold ?? 0.05; // Significant volume jump
+  const averagingBuffer: { pitch: number, time: number }[] = [];
+  let lastVolume = 0;
 
   // Watch for LPF toggle and config changes (from global platform store)
   watch( [() => usePlatformStore().isLowPassEnabled, () => usePlatformStore().downsample], () => {
@@ -89,7 +104,6 @@ export function usePitch ( config: { smoothing?: number } = {} ) {
         downsample: downsample.value
       } );
     } catch ( e ) {
-      console.warn( 'PitchNodePool failed, falling back to Native Main Thread:', e );
       startLegacyLoop();
     }
   };
@@ -165,6 +179,32 @@ export function usePitch ( config: { smoothing?: number } = {} ) {
       const sorted = [...validPitches].sort( ( a, b ) => a - b );
       p = sorted[Math.floor( sorted.length / 2 )]!;
     }
+
+    // 4. Long-term Averaging & Dynamics Reset
+    if ( p && AVERAGING_WINDOW > 0 ) {
+      const now = performance.now();
+
+      // Dynamics Reset: If volume spikes (new note attack), clear old history to lock quickly
+      // We use a simple difference check. 
+      if ( v > lastVolume + DYNAMICS_THRESHOLD ) {
+        averagingBuffer.length = 0;
+      }
+
+      averagingBuffer.push( { pitch: p, time: now } );
+
+      // Prune old values
+      while ( averagingBuffer.length > 0 && ( now - averagingBuffer[0]!.time > AVERAGING_WINDOW ) ) {
+        averagingBuffer.shift();
+      }
+
+      // Calculate Average
+      if ( averagingBuffer.length > 0 ) {
+        const sum = averagingBuffer.reduce( ( acc, curr ) => acc + curr.pitch, 0 );
+        p = sum / averagingBuffer.length;
+      }
+    }
+
+    lastVolume = v;
 
     pitch.value = p;
     clarity.value = rawClarity;

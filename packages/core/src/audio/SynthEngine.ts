@@ -21,8 +21,8 @@ export class SynthEngine {
   private context: AudioContext | null = null;
   private gainNode: GainNode | null = null;
 
-  // Default to Retro
-  private currentPreset: TonePreset = 'RETRO';
+  // Default to Nylon (Plucked)
+  private currentPreset: TonePreset = 'PLUCKED';
 
   // Excitation Buffers (Generated once)
   private buffers: { [key: string]: AudioBuffer } = {};

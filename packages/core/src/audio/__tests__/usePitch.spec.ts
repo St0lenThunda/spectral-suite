@@ -1,8 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { usePitch } from '../usePitch';
-import { ref, nextTick } from 'vue';
+import { poolPitch, poolClarity, poolVolume } from '../PitchNodePool';
+import { ref, nextTick, defineComponent } from 'vue';
+import { mount, flushPromises } from '@vue/test-utils';
 
-// Mock dependencies
+// 1. Mock Dependencies
+// -------------------------------------------------------------------------
+
+// Mock Tonal
 vi.mock( 'tonal', () => ( {
   Note: {
     fromFreq: vi.fn( ( freq ) => {
@@ -21,126 +26,140 @@ vi.mock( 'tonal', () => ( {
   },
 } ) );
 
-// Mock AudioWorkletNode to capture the listener
-let mockPortHandlers: Record<string, ( e: any ) => void> = {};
-
-vi.mock( '../worklets/pitch-processor.ts?worker&url', () => ( {
-  default: 'mock-worker-url',
+// Mock Sensitivity Config
+vi.mock( '../../config/sensitivity', () => ( {
+  clarityThreshold: { value: 0.8 }
 } ) );
 
-vi.mock( '../useAudioEngine', () => ( {
-  useAudioEngine: vi.fn( () => ( {
-    getAnalyser: vi.fn( () => ( {
-      connect: vi.fn(),
-      getFloatTimeDomainData: vi.fn(), // Fallback if legacy loop triggers
-      fftSize: 2048,
-    } ) ),
-    getContext: vi.fn( () => ( {
-      createScriptProcessor: vi.fn( () => ( {
-        connect: vi.fn(),
-        onaudioprocess: null,
-      } ) ),
-      createAnalyser: vi.fn(),
-      sampleRate: 44100,
-      state: 'running',
-      audioWorklet: {
-        addModule: vi.fn().mockResolvedValue( undefined ),
-      },
-      destination: {},
-      resume: vi.fn().mockResolvedValue( undefined ),
-    } ) ),
-    isInitialized: ref( true ),
-  } ) ),
+// Mock Platform Store
+vi.mock( '../../stores/platform', () => ( {
+  usePlatformStore: vi.fn( () => ( {
+    isLowPassEnabled: { value: false },
+    downsample: { value: 1 }
+  } ) )
 } ) );
 
-// Mock AudioWorkletNode globally
-// Mock AudioWorkletNode globally
-const AudioWorkletNodeMock = vi.fn().mockImplementation( () => {
-  const port = {
-    postMessage: vi.fn(),
-    set onmessage ( handler: ( e: any ) => void ) {
-      mockPortHandlers['message'] = handler;
-    },
-  };
+// Mock PitchNodePool
+vi.mock( '../PitchNodePool', async () => {
+  const { ref } = await import( 'vue' );
   return {
-    port,
-    connect: vi.fn(),
-    disconnect: vi.fn(),
+    PitchNodePool: {
+      acquire: vi.fn().mockResolvedValue( undefined ),
+      release: vi.fn(),
+      configure: vi.fn(),
+    },
+    poolPitch: ref( null ),
+    poolClarity: ref( null ),
+    poolVolume: ref( 0 ),
   };
 } );
 
-vi.stubGlobal( 'AudioWorkletNode', AudioWorkletNodeMock );
+// Mock AudioEngine
+vi.mock( '../useAudioEngine', () => ( {
+  useAudioEngine: vi.fn( () => ( {
+    getAnalyser: vi.fn().mockReturnValue( {} ),
+    getContext: vi.fn().mockReturnValue( {
+      state: 'running', 
+      resume: vi.fn().mockResolvedValue( undefined )
+    } ),
+    isInitialized: ref( true ), // Start initialized so usePitch calls initFromPool
+    init: vi.fn(),
+  } ) ),
+} ) );
+
+// Mock AudioWorkletNode
+vi.stubGlobal( 'AudioWorkletNode', vi.fn() );
+
+// -------------------------------------------------------------------------
 
 describe( 'usePitch', () => {
   beforeEach( () => {
-    mockPortHandlers = {};
     vi.clearAllMocks();
+    poolPitch.value = null;
+    poolClarity.value = null;
+    poolVolume.value = 0;
   } );
+
+  // Helper to mount composable within a component context
+  function mountUsePitch ( config?: any ) {
+    let result: any;
+    const Comp = defineComponent( {
+      setup () {
+        result = usePitch( config );
+        return () => null;
+      }
+    } );
+    const wrapper = mount( Comp );
+    return { wrapper, result };
+  }
 
   it( 'initializes with default values', () => {
-    const { pitch, clarity, volume, currentNote, cents } = usePitch();
-    expect( pitch.value ).toBeNull();
-    expect( clarity.value ).toBeNull();
-    expect( volume.value ).toBe( 0 );
-    expect( currentNote.value ).toBeNull();
-    expect( cents.value ).toBe( 0 );
+    const { result } = mountUsePitch();
+    expect( result.pitch.value ).toBeNull();
+    expect( result.clarity.value ).toBeNull();
+    expect( result.volume.value ).toBe( 0 );
+    expect( result.currentNote.value ).toBeNull();
+    expect( result.cents.value ).toBe( 0 );
   } );
 
-  it( 'updates state when worklet sends pitch data', async () => {
-    // 1. Setup toggle-able initialization
-    const isInitialized = ref( false );
-    const { useAudioEngine } = await import( '../useAudioEngine' );
-    vi.mocked( useAudioEngine ).mockReturnValue( {
-      getAnalyser: vi.fn( () => ( {
-        connect: vi.fn(),
-        getFloatTimeDomainData: vi.fn(),
-        fftSize: 2048
-      } ) ) as any,
-      getContext: vi.fn( () => ( {
-        createScriptProcessor: vi.fn(),
-        createAnalyser: vi.fn(),
-        sampleRate: 44100,
-        state: 'running',
-        audioWorklet: { addModule: vi.fn().mockResolvedValue( undefined ) },
-        destination: {},
-        resume: vi.fn().mockResolvedValue( undefined ),
-      } ) ) as any,
-      isInitialized: isInitialized,
-      init: vi.fn(),
-    } as any );
+  it( 'updates state when pool data changes', async () => {
+    // Initialize
+    const { result } = mountUsePitch();
+    await flushPromises(); // Allow async acquire/onMounted
 
-    const { pitch, clarity, currentNote, cents } = usePitch();
+    // Update Pool Data
+    poolPitch.value = 440;
+    poolClarity.value = 0.95;
+    poolVolume.value = 0.5;
+    await nextTick(); // reactive update
 
-    // 2. Trigger Initialization
-    isInitialized.value = true;
-    await nextTick();
-    await nextTick(); // Wait for async initWorklet
+    // Assertions
+    expect( result.pitch.value ).toBe( 440 );
+    expect( result.clarity.value ).toBe( 0.95 );
+    expect( result.currentNote.value ).toBe( 'A4' );
+    expect( result.cents.value ).toBe( 0 );
+  } );
 
-    // 3. Trigger Message
-    // The mock global AudioWorkletNode should have captured the handler
-    expect( mockPortHandlers['message'] ).toBeDefined();
+  it( 'averages pitch when configured', async () => {
+    // 1. Initialize with Averaging Window
+    const { result } = mountUsePitch( { averagingWindowMs: 1000, dynamicsResetThreshold: 0.1, smoothing: 1 } );
+    await flushPromises(); // init
 
-    // Simulate "Perfect A440"
-    mockPortHandlers['message']!( {
-      data: { pitch: 440, clarity: 0.95, volume: 0.5 }
-    } );
-
+    // 2. Send Initial Pitch (440Hz, Vol 0.5)
+    vi.spyOn( performance, 'now' ).mockReturnValue( 1000 );
+    poolPitch.value = 440;
+    poolClarity.value = 1.0;
+    poolVolume.value = 0.5;
     await nextTick();
 
-    // 4. Assertions
-    expect( pitch.value ).toBe( 440 );
-    expect( clarity.value ).toBe( 0.95 );
-    expect( currentNote.value ).toBe( 'A4' );
-    expect( cents.value ).toBe( 0 );
+    expect( result.pitch.value ).toBe( 440 ); // Initial value
 
-    // Simulate "Slightly Sharp A440"
-    mockPortHandlers['message']!( {
-      data: { pitch: 445, clarity: 0.95, volume: 0.5 }
-    } );
+    // 3. Send Second Pitch (450Hz, Vol 0.5) - constant volume
+    vi.spyOn( performance, 'now' ).mockReturnValue( 1100 ); // 100ms later
+    poolPitch.value = 450;
+    poolClarity.value = 1.0;
+    poolVolume.value = 0.5; // No volume spike
     await nextTick();
 
-    // Check if median filter handles it (might need multiple samples if smoothing is on)
-    // With default smoothing, it might lag.
-    // Let's rely on the first value setting the median buffer if it was empty.
+    // Average of 440 and 450 = 445
+    expect( result.pitch.value ).toBe( 445 );
+
+    // 4. Send Third Pitch (460Hz, Vol 0.5)
+    vi.spyOn( performance, 'now' ).mockReturnValue( 1200 ); // 200ms later
+    poolPitch.value = 460;
+    await nextTick();
+
+    // (440 + 450 + 460) / 3 = 450
+    expect( result.pitch.value ).toBe( 450 );
+
+    // 5. Test Dynamics Reset (Volume Jump)
+    // New Note Attack: 440Hz, Vol 0.8 (Jump > 0.1)
+    vi.spyOn( performance, 'now' ).mockReturnValue( 1300 );
+    poolVolume.value = 0.8;
+    poolPitch.value = 440;
+    await nextTick();
+
+    // Should have reset the buffer, so pitch is just 440
+    expect( result.pitch.value ).toBe( 440 );
   } );
 } );

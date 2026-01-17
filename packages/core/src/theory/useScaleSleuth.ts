@@ -2,7 +2,8 @@ import { ref, watch } from 'vue';
 import { Note } from 'tonal';
 import { usePitch } from '../audio/usePitch';
 import { ScaleEngine, type ScaleMatch } from '../theory/ScaleEngine';
-import { sensitivityThreshold, clarityThreshold } from '../config/sensitivity';
+
+
 
 export function useScaleSleuth () {
   const { pitch, clarity, volume, isLowPassEnabled, downsample } = usePitch( { smoothing: 3 } );

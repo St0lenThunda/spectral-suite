@@ -251,7 +251,7 @@ const handleFretClick = ( s: number, f: number ) => {
     const note = getNoteAtFret( s, f );
     SynthEngine.getInstance().playNote( Note.freq( note ) || 440, 500, 0.3 );
   }
-  emit( 'update:chord', detectedChord.value, selectedNotes.value );
+  emit( 'update:chord', detectedChord.value || '', selectedNotes.value );
 };
 
 const strum = () => {

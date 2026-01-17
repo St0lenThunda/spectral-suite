@@ -45,7 +45,6 @@ const {
   keyCenter,
   clearNotes,
   captureChord,
-  removeChord,
   clearHistory,
   getFormattedLedger
 } = useChordCapture()

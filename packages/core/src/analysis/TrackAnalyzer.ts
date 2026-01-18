@@ -2,6 +2,9 @@ import { BpmDetector } from './BpmDetector';
 import { KeyDetector } from './KeyDetector';
 import { AudioEngine } from '../audio/AudioEngine';
 
+import { OfflinePitch } from './OfflinePitch';
+import { ChordEngine } from '../theory/ChordEngine';
+
 export interface AnalysisResult {
   bpm: number;
   key: string;
@@ -9,6 +12,7 @@ export interface AnalysisResult {
   energyMap: number[];
   fileName: string;
   sections: { label: string; start: number; end: number }[];
+  chords: { start: number; end: number; symbol: string; roman: string }[];
   buffer?: AudioBuffer;
 }
 
@@ -49,6 +53,9 @@ export class TrackAnalyzer {
     // Detect song sections using both energy and vocal data
     const sections = this.detectSections( energyMap, vocalMap, audioBuffer.duration );
 
+    // Detect Chords (Spectral Windowing)
+    const chords = await this.detectChords( audioBuffer );
+
     return {
       bpm,
       key: keyData.key,
@@ -56,8 +63,153 @@ export class TrackAnalyzer {
       energyMap,
       fileName,
       sections,
+      chords,
       buffer: audioBuffer
     };
+  }
+
+  private static async detectChords ( buffer: AudioBuffer ): Promise<{ start: number, end: number, symbol: string, roman: string }[]> {
+    const offlineCtx = new OfflineAudioContext( 1, buffer.length, buffer.sampleRate );
+    const source = offlineCtx.createBufferSource();
+    source.buffer = buffer;
+    source.connect( offlineCtx.destination );
+
+    // We can't use real-time AnalyserNode with OfflineAudioContext in the same way for "faster than realtime"
+    // So we manually slice the raw channel data.
+
+    // Window size: ~250ms (approx 1 beat at 120bpm is 500ms, let's go granular)
+    const windowSize = 0.25;
+    const sampleRate = buffer.sampleRate;
+    const chunkSize = Math.floor( sampleRate * windowSize );
+    const data = buffer.getChannelData( 0 );
+    const totalChunks = Math.floor( data.length / chunkSize );
+
+    const timeline: { start: number, end: number, symbol: string, roman: string }[] = [];
+
+    // Re-use a Float32Array for FFT to avoid allocations
+    // FFT Size 2048 is standard for musical pitch
+    const fftSize = 4096;
+    const frequencyData = new Float32Array( fftSize / 2 );
+
+    // We need to perform a "Mock FFT" or use a library for true FFT.
+    // Since we don't have a JS FFT lib installed, we have to rely on a workaround or basic implementation.
+    // actually, 'OfflinePitch' expects frequency data (post-FFT).
+    // Getting frequency data from raw PCM without an AnalyserNode (which requires time-progression) is hard without an FFT lib.
+
+    // Better approach:
+    // Use the OfflineAudioContext to render *slices* or use an Analyser connected to the offline context 
+    // BUT AnalyserNode doesn't work well in "startRendering" fast-forward mode for extracting data at intervals.
+
+    // ALTERNATIVE: Use a "Scanning" Offline Context?
+    // Actually, for this prototype, let's use a simplified "Time Domain" pitch detection 
+    // OR create a temporary sequence of small offline contexts? No, too heavy.
+
+    // Let's defer to the implementation plan which assumed we could "Perform FFT".
+    // I will use a very basic JS FFT implementation here for the sake of the feature.
+
+    // Simple Real-to-Complex FFT (Cooley-Tukey) for just the magnitude
+    // This is computationally expensive but native JS.
+    const performFFT = ( signal: Float32Array ): Float32Array => {
+      const n = signal.length;
+      const real = new Float32Array( signal );
+      const imag = new Float32Array( n ).fill( 0 );
+
+      // Bit-reversal permutation
+      let j = 0;
+      for ( let i = 0; i < n - 1; i++ ) {
+        if ( i < j ) {
+          [real[i], real[j]] = [real[j]!, real[i]!];
+          [imag[i], imag[j]] = [imag[j]!, imag[i]!];
+        }
+        let k = n >> 1;
+        while ( k <= j ) {
+          j -= k;
+          k >>= 1;
+        }
+        j += k;
+      }
+
+      // Butterfly operations
+      let size = 2;
+      while ( size <= n ) {
+        const half = size >> 1;
+        const angle = -2 * Math.PI / size;
+        const wReal = Math.cos( angle );
+        const wImag = Math.sin( angle );
+        for ( let i = 0; i < n; i += size ) {
+          let uReal = 1, uImag = 0;
+          for ( let j = 0; j < half; j++ ) {
+            const index = i + j;
+            const target = index + half;
+            const tReal = uReal * real[target]! - uImag * imag[target]!;
+            const tImag = uReal * imag[target]! + uImag * real[target]!;
+
+            real[target] = real[index]! - tReal;
+            imag[target] = imag[index]! - tImag;
+            real[index]! += tReal;
+            imag[index]! += tImag;
+
+            const tempReal = uReal * wReal - uImag * wImag;
+            uImag = uReal * wImag + uImag * wReal;
+            uReal = tempReal;
+          }
+        }
+        size <<= 1;
+      }
+
+      // Calculate Magnitude
+      const mags = new Float32Array( n / 2 );
+      for ( let i = 0; i < n / 2; i++ ) {
+        mags[i] = 10 * Math.log10( real[i]! * real[i]! + imag[i]! * imag[i]! );
+      }
+      return mags;
+    };
+
+    let lastSymbol = '';
+    let startParams = 0;
+
+    // Optimization: Skip every other chunk or so
+    for ( let i = 0; i < totalChunks; i++ ) {
+      const start = i * chunkSize;
+      const chunk = data.slice( start, start + fftSize );
+
+      // Pad if needed
+      if ( chunk.length < fftSize ) continue;
+
+      const mags = performFFT( chunk );
+
+      const notes = OfflinePitch.detectPolyphonicNotes( mags, sampleRate, -50 );
+      const matches = ChordEngine.detectChords( notes );
+      const symbol = matches[0]?.symbol || '';
+
+      if ( symbol !== lastSymbol ) {
+        if ( lastSymbol ) {
+          // Commit previous
+          timeline.push( {
+            start: startParams,
+            end: i * windowSize,
+            symbol: lastSymbol,
+            roman: '' // Todo: Key context
+          } );
+        }
+        lastSymbol = symbol;
+        startParams = i * windowSize;
+      }
+    }
+
+    // Commit final
+    if ( lastSymbol ) {
+      timeline.push( {
+        start: startParams,
+        end: buffer.duration,
+        symbol: lastSymbol,
+        roman: ''
+      } );
+    }
+
+
+
+    return timeline;
   }
 
   private static detectSections ( energyMap: number[], vocalMap: number[], duration: number ): { label: string; start: number; end: number }[] {

@@ -353,7 +353,7 @@ const handleNutAction = ( stringNum: number ) => {
   <div class="fretboard-container overflow-x-auto p-4 bg-slate-950 rounded-2xl border border-slate-800">
     <svg
       :viewBox="`0 0 ${FRETBOARD_WIDTH} ${FRETBOARD_HEIGHT}`"
-      class="w-full min-w-[600px] h-auto"
+      class="w-full min-w-[600px] mx-auto"
       preserveAspectRatio="xMidYMid meet"
     >
       <!-- Wood Texture Background -->
@@ -430,6 +430,20 @@ const handleNutAction = ( stringNum: number ) => {
         :height="FRETBOARD_HEIGHT"
         fill="#f5f5f5"
         rx="2"
+      />
+
+      <!-- Range Indicator (Area Highlight) -->
+      <rect
+        v-if=" props.fretRange "
+        :x="getFretX( props.fretRange[0] ) - ( ( FRETBOARD_WIDTH - NUT_WIDTH ) / fretCount ) / 2"
+        y="0"
+        :width="( ( FRETBOARD_WIDTH - NUT_WIDTH ) / fretCount ) * ( props.fretRange[1] - props.fretRange[0] + 1 )"
+        :height="FRETBOARD_HEIGHT"
+        fill="rgba(99, 102, 241, 0.1)"
+        stroke="rgba(99, 102, 241, 0.3)"
+        stroke-width="2"
+        rx="8"
+        class="pointer-events-none transition-all duration-300"
       />
 
       <!-- Fret Wires -->

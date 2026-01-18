@@ -47,3 +47,10 @@ __pycache__/
 
 # Docs Build
 docs/*
+
+# Playwright Testing Artifacts
+# These folders contain large binary files (videos, screenshots, traces) generated during test runs.
+# We do NOT want to commit them because they change every time and bloat the repo size.
+test-results/
+playwright-report/
+blob-report/

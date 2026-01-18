@@ -248,6 +248,7 @@ const toneQualityLabel = computed(() => {
               max="490"
               v-model.number="concertA"
               class="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
+              aria-label="Concert A Frequency"
             />
             <p class="text-[11px] text-slate-500 leading-relaxed">
               Sets the frequency of A4. Standard is 440Hz. 432Hz or other scientific tunings can be set here.
@@ -304,6 +305,7 @@ const toneQualityLabel = computed(() => {
               step="0.1"
               v-model.number="droneVolume"
               class="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
+              aria-label="Drone Volume"
             />
           </div>
         </div>

@@ -21,6 +21,7 @@ const mockAnalyser = {
   fftSize: 2048,
   frequencyBinCount: 1024,
   getByteFrequencyData: vi.fn(),
+  getFloatFrequencyData: vi.fn(),
   getFloatTimeDomainData: vi.fn(),
   smoothingTimeConstant: 0.8,
   context: { sampleRate: 44100 }
@@ -75,6 +76,16 @@ class MockOfflineAudioContext {
 
   createAnalyser () {
     return mockAnalyser;
+  }
+
+  createBufferSource () {
+    return {
+      buffer: null,
+      connect: vi.fn(),
+      start: vi.fn(),
+      stop: vi.fn(),
+      onended: null
+    };
   }
 
   startRendering () {

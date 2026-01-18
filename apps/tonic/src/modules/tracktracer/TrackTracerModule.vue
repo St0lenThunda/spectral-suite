@@ -829,7 +829,7 @@ const exportAnalysis = () => {
 
         <div class="lg:col-span-8 flex flex-col gap-6">
           <div
-            class="p-10 rounded-[2.5rem] bg-white/5 border border-white/5 backdrop-blur-xl h-64 relative overflow-hidden flex flex-col"
+            class="p-10 rounded-[2.5rem] bg-white/5 border border-white/5 backdrop-blur-xl h-auto min-h-[16rem] relative overflow-hidden flex flex-col"
           >
             <!-- Song Sections Labels -->
             <div class="flex h-6 mb-2 border-b border-white/5 items-center">
@@ -874,6 +874,34 @@ const exportAnalysis = () => {
                 <span>{{ formatDuration( result!.duration * 0.75 ) }}</span>
                 <span>{{ formatDuration( result!.duration ) }}</span>
               </div>
+            </div>
+
+            <!-- CHORD TIMELINE -->
+            <div
+              class="h-12 mt-8 relative w-full bg-slate-900/50 border border-white/5 rounded-lg flex items-center overflow-hidden mb-2"
+            >
+              <div
+                v-for=" ( chord, cIdx ) in result!.chords "
+                :key="'chord-' + cIdx"
+                class="absolute top-0 bottom-0 border-l border-white/5 flex items-center justify-center overflow-hidden transition-all duration-200"
+                :class="currentTime >= chord.start && currentTime < chord.end ? 'bg-indigo-600 text-white z-20 shadow-lg' : 'text-slate-600 hover:bg-white/5 hover:text-slate-400'"
+                :style="{
+                  left: ( chord.start / result!.duration * 100 ) + '%',
+                  width: ( ( chord.end - chord.start ) / result!.duration * 100 ) + '%'
+                }"
+              >
+                <span
+                  class="text-[8px] font-bold font-mono truncate px-0.5 tracking-tighter"
+                  :title="chord.symbol"
+                >{{ chord.symbol }}</span>
+              </div>
+
+              <!-- Playhead (Synced) -->
+              <div
+                v-if=" result!.duration > 0 "
+                class="absolute top-0 bottom-0 w-0.5 bg-rose-500 z-30 pointer-events-none shadow-[0_0_10px_rgba(244,63,94,0.8)]"
+                :style="{ left: ( currentTime / result!.duration * 100 ) + '%' }"
+              ></div>
             </div>
           </div>
 

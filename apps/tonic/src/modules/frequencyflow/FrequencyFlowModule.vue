@@ -477,6 +477,7 @@ onUnmounted( () => {
               v-model="fftSize"
               @change="updateEngine"
               class="w-full bg-slate-900 border border-white/10 rounded-2xl px-5 py-3 text-[11px] text-white outline-none hover:border-sky-500/30 transition-colors cursor-pointer"
+              aria-label="FFT Buffer Resolution"
             >
               <option
                 :value="256"
@@ -514,6 +515,7 @@ onUnmounted( () => {
               step="0.01"
               @input="updateEngine"
               class="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-sky-400"
+              aria-label="Signal Smoothing Amount"
             >
           </div>
 

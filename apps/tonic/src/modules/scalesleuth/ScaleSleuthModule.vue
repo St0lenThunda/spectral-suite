@@ -100,8 +100,10 @@ const effectiveScale = computed( () => {
 
 /**
  * Computed: degreeLabels
- * Creates a mapping of chroma values (0-11) to Roman Numeral degrees (I, bII, etc.)
- * This is used to display theoretical degrees on the fretboard bubbles.
+ * 
+ * Creates a mapping of note names to their Roman Numeral degrees (I, bII, III, etc.)
+ * The Fretboard component's getLabel function expects keys to be note names (e.g., "C", "D#"),
+ * because it searches via: Object.keys(labels).find(k => Note.chroma(k) === chroma)
  */
 const degreeLabels = computed( () => {
   const targetName = effectiveScale.value;
@@ -109,11 +111,11 @@ const degreeLabels = computed( () => {
   const found = potentialScales.value.find( s => s.name === targetName );
   if ( !found || !found.romanIntervals ) return {};
 
-  const mapping: Record<number, string> = {};
+  // Use note names as keys (strings), NOT chroma numbers
+  const mapping: Record<string, string> = {};
   found.notes.forEach( ( note, i ) => {
-    // Note.chroma converts a note like "C#" to its index (1).
     const degree = found.romanIntervals?.[i];
-    if ( degree ) mapping[Note.chroma( note ) || 0] = degree;
+    if ( degree ) mapping[note] = degree;  // e.g., "C" -> "I", "D" -> "II"
   } );
   return mapping;
 } );
@@ -379,10 +381,18 @@ watch( isInitialized, ( newVal ) => {
           </div>
 
           <div class="md:col-span-2 border-t border-white/5 pt-6">
-            <div class="flex items-center justify-between">
+            <div
+              class="flex items-center justify-between cursor-pointer"
+              @click="showCAGED = !showCAGED"
+            >
               <div>
-                <h3 class="text-white font-bold text-base">Enable CAGED Mode</h3>
-                <p class="text-xs text-slate-500 uppercase tracking-widest font-mono">Shape Isolation</p>
+                <h3 class="text-white font-bold text-base">CAGED Mode</h3>
+                <!-- Status label button - clicking toggles CAGED mode off/on -->
+                <button
+                  @click.stop="showCAGED = !showCAGED"
+                  class="text-xs uppercase tracking-widest font-mono px-2 py-0.5 rounded hover:bg-white/10 transition-all"
+                  :class="showCAGED ? 'text-indigo-400' : 'text-slate-500 hover:text-slate-300'"
+                >{{ showCAGED ? 'Active' : 'Inactive' }}</button>
               </div>
               <button
                 @click="showCAGED = !showCAGED"
@@ -400,15 +410,14 @@ watch( isInitialized, ( newVal ) => {
             </p>
 
             <div
-              v-if=" showCAGED "
-              class="flex gap-2 animate-pop-in"
+class="flex gap-2 mt-4"
             >
               <button
                 v-for=" shape in ['C', 'A', 'G', 'E', 'D'] "
                 :key="shape"
-                @click="selectedCAGEDShape = shape as any"
+                @click="selectedCAGEDShape = shape as any; showCAGED = true"
                 class="w-10 h-10 rounded-xl text-xs font-black transition-all flex items-center justify-center border"
-                :class="selectedCAGEDShape === shape ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white'"
+                :class="showCAGED && selectedCAGEDShape === shape ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-800 border-slate-700 text-slate-500 hover:text-white hover:bg-slate-700'"
               >{{ shape }}</button>
             </div>
           </div>
@@ -422,122 +431,72 @@ watch( isInitialized, ( newVal ) => {
       </template>
     </LocalSettingsDrawer>
 
-    <div class="grid grid-cols-1 xl:grid-cols-4 gap-6">
-      <div class="xl:col-span-1 space-y-6">
-        <div
-          class="bg-slate-800/40 rounded-3xl p-6 border border-slate-700/50 backdrop-blur-xl relative overflow-hidden"
-        >
-          <div
-            v-if=" isLocked "
-            class="absolute top-0 right-0 px-3 py-1 bg-indigo-500 text-[8px] font-black uppercase tracking-widest text-white z-50 rounded-bl-xl shadow-lg animate-pulse"
-          >Detection Locked</div>
-          <span class="text-[10px] uppercase font-bold tracking-widest text-slate-500 block mb-2">Live Note</span>
-          <div class="flex items-baseline gap-2">
-            <span class="text-5xl font-black text-white font-mono">{{ currentNote || '--' }}</span>
-            <span class="text-sky-500 font-mono text-xs">{{ pitch ? pitch.toFixed( 1 ) + 'Hz' : '' }}</span>
-          </div>
-          <div class="mt-4 h-1.5 bg-slate-700 rounded-full overflow-hidden">
-            <div
-              class="h-full bg-sky-500 transition-all duration-75"
-              :style="{ width: ( clarity || 0 ) * 100 + '%' }"
-            ></div>
-          </div>
-        </div>
+    <div class="flex flex-col gap-6">
+      <!-- TOP ROW: Analysis (20%) & Scale Suggestions (80%) -->
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
 
-        <div class="bg-slate-800/40 rounded-3xl p-6 border border-slate-700/50 backdrop-blur-xl min-h-[150px]">
-          <span class="text-[10px] uppercase font-bold tracking-widest text-slate-500 block mb-4">Detected Set</span>
-          <div class="flex flex-wrap gap-4">
+        <!-- Analysis Panel (20%) -->
+        <div class="lg:col-span-1 space-y-6">
+          <div
+            class="bg-slate-800/40 rounded-3xl p-6 border border-slate-700/50 backdrop-blur-xl relative overflow-hidden"
+          >
             <div
-              v-for=" note in detectedNotes "
-              :key="note"
-              class="group/note perspective-500 relative w-12 h-12"
-            >
+              v-if=" isLocked "
+              class="absolute top-0 right-0 px-3 py-1 bg-indigo-500 text-[8px] font-black uppercase tracking-widest text-white z-50 rounded-bl-xl shadow-lg animate-pulse"
+            >Detection Locked</div>
+            <span class="text-[10px] uppercase font-bold tracking-widest text-slate-500 block mb-2">Live Note</span>
+            <div class="flex items-baseline gap-2">
+              <span class="text-5xl font-black text-white font-mono">{{ currentNote || '--' }}</span>
+              <span class="text-sky-500 font-mono text-xs">{{ pitch ? pitch.toFixed( 1 ) + 'Hz' : '' }}</span>
+            </div>
+            <div class="mt-4 h-1.5 bg-slate-700 rounded-full overflow-hidden">
               <div
-                class="relative w-full h-full transition-transform duration-500 preserve-3d group-hover/note:rotate-y-180"
-              >
-                <div
-                  class="absolute inset-0 backface-hidden rounded-full bg-slate-900 border border-sky-500/30 flex items-center justify-center font-bold text-sky-400 text-sm shadow-lg"
-                >{{ note }}</div>
-                <div
-                  class="absolute inset-0 backface-hidden rotate-y-180 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex flex-col items-center justify-center shadow-lg shadow-indigo-500/10"
-                >
-                  <span
-                    class="text-[8px] text-indigo-400/60 uppercase font-black tracking-tighter leading-none mb-0.5">Degree</span>
-                  <span
-                    class="text-xs font-black text-white leading-none">{{ degreeLabels[Note.chroma( note ) || 0] || '?' }}</span>
-                </div>
-              </div>
-              <div
-                class="absolute -bottom-2 left-1/2 -translate-x-1/2 h-1 rounded-full transition-all duration-500 z-0"
-                :class="getWeightColor( note )"
-                :style="{ width: Math.min( ( noteWeights[note] || 0 ) * 4, 32 ) + 'px' }"
+                class="h-full bg-sky-500 transition-all duration-75"
+                :style="{ width: ( clarity || 0 ) * 100 + '%' }"
               ></div>
             </div>
           </div>
-          <p
-            v-if=" detectedNotes.length === 0 "
-            class="text-xs text-slate-600 italic"
-          >No notes detected yet...</p>
-        </div>
-      </div>
 
-      <div class="xl:col-span-3 space-y-6">
-        <div class="bg-slate-800/20 rounded-3xl p-6 border border-slate-700/50">
-          <div class="flex justify-between items-center mb-4">
-            <h3 class="text-xs font-bold uppercase tracking-widest text-slate-500">Visual Fretboard</h3>
-            <div class="flex items-center gap-3">
-              <!-- Refined Play Button -->
-              <button
-               @click="playScale( scaleNotes, 'current' )"
-                :disabled="!selectedScale"
-                class="flex items-center gap-2 px-4 py-1.5 transition-all duration-300 transform active:scale-95 text-[10px] font-black uppercase disabled:opacity-20"
-                :class="isPlaying && playingScaleName === 'current' ? 'bg-red-500 text-white rounded-lg' : 'bg-emerald-500 text-white rounded-full'"
+          <div class="bg-slate-800/40 rounded-3xl p-6 border border-slate-700/50 backdrop-blur-xl min-h-[150px]">
+            <span class="text-[10px] uppercase font-bold tracking-widest text-slate-500 block mb-4">Detected Set</span>
+            <div class="flex flex-wrap gap-4">
+              <div
+                v-for=" note in detectedNotes "
+                :key="note"
+                class="group/note perspective-500 relative w-12 h-12"
               >
-                <div class="relative w-3 h-3 flex items-center justify-center">
-                  <svg
-                    v-if=" isPlaying && playingScaleName === 'current' "
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-3 w-3"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
+                <div
+                  class="relative w-full h-full transition-transform duration-500 preserve-3d group-hover/note:rotate-y-180"
+                >
+                  <div
+                    class="absolute inset-0 backface-hidden rounded-full bg-slate-900 border border-sky-500/30 flex items-center justify-center font-bold text-sky-400 text-sm shadow-lg"
+                  >{{ note }}</div>
+                  <div
+                    class="absolute inset-0 backface-hidden rotate-y-180 rounded-full bg-indigo-500/20 border border-indigo-500/40 flex flex-col items-center justify-center shadow-lg shadow-indigo-500/10"
                   >
-                    <rect
-                      x="6"
-                      y="6"
-                      width="12"
-                      height="12"
-                    />
-                  </svg>
-                  <svg
-                    v-else
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="h-3 w-3"
-                    fill="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path d="M8 5v14l11-7z" />
-                  </svg>
+                    <span
+                      class="text-[8px] text-indigo-400/60 uppercase font-black tracking-tighter leading-none mb-0.5"
+                    >Degree</span>
+                    <span
+                      class="text-xs font-black text-white leading-none">{{ degreeLabels[Note.chroma( note ) || 0] || '?' }}</span>
+                  </div>
                 </div>
-                {{ isPlaying && playingScaleName === 'current' ? 'Stop' : 'Play' }}
-              </button>
-
-              <span
-                class="text-[10px] text-sky-500 font-bold ml-2"
-                v-if=" selectedScale "
-              >Showing: {{ selectedScale }}</span>
+                <div
+                  class="absolute -bottom-2 left-1/2 -translate-x-1/2 h-1 rounded-full transition-all duration-500 z-0"
+                  :class="getWeightColor( note )"
+                  :style="{ width: Math.min( ( noteWeights[note] || 0 ) * 4, 32 ) + 'px' }"
+                ></div>
+              </div>
             </div>
+            <p
+              v-if=" detectedNotes.length === 0 "
+              class="text-xs text-slate-600 italic"
+            >No notes detected yet...</p>
           </div>
-          <Fretboard
-            :active-notes="showPlayedNotes ? detectedNotes : []"
-            :highlight-notes="showScaleNotes ? scaleNotes : []"
-            :labels="degreeLabels"
-            :num-frets="24"
-            :fret-range="showCAGED ? cagedRange : undefined"
-            :playback-note="playbackNote || undefined"
-          />
         </div>
 
-        <div class="bg-slate-800/40 rounded-3xl p-6 border border-slate-700/50 backdrop-blur-xl">
+        <!-- Scale Suggestions (80%) -->
+        <div class="lg:col-span-4 bg-slate-800/40 rounded-3xl p-6 border border-slate-700/50 backdrop-blur-xl">
           <div class="flex justify-between items-center mb-6">
             <h3 class="text-xs font-bold uppercase tracking-widest text-slate-500">Scale Suggestions</h3>
             <div class="flex bg-slate-900 p-1 rounded-xl border border-white/5">
@@ -559,7 +518,7 @@ watch( isInitialized, ( newVal ) => {
           >
             <p class="text-sm">Detecting scales requires at least 3 distinct notes</p>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
             <button
               v-for=" scale in potentialScales.slice( 0, 10 ) "
               :key="scale.name"
@@ -623,6 +582,62 @@ watch( isInitialized, ( newVal ) => {
             </button>
           </div>
         </div>
+      </div>
+
+      <!-- BOTTOM ROW: Fretboard (Full Width) -->
+      <div class="bg-slate-800/20 rounded-3xl p-6 border border-slate-700/50 overflow-x-auto">
+        <div class="flex justify-between items-center mb-4 min-w-[600px]">
+          <h3 class="text-xs font-bold uppercase tracking-widest text-slate-500">Visual Fretboard</h3>
+          <div class="flex items-center gap-3">
+            <!-- Refined Play Button -->
+            <button
+              @click="playScale( scaleNotes, 'current' )"
+              :disabled="!selectedScale"
+              class="flex items-center gap-2 px-4 py-1.5 transition-all duration-300 transform active:scale-95 text-[10px] font-black uppercase disabled:opacity-20"
+              :class="isPlaying && playingScaleName === 'current' ? 'bg-red-500 text-white rounded-lg' : 'bg-emerald-500 text-white rounded-full'"
+            >
+              <div class="relative w-3 h-3 flex items-center justify-center">
+                <svg
+                  v-if=" isPlaying && playingScaleName === 'current' "
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-3 w-3"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <rect
+                    x="6"
+                    y="6"
+                    width="12"
+                    height="12"
+                  />
+                </svg>
+                <svg
+                  v-else
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="h-3 w-3"
+                  fill="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+              {{ isPlaying && playingScaleName === 'current' ? 'Stop' : 'Play' }}
+            </button>
+
+            <span
+              class="text-[10px] text-sky-500 font-bold ml-2"
+              v-if=" selectedScale "
+            >Showing: {{ selectedScale }}</span>
+          </div>
+        </div>
+        <Fretboard
+          :active-notes="showPlayedNotes ? detectedNotes : []"
+          :highlight-notes="showScaleNotes ? scaleNotes : []"
+          :labels="showDegrees ? degreeLabels : {}"
+          :num-frets="24"
+          :fret-range="showCAGED ? cagedRange : undefined"
+          :playback-note="playbackNote || undefined"
+        />
       </div>
     </div>
 

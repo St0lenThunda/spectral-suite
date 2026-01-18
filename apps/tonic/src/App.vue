@@ -369,7 +369,7 @@ const handleGainChange = ( event: Event ) => {
       <div class="flex items-center gap-8 overflow-x-auto no-scrollbar scroll-smooth w-full md:w-auto">
         <div class="flex flex-col flex-shrink-0 group relative">
           <div class="flex items-center justify-between mb-1.5">
-            <span class="text-[8px] uppercase tracking-[0.3em] text-slate-500 font-black">Input Gain</span>
+            <span class="text-[8px] uppercase tracking-[0.3em] text-slate-400 font-black">Input Gain</span>
             <span
               class="text-[8px] font-mono text-indigo-400 opacity-0 group-hover:opacity-100 transition-opacity">{{ Math.round( inputGain * 100 ) }}%</span>
           </div>
@@ -390,6 +390,7 @@ const handleGainChange = ( event: Event ) => {
               :value="inputGain"
               @input="handleGainChange"
               class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+              aria-label="Global Input Gain"
             />
 
             <!-- Visual Handle/Progress -->
@@ -403,7 +404,7 @@ const handleGainChange = ( event: Event ) => {
         <div class="h-6 w-px bg-white/5 hidden md:block"></div>
 
         <div class="flex flex-col flex-shrink-0 hidden sm:flex">
-          <span class="text-[8px] uppercase tracking-[0.3em] text-slate-500 font-black">Global Engine</span>
+          <span class="text-[8px] uppercase tracking-[0.3em] text-slate-400 font-black">Global Engine</span>
           <span
             class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">{{ isInitialized ? 'Synced' : 'Standby' }}</span>
         </div>

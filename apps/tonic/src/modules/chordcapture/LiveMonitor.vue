@@ -210,6 +210,12 @@ const selectKey = ( key: string ) => {
           <span class="h-6 w-px bg-white/10"></span>
           <span
             class="text-sm md:text-base font-bold text-slate-400 uppercase tracking-[0.2em]">{{ topChord.name }}</span>
+          <span
+            v-if=" topChord.inversion && topChord.inversion !== 'Root' "
+            class="ml-2 px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 text-[10px] font-bold uppercase tracking-wider border border-indigo-500/30"
+          >
+            {{ topChord.inversion }}
+          </span>
         </div>
 
         <div class="flex flex-wrap justify-center gap-2 mb-8">

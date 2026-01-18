@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-import { useChordCapture, useAudioEngine, ChordEngine, SynthEngine, type ChordMatch, useGlobalEngine } from '@spectralsuite/core'
+import { useChordCapture, useAudioEngine, ChordEngine, SynthEngine, type ChordMatch, useGlobalEngine, Fretboard } from '@spectralsuite/core'
 import { useToolInfo } from '../../composables/useToolInfo';
 import ContextDrawer from '../../components/ui/ContextDrawer.vue';
 import ChordForgePanel from '../chordforge/ChordForgePanel.vue';
@@ -19,13 +19,14 @@ const isSettingsOpen = ref( false );
 // Visibility toggles for different note layers on the fretboard
 const showInputNotes = ref( true );
 const showChordNotes = ref( true );
+const showFretboard = ref( false ); // Fretboard hidden by default
 
 const drawerCategories = computed( () => [
   {
     id: 'General',
     label: 'General',
     description: 'Fretboard & Visuals',
-    showIndicator: !showInputNotes.value || !showChordNotes.value
+    showIndicator: !showInputNotes.value || !showChordNotes.value || showFretboard.value
   },
   {
     id: 'Engine',
@@ -354,7 +355,29 @@ const emit = defineEmits<{
             Flow</p>
         </div>
 
-        <div class="flex items-center gap-4">
+        <div class="flex items-center gap-3">
+          <!-- Sleuth Button -->
+          <button
+            @click="isSleuthOpen = true"
+            class="h-10 px-4 rounded-xl bg-slate-800/50 border border-white/5 text-slate-300 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-indigo-500/20 hover:text-white transition-all active:scale-95"
+            title="Open Scale Sleuth"
+          >
+            <span>🕵️</span>
+            <span class="hidden md:inline">Sleuth</span>
+          </button>
+
+          <!-- Forge Button -->
+          <button
+            @click="handleForge"
+            class="h-10 px-4 rounded-xl bg-slate-800/50 border border-white/5 text-slate-300 font-bold uppercase text-[10px] tracking-widest flex items-center gap-2 hover:bg-amber-500/20 hover:text-amber-400 transition-all active:scale-95"
+            title="Open Chord Forge"
+          >
+            <span>⚒️</span>
+            <span class="hidden md:inline">Forge</span>
+          </button>
+
+          <span class="w-px h-6 bg-white/10 mx-1"></span>
+
           <SettingsToggle
             :is-open="isSettingsOpen"
             @click="isSettingsOpen = !isSettingsOpen"
@@ -415,6 +438,23 @@ const emit = defineEmits<{
                 (Emerald).
               </p>
             </div>
+
+            <div class="flex items-center justify-between pt-4 border-t border-white/5">
+              <div>
+                <h3 class="text-white font-bold text-base">Show Fretboard</h3>
+                <p class="text-xs text-slate-500 uppercase tracking-widest font-mono">Full-Width Visualizer</p>
+              </div>
+              <button
+                @click="showFretboard = !showFretboard"
+                class="w-12 h-6 rounded-full transition-colors relative"
+                :class="showFretboard ? 'bg-amber-500' : 'bg-slate-700'"
+              >
+                <div
+                  class="w-4 h-4 rounded-full bg-white absolute top-1 transition-all"
+                  :class="showFretboard ? 'right-1' : 'left-1'"
+                ></div>
+              </button>
+            </div>
           </div>
         </template>
 
@@ -426,8 +466,9 @@ const emit = defineEmits<{
       </LocalSettingsDrawer>
 
       <!-- Main Interactive Split: Monitor (Left) & Workspace (Right) -->
+      <!-- Lowered breakpoint to md: for better responsiveness -->
       <div
-        class="w-full max-w-[100rem] grid grid-cols-1 lg:grid-cols-[35%_65%] lg:grid-rows-[auto_1fr] h-auto lg:h-[calc(100vh-220px)] min-h-[600px] gap-8 items-stretch animate-fade-in px-4 relative pb-24 lg:pb-0"
+        class="w-full max-w-[100rem] grid grid-cols-1 md:grid-cols-[40%_60%] lg:grid-cols-[35%_65%] gap-8 items-start animate-fade-in relative"
       >
 
         <!-- 1. Live Monitor (Top-Left) -->
@@ -600,58 +641,15 @@ const emit = defineEmits<{
       </div>
 
       <!-- 5. Fretboard / Voicing Atlas (Full-Width Bottom) -->
-      <!-- 5. Key Context Footer (Smart Drawer Trigger) -->
-      <!-- 5. Key Context Footer (Smart Drawer Trigger) -->
-      <div class="mt-12 w-full max-w-[100rem] mx-auto grid grid-cols-1 md:grid-cols-2 gap-6 pb-24 lg:pb-0">
-        <!-- Scale Sleuth Trigger -->
-        <button
-          @click="isSleuthOpen = true"
-          class="bg-slate-900/40 hover:bg-slate-900/60 transition-all rounded-[3rem] p-8 border border-white/5 backdrop-blur-3xl px-4 flex items-center justify-between group"
-        >
-          <div class="flex items-center gap-6 px-4">
-            <div
-              class="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center group-hover:bg-indigo-500/20 transition-colors"
-            >
-              <span class="text-3xl">🕵️</span>
-            </div>
-            <div class="text-left">
-              <h3 class="text-2xl font-black text-white italic uppercase tracking-tighter">Scale <span
-                  class="text-indigo-400"
-                >Sleuth</span></h3>
-              <p
-                class="text-xs text-slate-500 uppercase font-bold tracking-widest mt-1 group-hover:text-white transition-colors">
-                Analyze Context</p>
-            </div>
-          </div>
-          <div class="pr-6 opacity-50 group-hover:opacity-100 transition-opacity">
-            <span class="text-xs font-black uppercase tracking-widest text-indigo-400">Open</span>
-          </div>
-        </button>
-
-        <!-- Chord Forge Trigger -->
-        <button
-          @click="handleForge"
-          class="bg-slate-900/40 hover:bg-slate-900/60 transition-all rounded-[3rem] p-8 border border-white/5 backdrop-blur-3xl px-4 flex items-center justify-between group"
-        >
-          <div class="flex items-center gap-6 px-4">
-            <div
-              class="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center group-hover:bg-amber-500/20 transition-colors"
-            >
-              <span class="text-3xl">⚒️</span>
-            </div>
-            <div class="text-left">
-              <h3 class="text-2xl font-black text-white italic uppercase tracking-tighter">Chord <span
-                  class="text-amber-500"
-                >Forge</span></h3>
-              <p
-                class="text-xs text-slate-500 uppercase font-bold tracking-widest mt-1 group-hover:text-white transition-colors">
-                Edit Voicing</p>
-            </div>
-          </div>
-          <div class="pr-6 opacity-50 group-hover:opacity-100 transition-opacity">
-            <span class="text-xs font-black uppercase tracking-widest text-amber-500">Open</span>
-          </div>
-        </button>
+      <div
+        v-if=" showFretboard "
+        class="w-full max-w-[100rem] mx-auto pb-24 lg:pb-0 bg-slate-900/40 rounded-[3rem] p-8 border border-white/5 backdrop-blur-xl"
+      >
+        <Fretboard
+          :active-notes="effectiveCapturedNotes"
+          :highlight-notes="effectiveTopChord ? effectiveTopChord.notes : []"
+          :num-frets="24"
+        />
       </div>
     </main>
 

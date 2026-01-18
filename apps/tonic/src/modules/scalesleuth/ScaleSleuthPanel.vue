@@ -70,19 +70,29 @@ const scaleNotes = computed( () => {
   return s ? s.notes : [];
 } );
 
+/**
+ * Computed: degreeLabels
+ * 
+ * Creates a mapping of note names to their Roman Numeral degrees (I, bII, III, etc.)
+ * The Fretboard component expects keys to be note names (e.g., "C", "D#") not chroma numbers.
+ * When showDegrees is false, we return an empty object so the Fretboard shows note names.
+ */
 const degreeLabels = computed( () => {
-  if ( !showDegrees.value ) return {}; // If toggle off, Fretboard defaults to Note Names if labels property is empty?
-  // Actually Fretboard usually shows note names if no label map provided. 
-  // If we want Note Names, we pass nothing. If we want Intervals, we pass this map.
+  // When toggle is off, return empty so Fretboard displays note names by default
+  if ( !showDegrees.value ) return {};
 
   const targetName = effectiveScale.value;
   if ( !targetName ) return {};
+
   const found = effectivePotentialScales.value.find( s => s.name === targetName );
   if ( !found || !found.romanIntervals ) return {};
-  const mapping: Record<number, string> = {};
+
+  // Build mapping using NOTE NAMES as keys (not chroma numbers)
+  // The Fretboard's getLabel function searches for keys via Note.chroma(key) === chroma
+  const mapping: Record<string, string> = {};
   found.notes.forEach( ( note, i ) => {
     const degree = found.romanIntervals?.[i];
-    if ( degree ) mapping[Note.chroma( note ) || 0] = degree;
+    if ( degree ) mapping[note] = degree;  // Use note name as key, e.g., "C" -> "I"
   } );
   return mapping;
 } );
@@ -204,75 +214,87 @@ const fretboardHighlights = computed( () => {
         </div>
       </div>
 
-      <!-- Detected Notes Strip -->
-      <div class="flex gap-1 overflow-x-auto max-w-[50%] p-1">
+      <!-- Detected Notes Strip + Key Label -->
+      <div class="flex flex-col items-end gap-1">
+        <!-- Prominent Key Label -->
         <div
-          v-for=" n in effectiveDetectedNotes "
-          :key="n"
-          class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
-          :class="getWeightColor( n )"
+          v-if=" effectiveScale "
+          class="text-right"
         >
-          {{ n }}
+          <span class="text-[8px] font-black uppercase tracking-widest text-slate-600">Key</span>
+          <span class="text-lg font-black text-indigo-400 italic tracking-tight ml-2">{{ effectiveScale }}</span>
         </div>
-        <div
-          v-if=" effectiveDetectedNotes.length === 0 "
-          class="text-[9px] text-slate-600 w-full text-right italic"
-        >Play notes...</div>
+        <!-- Notes Strip -->
+        <div class="flex gap-1 overflow-x-auto max-w-full p-1">
+          <div
+            v-for=" n in effectiveDetectedNotes "
+            :key="n"
+            class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white shrink-0"
+            :class="getWeightColor( n )"
+          >
+            {{ n }}
+          </div>
+          <div
+            v-if=" effectiveDetectedNotes.length === 0 "
+            class="text-[9px] text-slate-600 w-full text-right italic"
+          >Play notes...</div>
+        </div>
       </div>
     </div>
 
     <!-- Main Content Area: Split when Maximized -->
-    <div class="flex-1 min-h-0 flex gap-6">
-      <!-- Left: Scale List (Takes full width if not maximized) -->
-      <div class="flex-1 flex flex-col gap-2 overflow-hidden">
-        <div
-          class="flex-1 overflow-y-auto bg-slate-900/30 rounded-2xl border border-white/5 p-2 space-y-2 custom-scrollbar"
-        >
-          <button
-            v-for=" scale in effectivePotentialScales "
-            :key="scale.name"
-            @click="handleScaleClick( scale.name )"
-            class="w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left group"
-            :class="selectedScale === scale.name ? 'bg-indigo-500/20 border-indigo-500' : 'bg-transparent border-white/5 hover:bg-white/5'"
-          >
-            <div>
-              <div class="text-sm font-bold text-white group-hover:text-indigo-300">{{ scale.name }}</div>
-              <div class="text-[9px] text-slate-500 font-mono">{{ scale.notes.join( ' ' ) }}</div>
-            </div>
-            <div class="flex items-center gap-3">
-              <button
-                @click.stop="playScale( scale.notes )"
-                class="w-8 h-8 rounded-full bg-white/5 hover:bg-emerald-500 hover:text-white flex items-center justify-center text-slate-500 transition-colors"
-              >
-                ▶
-              </button>
-              <div class="text-xs font-black text-indigo-500">{{ ( scale.score * 100 ).toFixed( 0 ) }}%</div>
-            </div>
-          </button>
-
+    <div class="flex-1 min-h-0 flex flex-col gap-6">
+      <!-- TOP ROW: Analysis Header + Scale List (side by side) -->
+      <div class="flex gap-6 flex-1 min-h-0">
+        <!-- Left: Scale List -->
+        <div class="flex-1 flex flex-col gap-2 overflow-hidden">
           <div
-            v-if=" effectivePotentialScales.length === 0 "
-            class="text-center py-8 opacity-40"
+            class="flex-1 overflow-y-auto bg-slate-900/30 rounded-2xl border border-white/5 p-2 space-y-2 custom-scrollbar"
           >
-            {{ staticNotes ? 'No scales found.' : 'Listening for pattern...' }}
+            <button
+              v-for=" scale in effectivePotentialScales "
+              :key="scale.name"
+              @click="handleScaleClick( scale.name )"
+              class="w-full flex items-center justify-between p-3 rounded-xl border transition-all text-left group"
+              :class="selectedScale === scale.name ? 'bg-indigo-500/20 border-indigo-500' : 'bg-transparent border-white/5 hover:bg-white/5'"
+            >
+              <div>
+                <div class="text-sm font-bold text-white group-hover:text-indigo-300">{{ scale.name }}</div>
+                <div class="text-[9px] text-slate-500 font-mono">{{ scale.notes.join( ' ' ) }}</div>
+              </div>
+              <div class="flex items-center gap-3">
+                <button
+                  @click.stop="playScale( scale.notes )"
+                  class="w-8 h-8 rounded-full bg-white/5 hover:bg-emerald-500 hover:text-white flex items-center justify-center text-slate-500 transition-colors"
+                >
+                  ▶
+                </button>
+                <div class="text-xs font-black text-indigo-500">{{ ( scale.score * 100 ).toFixed( 0 ) }}%</div>
+              </div>
+            </button>
+
+            <div
+              v-if=" effectivePotentialScales.length === 0 "
+              class="text-center py-8 opacity-40"
+            >
+              {{ staticNotes ? 'No scales found.' : 'Listening for pattern...' }}
+            </div>
           </div>
         </div>
 
-        <!-- Fretboard (Always visible for now, or conditionally) -->
-        <div
-          v-if=" showFretboard "
-          class="h-[200px] shrink-0 bg-slate-800/50 rounded-2xl border border-white/5 p-3 overflow-hidden relative"
-        >
-          <Fretboard
-            :active-notes="effectiveDetectedNotes"
-            :highlight-notes="scaleNotes"
-            :labels="degreeLabels"
-            :num-frets="15"
-            :fret-range="showCAGED ? cagedRange : undefined"
-            :highlights="fretboardHighlights"
-          />
-        </div>
-      </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
 
       <!-- Right: Maximized Advanced Controls -->
       <div
@@ -299,22 +321,36 @@ const fretboardHighlights = computed( () => {
 
           <!-- CAGED Overlay -->
           <div class="pt-4 border-t border-white/5">
-            <div class="flex items-center justify-between mb-3">
-              <span class="text-xs font-black uppercase tracking-widest text-slate-500">CAGED System</span>
-              <button
+              <!-- Clickable header row to toggle CAGED mode on/off -->
+              <div
+                class="flex items-center justify-between mb-3 cursor-pointer"
                 @click="showCAGED = !showCAGED"
-                class="text-[10px] font-bold uppercase transition-colors"
-                :class="showCAGED ? 'text-indigo-400' : 'text-slate-600 hover:text-white'"
-              >{{ showCAGED ? 'Hide' : 'Show' }}</button>
+              >
+                <span
+                  class="text-xs font-black uppercase tracking-widest text-slate-500 hover:text-slate-300 transition-colors"
+                >CAGED System</span>
+                <!-- Status label - also functions as a toggle button -->
+                <button
+                  @click.stop="showCAGED = !showCAGED"
+                  class="text-[10px] font-bold uppercase transition-colors px-2 py-1 rounded hover:bg-white/10"
+                  :class="showCAGED ? 'text-indigo-400' : 'text-slate-600'"
+                >{{ showCAGED ? 'Active' : 'Inactive' }}</button>
+
+
+
+
+
+
+ 
             </div>
             <div
-              class="grid grid-cols-5 gap-2"
-              :class="{ 'opacity-50 pointer-events-none': !showCAGED }"
+class="grid grid-cols-5 gap-2"
             >
               <button
                 v-for=" shape in ['C', 'A', 'G', 'E', 'D'] "
                 :key="shape"
-                @click="selectedCAGEDShape = shape as any"
+                  @click="selectedCAGEDShape = shape as any; showCAGED = true"
+ 
                 class="aspect-square rounded-lg border flex items-center justify-center font-black transition-all text-xs"
                 :class="selectedCAGEDShape === shape && showCAGED ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20' : 'bg-white/5 border-white/10 hover:bg-white/10 text-slate-400'"
               >
@@ -324,6 +360,23 @@ const fretboardHighlights = computed( () => {
           </div>
         </div>
       </div>
+      </div>
+
+      <!-- BOTTOM ROW: Full-Width Fretboard -->
+      <div
+        v-if=" showFretboard "
+        class="shrink-0 bg-slate-800/50 rounded-2xl border border-white/5 p-3 overflow-hidden"
+      >
+        <Fretboard
+          :active-notes="effectiveDetectedNotes"
+          :highlight-notes="scaleNotes"
+          :labels="degreeLabels"
+          :num-frets="15"
+          :fret-range="showCAGED ? cagedRange : undefined"
+          :highlights="fretboardHighlights"
+        />
+      </div>
+
     </div>
   </div>
 </template>

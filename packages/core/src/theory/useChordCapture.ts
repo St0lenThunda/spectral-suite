@@ -131,7 +131,8 @@ export function useChordCapture () {
     }
 
     const note = Note.fromFreq( newPitch );
-    const pc = Note.get( note ).pc;
+    // Use full note name (e.g. "C3") for consistency with new poly engine
+    // const pc = Note.get( note ).pc; 
 
     /**
      * Transient Protection:
@@ -139,11 +140,11 @@ export function useChordCapture () {
      * we ignore the single-pitch detector to prevent "Note Flickering"
      * in the tray. The poly engine is more stable for chords.
      */
-    if ( pc && pc !== currentNote.value ) {
-      currentNote.value = pc;
+    if ( note && note !== currentNote.value ) {
+      currentNote.value = note; // Store full note "C3"
 
       if ( polyNotes.value.length < 2 ) {
-        noteBuffer.add( pc );
+        noteBuffer.add( note );
         capturedNotes.value = Array.from( noteBuffer );
         detectedChords.value = ChordEngine.detectChords( capturedNotes.value, keyCenter.value );
       }

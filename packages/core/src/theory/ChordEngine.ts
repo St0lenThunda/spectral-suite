@@ -6,6 +6,8 @@ export interface ChordMatch {
   notes: string[];
   tonic: string | null;
   quality: string;
+  bassNote?: string;
+  inversion?: string;
   roman?: string;
 }
 
@@ -19,7 +21,16 @@ export class ChordEngine {
   public static detectChords ( playedNotes: string[], key?: string ): ChordMatch[] {
     if ( playedNotes.length === 0 ) return [];
 
-    // Normalize notes to pitch classes
+    // Sort notes by pitch to find the true bass
+    const sortedNotes = [...playedNotes].sort( ( a, b ) => {
+      const midiA = Note.midi( a ) || 0;
+      const midiB = Note.midi( b ) || 0;
+      return midiA - midiB;
+    } );
+
+    const trueBass = Note.get( sortedNotes[0]! ).pc;
+
+    // Normalize notes to pitch classes for chord detection
     const normalizedPlayed = [...new Set( playedNotes.map( n => Note.get( n ).pc ) )].filter( Boolean ) as string[];
 
     const symbols = Chord.detect( normalizedPlayed, { assumePerfectFifth: true } );
@@ -33,14 +44,30 @@ export class ChordEngine {
       // Use unique chromas for counting notes to avoid enharmonic duplicates (e.g., C and B#)
       const uniquePC = new Set( chord.notes.map( n => Note.chroma( n ) ) );
 
+      const tonic = chord.tonic;
+      let finalSymbol = chord.symbol;
+      let inversion = 'Root';
+
+      // Slash Chord Logic
+      if ( tonic && trueBass && tonic !== trueBass ) {
+        finalSymbol = `${chord.symbol}/${trueBass}`;
+        // Determine inversion name roughly (1st/2nd/3rd)
+        // Simplified inversion logic
+        if ( chord.notes[1] === trueBass ) inversion = '1st';
+        else if ( chord.notes[2] === trueBass ) inversion = '2nd';
+        else if ( chord.notes[3] === trueBass ) inversion = '3rd';
+      }
+
       return {
-        symbol: chord.symbol,
+        symbol: finalSymbol,
         name: chord.name,
         notes: chord.notes,
         tonic: chord.tonic,
         quality: chord.quality,
         uniqueNoteCount: uniquePC.size,
-        roman: key ? this.getRomanNumeral( chord.symbol, key ) : undefined
+        bassNote: trueBass,
+        inversion: inversion,
+        roman: key ? this.getRomanNumeral( finalSymbol, key ) : undefined
       };
     } );
 

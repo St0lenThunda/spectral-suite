@@ -379,6 +379,7 @@ const playChord = () => {
 const clearAll = () => {
   initStringState();
   activeVoicings.value = new Set();
+  appliedVoicing.value = null;  // Also clear the stored voicing
 };
 
 const shiftFrets = ( delta: number ) => {
@@ -406,11 +407,22 @@ interface Voicing { id: number; label: string; notes: VoicingNote[]; color: stri
 
 const activeVoicings = ref<Set<number>>( new Set() );
 
+/**
+ * Stores the actually applied voicing data.
+ * This persists even after suggestedVoicings recomputes (which would filter out
+ * the applied voicing since it now matches the current selection).
+ */
+const appliedVoicing = ref<Voicing | null>( null );
+
 const VOICING_COLORS = ['#f43f5e', '#06b6d4', '#10b981']; // Rose, Cyan, Emerald
 
 /**
  * Generates playable voicings for the currently detected pitch classes.
  * Uses a "Zone" based search strategy (CAGED-like) to find valid shapes.
+ * 
+ * IMPORTANT: Voicing IDs are now STABLE hashes based on fret positions,
+ * not sequential numbers. This prevents IDs from becoming invalid when
+ * the suggestedVoicings computed recomputes after applying a voicing.
  */
 const suggestedVoicings = computed( () => {
   const pitchClasses = selectedPitchClasses.value;
@@ -423,7 +435,7 @@ const suggestedVoicings = computed( () => {
   const zones = [0, 3, 5, 8, 10]; 
   const SPAN = 5; // Relaxed span to find more shapes
 
-  zones.forEach( startFret => {
+  zones.forEach( ( startFret, zoneIdx ) => {
     if ( voicings.length >= 3 ) return;
 
     const currentNotes: VoicingNote[] = [];
@@ -460,13 +472,18 @@ const suggestedVoicings = computed( () => {
       );
 
       if ( !isTwice && !isDuplicate ) {
-        // Push with unique ID
-        const id = voicings.length + 1; // 1-based IDs for safety
+        // Generate a STABLE ID based on the zone index and fret signature
+        // This ensures the ID remains valid even after recomputation
+        // We use zone index + 100 as a simple stable identifier
+        const fretSignature = currentNotes.map( n => `${n.string}${n.fret}` ).join( '' );
+        const stableId = ( zoneIdx + 1 ) * 1000 + fretSignature.length;
+        const displayIdx = voicings.length + 1; // For display label only
+
         voicings.push( {
-          id,
-          label: `Alt ${id}`,
+          id: stableId,
+          label: `Alt ${displayIdx}`,
           notes: currentNotes,
-          color: VOICING_COLORS[(id - 1) % VOICING_COLORS.length] || '#ffffff'
+          color: VOICING_COLORS[( displayIdx - 1 ) % VOICING_COLORS.length] || '#ffffff'
         } );
       }
     }
@@ -480,18 +497,23 @@ const toggleVoicing = ( id: number ) => {
   if ( !v ) return;
 
   if ( activeVoicings.value.has( id ) ) {
+    // Deactivate: clear from activeVoicings and appliedVoicing
     activeVoicings.value.delete( id );
-    // Optional: Could clear the board, but maybe user wants to keep the notes?
-    // Let's clear ONLY the notes that match this voicing to be truly "togglable"
+    appliedVoicing.value = null;
+
+    // Clear the notes from the board
     v.notes.forEach( n => {
       if ( stringState.value[n.string] === n.fret ) {
         stringState.value[n.string] = null;
       }
     } );
   } else {
-    // Clear other active voicings to avoid confusion
+    // Activate: store the voicing data BEFORE applying
+    // This is crucial because applying will cause suggestedVoicings to recompute
+    // and filter out this voicing (since it now matches the selection)
     activeVoicings.value.clear();
     activeVoicings.value.add( id );
+    appliedVoicing.value = { ...v, notes: [...v.notes] }; // Deep copy
 
     // Apply this voicing to the board
     v.notes.forEach( n => {
@@ -500,16 +522,22 @@ const toggleVoicing = ( id: number ) => {
   }
 };
 
+/**
+ * Computed: fretboardHighlights
+ * 
+ * Uses the STORED appliedVoicing (not suggestedVoicings) to generate highlights.
+ * This ensures highlights persist even after suggestedVoicings recomputes.
+ */
 const fretboardHighlights = computed( () => {
   const highlights: Array<{ string: number; fret: number; color?: string }> = [];
-  activeVoicings.value.forEach( id => {
-    const v = suggestedVoicings.value.find( v => v.id === id );
-    if ( v ) {
-      v.notes.forEach( n => {
-        highlights.push( { string: n.string, fret: n.fret, color: v.color } );
-      } );
-    }
-  } );
+
+  // Use the stored appliedVoicing, not suggestedVoicings
+  if ( appliedVoicing.value && activeVoicings.value.has( appliedVoicing.value.id ) ) {
+    appliedVoicing.value.notes.forEach( n => {
+      highlights.push( { string: n.string, fret: n.fret, color: appliedVoicing.value!.color } );
+    } );
+  }
+
   return highlights;
 } );
 </script>

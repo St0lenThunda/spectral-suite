@@ -46,6 +46,7 @@ vi.mock( '../../theory/ChordEngine', () => ( {
 describe( 'useChordCapture', () => {
   beforeEach( () => {
     vi.clearAllMocks();
+    vi.useFakeTimers();
     // Initialize globals with REAL refs
     ( global as any ).mockPitch = ref<number | null>( null );
     ( global as any ).mockClarity = ref( 0 );
@@ -69,13 +70,18 @@ describe( 'useChordCapture', () => {
 
     // Simulate 2 notes (Additive Mode)
     ( global as any ).mockDetectedNotes.value = ['C', 'E'];
-    await nextTick();
+    await nextTick(); // Allow watcher to trigger
+    // Fast-forward time to bypass debounce
+    vi.advanceTimersByTime( 100 );
+    await nextTick(); // Allow timeout callback to update state
 
     expect( capturedNotes.value ).toContain( 'C' );
     expect( capturedNotes.value ).toContain( 'E' );
 
     // Simulate 3 notes (Strum Mode - should clear and sync)
     ( global as any ).mockDetectedNotes.value = ['G', 'B', 'D'];
+    await nextTick();
+    vi.advanceTimersByTime( 100 );
     await nextTick();
 
     // Should replace previous C, E with G, B, D

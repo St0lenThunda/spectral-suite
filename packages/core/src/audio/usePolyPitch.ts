@@ -103,9 +103,9 @@ export function usePolyPitch ( config: { threshold?: number; maxNotes?: number }
 
       if ( !isHarmonic ) {
         const noteName = Note.fromFreq( peak.freq );
-        const pc = Note.get( noteName ).pc;
-        if ( pc ) {
-          foundNotes.add( pc );
+        // We now preserve the full note name (e.g. "C3") for voicing/inversion detection
+        if ( noteName ) {
+          foundNotes.add( noteName );
           activeFundamentals.push( peak.freq );
         }
       }

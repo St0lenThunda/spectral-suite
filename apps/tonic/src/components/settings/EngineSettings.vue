@@ -129,6 +129,7 @@ const isDev = import.meta.env.DEV;
                 :value="selectedDeviceId"
                 @change="( e ) => selectDevice( ( e.target as HTMLSelectElement ).value )"
                 class="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white appearance-none hover:border-emerald-500/50 focus:border-emerald-500 focus:outline-none transition-all truncate pr-8"
+                aria-label="Microphone Selection"
               >
                 <option
                   v-for=" device in availableDevices "
@@ -152,6 +153,7 @@ const isDev = import.meta.env.DEV;
                 :value="selectedOutputId"
                 @change="( e ) => selectOutputDevice( ( e.target as HTMLSelectElement ).value )"
                 class="w-full bg-slate-900 border border-white/10 rounded-xl px-4 py-3 text-xs font-bold text-white appearance-none hover:border-emerald-500/50 focus:border-emerald-500 focus:outline-none transition-all truncate pr-8"
+                aria-label="Speaker Selection"
               >
                 <option
                   v-for=" device in availableOutputDevices "
@@ -273,6 +275,7 @@ const isDev = import.meta.env.DEV;
             step="0.01"
             v-model.number="platform.sensitivity"
             class="w-full accent-sky-500 bg-slate-800 h-2 rounded-lg appearance-none cursor-pointer"
+            aria-label="Microphone Sensitivity Gate"
           />
           <!-- 
             Range: 0.00 (Always on) to 0.50 (Very Strict)
@@ -294,6 +297,7 @@ const isDev = import.meta.env.DEV;
             step="0.05"
             v-model.number="platform.clarity"
             class="w-full accent-emerald-500 bg-slate-800 h-2 rounded-lg appearance-none cursor-pointer"
+            aria-label="Note Detection Clarity"
           />
           <!-- 
             Range: 0.20 (Relaxed) to 1.00 (Perfect) 

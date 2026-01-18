@@ -70,6 +70,14 @@ interface VoicingNote { string: number; fret: number; note: string; }
 interface Voicing { id: number; label: string; notes: VoicingNote[]; color: string; }
 
 const activeVoicings = ref<Set<number>>( new Set() );
+
+/**
+ * Stores the applied voicing data so it persists after suggestedVoicings recomputes.
+ * When a voicing is activated, it gets filtered out of suggestedVoicings (because
+ * it now matches the current selection), so we need to store it separately.
+ */
+const appliedVoicing = ref<Voicing | null>( null );
+
 const VOICING_COLORS = ['#f43f5e', '#06b6d4', '#10b981']; // Rose, Cyan, Emerald
 
 const selectedPitchClasses = computed( () => selectedNotes.value.map( Note.pitchClass ) );
@@ -129,28 +137,41 @@ const toggleVoicing = ( id: number ) => {
   if ( !v ) return;
 
   if ( activeVoicings.value.has( id ) ) {
+    // Deactivate: clear from activeVoicings and appliedVoicing
     activeVoicings.value.delete( id );
-    // Clear only these notes
+    appliedVoicing.value = null;
+
+    // Clear only these notes from the board
     v.notes.forEach( n => {
       if ( stringState.value[n.string] === n.fret ) stringState.value[n.string] = null;
     } );
   } else {
+    // Activate: store the voicing data BEFORE applying
+    // This is crucial because applying will cause suggestedVoicings to recompute
     activeVoicings.value.clear();
     activeVoicings.value.add( id );
+    appliedVoicing.value = { ...v, notes: [...v.notes] }; // Deep copy
+
     v.notes.forEach( n => { stringState.value[n.string] = n.fret; } );
   }
 };
 
+/**
+ * Computed: fretboardHighlights
+ * 
+ * Uses the STORED appliedVoicing (not suggestedVoicings) to generate highlights.
+ * This ensures highlights persist even after suggestedVoicings recomputes.
+ */
 const fretboardHighlights = computed( () => {
   const highlights: Array<{ string: number; fret: number; color?: string }> = [];
-  activeVoicings.value.forEach( id => {
-    const v = suggestedVoicings.value.find( v => v.id === id );
-    if ( v ) {
-      v.notes.forEach( n => {
-        highlights.push( { string: n.string, fret: n.fret, color: v.color } );
-      } );
-    }
-  } );
+
+  // Use the stored appliedVoicing, not suggestedVoicings
+  if ( appliedVoicing.value && activeVoicings.value.has( appliedVoicing.value.id ) ) {
+    appliedVoicing.value.notes.forEach( n => {
+      highlights.push( { string: n.string, fret: n.fret, color: appliedVoicing.value!.color } );
+    } );
+  }
+
   return highlights;
 } );
 const getNoteAtFret = ( stringNum: number, fret: number ): string => {
@@ -264,7 +285,35 @@ const strum = () => {
 
 const clear = () => {
   initStringState();
+  activeVoicings.value = new Set();
+  appliedVoicing.value = null;
   emit( 'update:chord', '', [] );
+};
+
+/**
+ * Shifts all selected frets up or down by the given delta.
+ * Keeps frets within valid bounds (0-24).
+ * 
+ * @param delta - Number of frets to shift (+1 = up, -1 = down)
+ */
+const shiftFrets = ( delta: number ) => {
+  const newState = { ...stringState.value };
+  Object.keys( newState ).forEach( key => {
+    const k = Number( key );
+    const val = newState[k];
+    if ( val !== null && val !== undefined && val >= 0 ) {
+      const newVal = val + delta;
+      // Keep within bounds (0-24)
+      if ( newVal >= 0 && newVal <= 24 ) {
+        newState[k] = newVal;
+      }
+    }
+  } );
+  stringState.value = newState;
+
+  // Clear any applied voicing since the shape has changed
+  activeVoicings.value = new Set();
+  appliedVoicing.value = null;
 };
 
 </script>
@@ -291,11 +340,27 @@ const clear = () => {
         </div>
       </div>
 
-      <div class="flex gap-2">
+      <div class="flex gap-2 items-center">
         <button
           @click="clear"
           class="px-3 py-2 rounded-lg text-[10px] font-bold uppercase text-slate-500 hover:text-white transition-colors"
         >Clear</button>
+
+        <!-- Fret Stepper Controls -->
+        <div class="flex items-center gap-1 bg-white/5 p-1 rounded-full border border-white/10">
+          <button
+            @click="shiftFrets( -1 )"
+            class="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-white/10 hover:text-white transition-all font-black text-xs"
+            title="Shift Frets Down"
+          >-1</button>
+          <span class="text-[8px] font-black text-slate-500 uppercase tracking-wider px-1">Shift</span>
+          <button
+            @click="shiftFrets( 1 )"
+            class="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-white/10 hover:text-white transition-all font-black text-xs"
+            title="Shift Frets Up"
+          >+1</button>
+        </div>
+
         <button
           @click="strum"
           class="px-6 py-2 rounded-full bg-amber-500 text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-amber-500/20 hover:scale-105 active:scale-95 transition-all"

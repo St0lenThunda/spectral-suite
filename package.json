@@ -29,12 +29,16 @@
     "typecheck": "npm run type-check --workspaces --if-present",
     "lint": "npm run type-check --workspaces --if-present",
     "test": "vitest run",
+    "test:e2e": "npx playwright test e2e --project=chromium --reporter=list",
+    "test:e2e:ui": "npx playwright test --ui",
     "docs": "npm run docs:api && npm run docs:build",
     "docs:api": "typedoc --entryPointStrategy packages packages/core --plugin typedoc-plugin-markdown --entryFileName index.md --out docs/api",
     "docs:build": "vitepress build docs",
     "docs:dev": "vitepress dev docs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.0",
+    "@playwright/test": "^1.57.0",
     "@vitest/coverage-v8": "^4.0.16",
     "@vue/test-utils": "^2.4.6",
     "happy-dom": "^20.1.0",

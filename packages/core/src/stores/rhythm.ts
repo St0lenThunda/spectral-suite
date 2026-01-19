@@ -1,30 +1,40 @@
 import { defineStore } from 'pinia';
-import { ref, reactive, readonly, watch } from 'vue';
+import { ref, reactive, readonly, watch, computed } from 'vue';
 import { MetronomeEngine } from '../rhythm/MetronomeEngine';
 import { TransientDetector } from '../rhythm/TransientDetector';
 import { useAudioEngine } from '../audio/useAudioEngine';
 
+/**
+ * useRhythmStore - Central management for Rhythm Logic.
+ * 
+ * WHY THIS EXISTS:
+ * This store coordinates the `MetronomeEngine` (audio timing) and `TransientDetector` (input analysis).
+ * It acts as the "Conductor" of the application, ensuring that:
+ * 1. The beat stays steady (Tempo).
+ * 2. We trigger visual effects exactly on the beat (Phase).
+ * 3. We analyze user accuracy against that beat (Scoring).
+ */
 export const useRhythmStore = defineStore( 'rhythm', () => {
 
   // State (Engine Instances - scoped to Store Lifecycle)
   const metronome = new MetronomeEngine( 120 );
-  const detector = new TransientDetector( 0.1 );
+  const detector = new TransientDetector( 0.1 ); // 0.1 is the sensitivity threshold for onset detection
 
   // Reactive State
   const { isInitialized: isEngineInitialized } = useAudioEngine();
   const isRhythmStarted = ref( false );
   const isPlaying = ref( false );
-  const tempo = ref( 120 );
-  const subdivision = ref( 1 );
-  const polySubdivision = ref( 0 );
-  const currentPulse = ref( 0 );
+  const tempo = ref( 120 ); // BPM
+  const subdivision = ref( 1 ); // 1 = Quarter notes, 2 = Eighths, etc.
+  const polySubdivision = ref( 0 ); // Secondary rhythm (polyrhythm) - 0 means disabled.
+  const currentPulse = ref( 0 ); // The current beat index (0-based)
   const error = ref<string | null>( null );
 
   /**
    * Resilience: If the global engine uninitializes (e.g. after a settings reset),
    * we must also reset our local initialization state so we re-bind to the new context.
    */
-  watch( isEngineInitialized, ( isReady: boolean ) => {
+  watch( () => useAudioEngine().isInitialized.value, ( isReady: boolean ) => {
     if ( !isReady ) {
       isRhythmStarted.value = false;
     }
@@ -48,8 +58,14 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
   const onFlashCallbacks: Array<() => void> = [];
 
   // Actions
+
+  /**
+   * Initializes the Rhythm Engine.
+   * Connects the Metronome and Detector to the AudioContext.
+   * Sets up event listeners for beat callbacks.
+   */
   const init = async () => {
-    if ( isRhythmStarted.value ) return;
+    // THEORY: We hook up the engine instances to our reactive state.
 
     try {
       const { getContext } = useAudioEngine();
@@ -79,6 +95,7 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
 
       // Hook up Detector
       detector.onTransient( ( time, _energy ) => {
+        console.log( 'DEBUG: onTransient called', { isPlaying: isPlaying.value, lastBeatTime: lastBeatTime.value } );
         if ( !isPlaying.value || lastBeatTime.value === 0 ) return;
 
         // --- Nearest Beat Logic ---
@@ -130,8 +147,8 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
     }
   };
 
-  const start = () => {
-    if ( !isRhythmStarted.value ) init();
+  const start = async () => {
+    if ( !isRhythmStarted.value ) await init();
 
     // Register as an audio consumer so the engine stays active
     useAudioEngine().activate();
@@ -189,12 +206,12 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
 
   return {
     // State
-    isInitialized: readonly( isRhythmStarted ),
-    isEngineInitialized: readonly( isEngineInitialized ),
-    isPlaying: readonly( isPlaying ),
-    tempo: readonly( tempo ),
-    currentPulse: readonly( currentPulse ),
-    error: readonly( error ),
+    isInitialized: isRhythmStarted,
+    isEngineInitialized,
+    isPlaying,
+    tempo,
+    currentPulse,
+    error,
 
     // Analysis
     timingOffset: readonly( timingOffset ),

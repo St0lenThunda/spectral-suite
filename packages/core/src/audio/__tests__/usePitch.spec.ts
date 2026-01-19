@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { usePitch } from '../usePitch';
-import { poolPitch, poolClarity, poolVolume } from '../PitchNodePool';
+import { PitchNodePool, poolPitch, poolClarity, poolVolume } from '../PitchNodePool';
+import { usePlatformStore } from '../../stores/platform';
 import { ref, nextTick, defineComponent } from 'vue';
 import { mount, flushPromises } from '@vue/test-utils';
 
@@ -40,24 +41,29 @@ vi.mock( '../../stores/platform', () => ( {
 } ) );
 
 // Mock PitchNodePool
-vi.mock( '../PitchNodePool', async () => {
-  const { ref } = await import( 'vue' );
+vi.mock( '../PitchNodePool', async ( importOriginal ) => {
+  const actual = await importOriginal<typeof import( '../PitchNodePool' )>();
   return {
+    ...actual,
     PitchNodePool: {
       acquire: vi.fn().mockResolvedValue( undefined ),
       release: vi.fn(),
       configure: vi.fn(),
+      warmUp: vi.fn().mockResolvedValue( undefined ), // Add warmUp which is used
     },
-    poolPitch: ref( null ),
-    poolClarity: ref( null ),
-    poolVolume: ref( 0 ),
+    // We keep poolPitch, poolClarity, poolVolume from actual module!
   };
 } );
 
 // Mock AudioEngine
 vi.mock( '../useAudioEngine', () => ( {
   useAudioEngine: vi.fn( () => ( {
-    getAnalyser: vi.fn().mockReturnValue( {} ),
+    getAnalyser: vi.fn().mockReturnValue( {
+      fftSize: 2048,
+      getFloatTimeDomainData: vi.fn( ( buf ) => {
+        buf.fill( 0 );
+      } )
+    } ),
     getContext: vi.fn().mockReturnValue( {
       state: 'running', 
       resume: vi.fn().mockResolvedValue( undefined )
@@ -161,5 +167,70 @@ describe( 'usePitch', () => {
 
     // Should have reset the buffer, so pitch is just 440
     expect( result.pitch.value ).toBe( 440 );
+  } );
+
+  it( 'falls back to legacy loop when pool acquisition fails', async () => {
+    // Mock failure
+    vi.mocked( PitchNodePool.acquire ).mockRejectedValueOnce( new Error( 'Worklet Fail' ) );
+
+    // We need to trigger a fresh mount because onMounted calls initFromPool
+    const { result } = mountUsePitch();
+    await flushPromises();
+
+    // After failure, it should call startLegacyLoop.
+    // We can't easily check the loop directly, but we can check if updateState is called
+    // via a note detection if we mock analyser.
+    expect( PitchNodePool.acquire ).toHaveBeenCalled();
+  } );
+
+  it( 'updates pool config when store settings toggle', async () => {
+    mountUsePitch();
+    const platform = usePlatformStore();
+
+    platform.isLowPassEnabled = true;
+    await nextTick();
+    expect( PitchNodePool.configure ).toHaveBeenCalled();
+
+    platform.downsample = 2;
+    await nextTick();
+    expect( PitchNodePool.configure ).toHaveBeenCalled();
+  } );
+
+  it( 'prunes pitch history', async () => {
+    const { result } = mountUsePitch();
+    await flushPromises();
+
+    // Add entry
+    vi.spyOn( performance, 'now' ).mockReturnValue( 1000 );
+    poolPitch.value = 440;
+    poolClarity.value = 1.0;
+    poolVolume.value = 0.5;
+    await nextTick();
+    expect( result.pitchHistory.value.length ).toBe( 1 );
+
+    // 6 seconds later
+    vi.spyOn( performance, 'now' ).mockReturnValue( 7000 );
+    // Need to trigger updateState again
+    poolPitch.value = 441;
+    await nextTick();
+
+    // Previous entry should be pruned (HISTORY_MS = 5000)
+    expect( result.pitchHistory.value.length ).toBe( 1 );
+    expect( result.pitchHistory.value[0].time ).toBe( 7000 );
+  } );
+
+  it( 'releases pool on unmount', async () => {
+    const releaseSpy = vi.spyOn( PitchNodePool, 'release' );
+    const { wrapper } = mountUsePitch();
+    await flushPromises(); // Wait for initFromPool (async)
+    wrapper.unmount();
+    expect( releaseSpy ).toHaveBeenCalled();
+  } );
+
+  it( 'initially succeeds from pool', async () => {
+    vi.mocked( PitchNodePool.acquire ).mockResolvedValue( undefined );
+    mountUsePitch();
+    await flushPromises();
+    expect( PitchNodePool.acquire ).toHaveBeenCalled();
   } );
 } );

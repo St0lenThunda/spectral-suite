@@ -165,10 +165,12 @@ export function useChordCapture () {
 
   // Re-detect chords when key center changes to update Roman Numerals
   watch( keyCenter, () => {
+    // console.log('DEBUG: keyCenter watcher', { notes: capturedNotes.value.length, detected: detectedChords.value.length });
     if ( capturedNotes.value.length > 0 ) {
       detectedChords.value = ChordEngine.detectChords( capturedNotes.value, keyCenter.value );
     } else if ( detectedChords.value.length > 0 ) {
       // Refresh current display even if tray is empty
+      // console.log('DEBUG: refreshing empty tray display');
       const updated = ChordEngine.detectChords( detectedChords.value[0]!.notes, keyCenter.value );
       if ( updated.length > 0 ) detectedChords.value = updated;
     }

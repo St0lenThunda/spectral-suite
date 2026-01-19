@@ -28,6 +28,18 @@ export interface PitchConfig {
   dynamicsResetThreshold?: number;
 }
 
+/**
+ * usePitch - Reactive Pitch Detection.
+ * 
+ * WHY THIS EXISTS:
+ * This composable bridges the gap between raw audio analysis (via AudioWorklet or fallback)
+ * and the Vue application. It handles:
+ * 1. Signal Stability (Smoothing out jitter).
+ * 2. Note Locking (Preventing rapid flickering between semitones).
+ * 3. Reactivity (Exposing pitch/volume/clarity as refs).
+ * 
+ * @param config - Optional configuration for smoothing and dynamics.
+ */
 export function usePitch ( config: PitchConfig = {} ) {
 
   const { getAnalyser, getContext, isInitialized } = useAudioEngine();
@@ -79,6 +91,7 @@ export function usePitch ( config: PitchConfig = {} ) {
 
   // Watch pool data and route through our updateState function
   watch( [poolPitch, poolClarity, poolVolume], ( [p, c, v] ) => {
+    console.log( 'DEBUG: usePitch watch', { isPoolAcquired, p, c, v } );
     if ( isPoolAcquired ) {
       updateState( p, c ?? 0, v );
     }
@@ -213,6 +226,8 @@ export function usePitch ( config: PitchConfig = {} ) {
     // Use a multi-stage lock:
     // 1. High-Clarity Lock: Note must start with > Global Threshold.
     // 2. Sustain Lock: Once locked, we follow it down slightly lower (decay phase).
+    // PHYSICS: Real instruments decay. As volume drops, clarity might drop slightly.
+    // Hysteresis (the difference between start/stop thresholds) prevents the note from checking out prematurely.
     const CLARITY_START = clarityThreshold.value;
     const CLARITY_SUSTAIN = Math.max( 0, clarityThreshold.value - 0.1 ); // Sustain 10% lower than start
     const isLocked = currentNote.value !== null;
@@ -226,10 +241,13 @@ export function usePitch ( config: PitchConfig = {} ) {
 
       const refFreq = Note.get( rawNoteName ).freq;
       if ( refFreq ) {
+        // MATH: Calculate Cents difference.
+        // Formula: 1200 * log2( f1 / f0 )
+        // We round to 1 decimal place for display stability.
         cents.value = Math.round( 1200 * Math.log2( calibratedFreq / refFreq ) * 10 ) / 10;
         const now = performance.now();
-        pitchHistory.value.push( { time: now, cents: cents.value } );
-        while ( pitchHistory.value.length > 0 && ( now - ( pitchHistory.value[0]?.time ?? 0 ) ) > HISTORY_MS ) {
+        // Remove entries older than or equal to the history window (HISTORY_MS)
+        while ( pitchHistory.value.length > 0 && ( now - ( pitchHistory.value[0]?.time ?? 0 ) ) >= HISTORY_MS ) {
           pitchHistory.value.shift();
         }
       } else {

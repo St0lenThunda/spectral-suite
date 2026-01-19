@@ -37,6 +37,9 @@ let toastIdCounter = 0;
 export function useToast() {
   /**
    * Shows a toast notification.
+   * 
+   * @param options - The toast configuration (message, type, duration, etc.)
+   * @returns string - The unique ID of the created toast (useful for manual dismissal)
    */
   const showToast = (options: Omit<Toast, 'id'>) => {
     const id = `toast-${++toastIdCounter}`;
@@ -44,7 +47,9 @@ export function useToast() {
     
     toasts.value.push(toast);
     
-    // Auto-dismiss after duration (if not 0)
+    // Auto-dismiss logic:
+    // We use setTimeout to remove the toast after `duration` milliseconds.
+    // If duration is 0, the toast persists until manually dismissed (good for errors).
     if (toast.duration && toast.duration > 0) {
       setTimeout(() => dismissToast(id), toast.duration);
     }
@@ -54,6 +59,8 @@ export function useToast() {
 
   /**
    * Dismiss a specific toast by ID.
+   * 
+   * @param id - The unique ID of the toast to remove
    */
   const dismissToast = (id: string) => {
     const index = toasts.value.findIndex(t => t.id === id);

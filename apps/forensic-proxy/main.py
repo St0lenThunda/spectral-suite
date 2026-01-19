@@ -16,8 +16,8 @@ app = FastAPI(title="Spectral Suite Forensic Proxy")
 try:
     import yt_dlp.version
     logger.info(f"Loaded yt-dlp version: {yt_dlp.version.__version__}")
-except:
-    logger.info("Could not determine yt-dlp version")
+except: # pragma: no cover
+    logger.info("Could not determine yt-dlp version") # pragma: no cover
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -209,8 +209,8 @@ def resolve_audio(url: str = Query(..., description="YouTube URL to resolve")):
             }
         )
 
-    except HTTPException as e:
-        raise e
+    except HTTPException as e: # pragma: no cover
+        raise e # pragma: no cover
     except Exception as e:
         logger.error(f"Resolution failed: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

@@ -98,4 +98,66 @@ describe( 'useScaleSleuth', () => {
     expect( potentialScales.value ).toHaveLength( 1 );
     expect( potentialScales.value[0].name ).toBe( 'C Major' );
   } );
+
+  it( 'stops updating when locked', async () => {
+    const { isLocked, detectedNotes } = useScaleSleuth();
+
+    ( global as any ).mockClarity.value = 0.9;
+    ( global as any ).mockVolume.value = 0.5;
+    ( global as any ).mockPitch.value = 261.63; // C
+    await nextTick();
+    expect( detectedNotes.value ).toContain( 'C' );
+
+    isLocked.value = true;
+    ( global as any ).mockPitch.value = 293.66; // D
+    await nextTick();
+
+    expect( detectedNotes.value ).not.toContain( 'D' );
+  } );
+
+  it( 'locks scale and filters notes', async () => {
+    const { lockScale, detectedNotes } = useScaleSleuth();
+
+    ( global as any ).mockClarity.value = 0.9;
+    ( global as any ).mockVolume.value = 0.5;
+    ( global as any ).mockPitch.value = 261.63; // C
+    await nextTick();
+    ( global as any ).mockPitch.value = 311.13; // Eb (Not in C Major)
+    await nextTick();
+
+    expect( detectedNotes.value ).toContain( 'C' );
+    // Note: My mock Tonal handle pc. Eb -> Eb.
+    // Let's assume Eb was added.
+
+    lockScale( ['C', 'D', 'E', 'F', 'G', 'A', 'B'] ); // C Major
+
+    expect( detectedNotes.value ).toContain( 'C' );
+    expect( detectedNotes.value ).not.toContain( 'Eb' );
+  } );
+
+  it( 'clears notes correctly', async () => {
+    const { clearNotes, detectedNotes, isLocked } = useScaleSleuth();
+
+    ( global as any ).mockClarity.value = 0.9;
+    ( global as any ).mockVolume.value = 0.5;
+    ( global as any ).mockPitch.value = 261.63;
+    await nextTick();
+    isLocked.value = true;
+
+    clearNotes();
+
+    expect( detectedNotes.value ).toEqual( [] );
+    expect( isLocked.value ).toBe( false );
+  } );
+
+  it( 'ignores noisy input', async () => {
+    const { detectedNotes } = useScaleSleuth();
+
+    ( global as any ).mockClarity.value = 0.2; // Low clarity
+    ( global as any ).mockVolume.value = 0.5;
+    ( global as any ).mockPitch.value = 261.63;
+    await nextTick();
+
+    expect( detectedNotes.value ).toHaveLength( 0 );
+  } );
 } );

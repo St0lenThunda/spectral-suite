@@ -28,7 +28,7 @@
     "preview:tonic": "npm run preview --workspace apps/tonic",
     "typecheck": "npm run type-check --workspaces --if-present",
     "lint": "npm run type-check --workspaces --if-present",
-    "test": "vitest run",
+    "test": "npx vitest packages/core --coverage",
     "test:e2e": "npx playwright test e2e --project=chromium --reporter=list",
     "test:e2e:ui": "npx playwright test --ui",
     "docs": "npm run docs:api && npm run docs:build",

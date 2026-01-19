@@ -45,4 +45,26 @@ describe( 'ScaleEngine', () => {
   it( 'should return empty array for empty input', () => {
     expect( ScaleEngine.detectScales( [] ) ).toEqual( [] );
   } );
+
+  it( 'should get scale notes correctly', () => {
+    const notes = ScaleEngine.getScaleNotes( 'C major' );
+    expect( notes ).toEqual( ['C', 'D', 'E', 'F', 'G', 'A', 'B'] );
+  } );
+
+  it( 'should prioritize major over more obscure scales with same score', () => {
+    // These notes fit both C Major and relatively obscure scales
+    const notes = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+    const results = ScaleEngine.detectScales( notes );
+
+    // Major should be top (Priority 1) vs Modal/etc.
+    expect( results[0].type.toLowerCase() ).toBe( 'major' );
+  } );
+
+  it( 'should include roman intervals', () => {
+    const results = ScaleEngine.detectScales( ['C', 'E', 'G'] );
+    const cMajor = results.find( r => r.name === 'C major' );
+    expect( cMajor?.romanIntervals ).toContain( 'I' );
+    expect( cMajor?.romanIntervals ).toContain( 'III' );
+    expect( cMajor?.romanIntervals ).toContain( 'V' );
+  } );
 } );

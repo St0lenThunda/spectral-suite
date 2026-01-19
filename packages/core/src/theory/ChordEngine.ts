@@ -35,7 +35,7 @@ export class ChordEngine {
     // Normalize notes to pitch classes (remove octaves) for basic chord detection
     const normalizedPlayed = [...new Set( playedNotes.map( n => Note.get( n ).pc ) )].filter( Boolean ) as string[];
 
-    const symbols = Chord.detect( normalizedPlayed, { assumePerfectFifth: true } );
+    const symbols = Chord.detect( normalizedPlayed );
 
     // First note played is often the root/tonic
     const firstNote = normalizedPlayed[0];
@@ -54,15 +54,23 @@ export class ChordEngine {
       // THEORY: If the tracked Bass note (trueBass) is NOT the chord's Tonic,
       // we have an inversion or hybrid chord (Slash Chord).
       if ( tonic && trueBass && tonic !== trueBass ) {
-        finalSymbol = `${chord.symbol}/${trueBass}`;
+        if ( !symbol.includes( '/' ) ) {
+          finalSymbol = `${chord.symbol}/${trueBass}`;
+        }
 
         // Determine inversion name roughly (1st/2nd/3rd)
         // 1st Inv: 3rd in Bass
         // 2nd Inv: 5th in Bass
         // 3rd Inv: 7th in Bass
-        if ( chord.notes[1] === trueBass ) inversion = '1st';
-        else if ( chord.notes[2] === trueBass ) inversion = '2nd';
-        else if ( chord.notes[3] === trueBass ) inversion = '3rd';
+        const bassChroma = Note.chroma( trueBass );
+        const baseSymbol = symbol.split( '/' )[0];
+        if ( baseSymbol ) {
+          const rootChord = Chord.get( baseSymbol );
+          const rootChromas = rootChord.notes.map( n => Note.chroma( n ) );
+          if ( rootChromas[1] === bassChroma ) inversion = '1st';
+          else if ( rootChromas[2] === bassChroma ) inversion = '2nd';
+          else if ( rootChromas[3] === bassChroma ) inversion = '3rd';
+        }
       }
 
       return {
@@ -105,16 +113,31 @@ export class ChordEngine {
         return aBassMatch ? -1 : 1;
       }
 
-      return a.symbol.length - b.symbol.length;
+      const lenDiff = a.symbol.length - b.symbol.length;
+      if ( lenDiff !== 0 ) return lenDiff;
+
+      // Tie-breaker: Prefer slash over standard if length is equal (usually means it's a valid inversion)
+      const aIsSlash = a.symbol.includes( '/' );
+      const bIsSlash = b.symbol.includes( '/' );
+      if ( aIsSlash !== bIsSlash ) return aIsSlash ? -1 : 1;
+
+      return 0;
     } );
   }
 
   /**
    * Identifies symbols only from a set of notes.
    */
-  public static detectSymbols ( playedNotes: string[] ): string[] {
+  public static detectSymbols ( playedNotes: string[], root?: string ): string[] {
     const normalizedPlayed = [...new Set( playedNotes.map( n => Note.get( n ).pc ) )].filter( Boolean ) as string[];
-    return Chord.detect( normalizedPlayed );
+    const matches = Chord.detect( normalizedPlayed );
+
+    if ( root && matches.length > 1 ) {
+      const rootMatches = matches.filter( m => m.startsWith( root ) );
+      if ( rootMatches.length > 0 ) return rootMatches;
+    }
+
+    return matches;
   }
 
   /**

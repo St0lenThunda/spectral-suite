@@ -60,9 +60,14 @@ export function useDiagnosticToasts() {
         shownIssueIds.value.delete(oldId);
       }
     }
-  }, { immediate: false }); // Don't trigger on mount, let user start fresh
+  }, {
+    // EDUCATIONAL: immediate: false
+    // We don't want to show toasts for issues that already existed when the app loaded.
+    // The user likely already saw them or expects them. We only want to alert on *new* problems.
+    immediate: false
+  } );
 
-  // Clean up on unmount
+  // Clean up on unmount to prevent memory leaks in the map/set
   onUnmounted(() => {
     shownIssueIds.value.clear();
     issueToToastMap.value.clear();

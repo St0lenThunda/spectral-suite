@@ -84,6 +84,16 @@ spectral-suite/
 - **Debounced lifecycle** - Prevents HMR freezes during development
 - **Lightweight volume polling** - Direct AnalyserNode reads instead of duplicate worklets
 
+### 🧪 Test Infrastructure (New!)
+- **E2E Testing Suite** - Comprehensive Playwright tests for critical user flows ("Golden Paths").
+- **Robust Mocking** - "Clean Injection" audio mocking prevents spectral smearing and ensures deterministic tests.
+- **State Snapshotting** - "Freeze" workflow verification using DOM state snapshots to validate complex logic without flakiness.
+
+### Core Audio Engine 2.0
+- **Slash Chord Support** - True bass detection allows identifying inversions (e.g., `C/E`) and complex voicings.
+- **Polyphonic Buffering** - `useChordCapture` now intelligently buffers inputs to support strummed chords vs. arpeggios.
+- **Octave-Aware Analysis** - `usePolyPitch` preserves octave data (`C3` vs `C4`) for accurate voicing reconstruction.
+
 ## 🚀 Getting Started
 
 ### Prerequisites

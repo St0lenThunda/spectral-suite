@@ -22,6 +22,8 @@ export class ChordEngine {
     if ( playedNotes.length === 0 ) return [];
 
     // Sort notes by pitch to find the true bass
+    // PHYSICS: The lowest frequency note is perceived as the "Bass".
+    // This is critical for distinguishing C Major (C-E-G) from C/E (E-G-C).
     const sortedNotes = [...playedNotes].sort( ( a, b ) => {
       const midiA = Note.midi( a ) || 0;
       const midiB = Note.midi( b ) || 0;
@@ -30,7 +32,7 @@ export class ChordEngine {
 
     const trueBass = Note.get( sortedNotes[0]! ).pc;
 
-    // Normalize notes to pitch classes for chord detection
+    // Normalize notes to pitch classes (remove octaves) for basic chord detection
     const normalizedPlayed = [...new Set( playedNotes.map( n => Note.get( n ).pc ) )].filter( Boolean ) as string[];
 
     const symbols = Chord.detect( normalizedPlayed, { assumePerfectFifth: true } );
@@ -49,10 +51,15 @@ export class ChordEngine {
       let inversion = 'Root';
 
       // Slash Chord Logic
+      // THEORY: If the tracked Bass note (trueBass) is NOT the chord's Tonic,
+      // we have an inversion or hybrid chord (Slash Chord).
       if ( tonic && trueBass && tonic !== trueBass ) {
         finalSymbol = `${chord.symbol}/${trueBass}`;
+
         // Determine inversion name roughly (1st/2nd/3rd)
-        // Simplified inversion logic
+        // 1st Inv: 3rd in Bass
+        // 2nd Inv: 5th in Bass
+        // 3rd Inv: 7th in Bass
         if ( chord.notes[1] === trueBass ) inversion = '1st';
         else if ( chord.notes[2] === trueBass ) inversion = '2nd';
         else if ( chord.notes[3] === trueBass ) inversion = '3rd';
@@ -71,10 +78,11 @@ export class ChordEngine {
       };
     } );
 
-    // Sort symbols: 
-    // 1. More unique notes (more specific/extended)
-    // 2. Tonic or Bass matches the first note played (Slash chord awareness)
-    // 3. Shorter symbol length (simpler name)
+    // Sort symbols to guess the "Best Fit"
+    // HEURISTICS:
+    // 1. Complexity: More notes usually means a more specific match (Cmaj7 > C).
+    // 2. Bass Alignment: If the symbol's bass matches our detected bass, it's likely correct.
+    // 3. Simplicity: If all else equal, prefer shorter names (C > Cmaj5add9).
     return matches.sort( ( a, b ) => {
       if ( b.uniqueNoteCount !== a.uniqueNoteCount ) {
         return b.uniqueNoteCount - a.uniqueNoteCount;

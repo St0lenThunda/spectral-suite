@@ -143,6 +143,9 @@ export function useChordCapture () {
     if ( note && note !== currentNote.value ) {
       currentNote.value = note; // Store full note "C3"
 
+      // Logic: If the Polyphonic Detector sees < 2 notes, we are likely playing a single note line (Arpeggio).
+      // We start "Collecting" these notes into the buffer (Additive Mode).
+      // e.g. Play C -> Buffer [C] -> Play E -> Buffer [C, E] -> Play G -> Buffer [C, E, G] (C Major)
       if ( polyNotes.value.length < 2 ) {
         noteBuffer.add( note );
         capturedNotes.value = Array.from( noteBuffer );

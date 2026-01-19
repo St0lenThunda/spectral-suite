@@ -114,9 +114,22 @@ def get_ydl_opts():
     
     return base_opts
 
+# Constants
+CHUNK_SIZE = 32 * 1024 # 32KB chunks for efficient streaming without memory bloat
+PORT = 8000 # Standard FastAPI port
+
 def get_best_audio_url(video_url: str) -> str:
     """
     Extracts the best available audio stream URL using yt-dlp.
+    
+    Why: We need the direct googlevideo.com link to stream it to the frontend
+    without downloading the entire file first.
+    
+    Args:
+        video_url: The full YouTube video URL
+        
+    Returns:
+        str: The direct stream URL
     """
     ydl_opts = get_ydl_opts()
 
@@ -133,12 +146,17 @@ def get_best_audio_url(video_url: str) -> str:
 
 @app.get("/health")
 def health_check():
+    """
+    Simple health check endpoint for monitoring uptime.
+    """
     return {"status": "operational", "service": "forensic-proxy"}
 
 @app.get("/info")
 def get_video_info(url: str = Query(..., description="YouTube URL to inspect")):
     """
     Returns metadata for a YouTube video (Title, Duration, Thumbnail) without downloading.
+    
+    Used by the Track Tracer module to preview the video before analysis.
     """
     ydl_opts = get_ydl_opts()
     ydl_opts['ignoreerrors'] = True # Don't fail completely on minor metadata issues
@@ -160,6 +178,14 @@ def get_video_info(url: str = Query(..., description="YouTube URL to inspect")):
 def resolve_audio(url: str = Query(..., description="YouTube URL to resolve")):
     """
     Proxies the audio stream from YouTube to the client.
+    
+    Why Proxy?
+    Browsers enforce CORS (Cross-Origin Resource Sharing). YouTube's direct streams
+    block requests from our web app. By routing through this backend, we bypass CORS.
+    
+    Process:
+    1. Get the direct stream URL (googlevideo.com...) from yt-dlp.
+    2. Pipe the bytes from that URL directly to the client response.
     """
     if "youtube.com" not in url and "youtu.be" not in url:
          raise HTTPException(status_code=400, detail="Only YouTube URLs are supported currently.")
@@ -176,7 +202,7 @@ def resolve_audio(url: str = Query(..., description="YouTube URL to resolve")):
         external_req = requests.get(stream_url, stream=True)
         
         return StreamingResponse(
-            external_req.iter_content(chunk_size=32 * 1024),
+            external_req.iter_content(chunk_size=CHUNK_SIZE),
             media_type="audio/mpeg", # Often defaults to webm/opus, but browser handles it generic
             headers={
                 "Content-Disposition": f'attachment; filename="forensic-audio.mp3"',
@@ -191,4 +217,4 @@ def resolve_audio(url: str = Query(..., description="YouTube URL to resolve")):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=PORT)

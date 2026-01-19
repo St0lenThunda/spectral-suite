@@ -184,6 +184,12 @@ const selectKey = ( key: string ) => {
 
       <!-- 2. Main Symbol / Notes -->
       <!-- Fluid Typography using cqw (Container Query Width) -->
+      <!-- 
+        UI PATTERN: Decomposed Data Display
+        We split the "Symbol" (C) from the "Quality" (Major) to allow distinct styling.
+        NOTE FOR TESTING: E2E tests must target these elements separately or use specific locators,
+        as "C Major" is not a single text node in the DOM.
+      -->
       <div
         class="font-black text-white leading-none font-outfit drop-shadow-[0_0_30px_rgba(255,255,255,0.1)] transition-all duration-300 mb-2"
         style="font-size: 18cqw;"

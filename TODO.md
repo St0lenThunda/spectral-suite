@@ -78,11 +78,41 @@
 
 ---
 
+## 🏗️ Core Architectural Enhancements (Future Capabilities)
+
+### 1. `AudioBufferEngine` (Recording & Looping)
+- [ ] Implement circular buffering in `AudioWorklet`.
+- [ ] Create `useRecorder` composable for capture/playback.
+- **Enables**: Looping, Backing Tracks, Instant Replay analysis.
+
+### 2. `UniversalMidiBridge` (I/O Expansion)
+- [ ] Create an Event Bus to normalize internal events to standard MIDI.
+- [ ] Implement `useMidi` composable to listen/send to external devices.
+- **Enables**: Controlling external synths, MIDI keyboard input, DAW integration.
+
+### 3. `TimbreClassifier` (Sound ID)
+- [ ] Implement MFCC (Mel-Frequency Cepstral Coefficients) analysis in core.
+- [ ] Create classifier logic to ID instruments (Guitar vs Voice vs Noise).
+- **Enables**: Smart Noise Gate ("Only listen when Guitar plays"), Tone advice.
+
+### 4. `SignalFlowGraph` (Modular Routing)
+- [ ] Refactor `AudioEngine` to use a node-based graph system.
+- [ ] Create UI for dynamic signal routing (Patch Bay).
+- **Enables**: Pedalboard-style app creation, complex FX chains, flexible routing.
+
+### 5. `CloudSyncManager` (Persistence)
+- [ ] Design JSON schema for User Data (Presets, Calibration, History).
+- [ ] Implement Supabase/Firebase adapter for cloud storage.
+- **Enables**: Cross-device sync, Leaderboards, Persistent settings backup.
+
+---
+
 ## 📋 Priority Order
 
 1. **Tauri (Desktop)** - Lower friction, faster to ship
 2. **Capacitor (Mobile)** - Higher effort, bigger market
-3. **Monetization** - After platforms are stable
+3. **Core Architecture** - Ongoing enhancements to support new features
+4. **Monetization** - After platforms are stable
 
 ## 🎧 Audio Engine Enhancements
 

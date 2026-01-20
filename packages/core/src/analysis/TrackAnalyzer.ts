@@ -89,7 +89,7 @@ export class TrackAnalyzer {
     // Re-use a Float32Array for FFT to avoid allocations
     // FFT Size 2048 is standard for musical pitch
     const fftSize = 4096;
-    const frequencyData = new Float32Array( fftSize / 2 );
+    // const frequencyData = new Float32Array( fftSize / 2 );
 
     // We need to perform a "Mock FFT" or use a library for true FFT.
     // Since we don't have a JS FFT lib installed, we have to rely on a workaround or basic implementation.

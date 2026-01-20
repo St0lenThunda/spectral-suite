@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, reactive, readonly, watch, computed } from 'vue';
+import { ref, reactive, readonly, watch } from 'vue';
 import { MetronomeEngine } from '../rhythm/MetronomeEngine';
 import { TransientDetector } from '../rhythm/TransientDetector';
 import { useAudioEngine } from '../audio/useAudioEngine';

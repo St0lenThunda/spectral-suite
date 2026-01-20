@@ -13,6 +13,7 @@ export * from './stores/platform';
 export * from './analysis/TrackAnalyzer';
 export * from './analysis/BpmDetector';
 export * from './analysis/KeyDetector';
+export * from './analysis/NoteSegmenter';
 export * from './theory/ScaleEngine';
 export * from './theory/useScaleSleuth';
 export * from './theory/ChordEngine';

@@ -8,6 +8,7 @@ import FrequencyFlowModule from './modules/frequencyflow/FrequencyFlowModule.vue
 import TrackTracerModule from './modules/tracktracer/TrackTracerModule.vue';
 import HarmonicOrbitModule from './modules/harmonicorbit/HarmonicOrbitModule.vue';
 import ChordForgeModule from './modules/chordforge/ChordForgeModule.vue';
+import MelodyMirrorModule from './modules/melodymirror/MelodyMirrorModule.vue';
 import AcademyModule from './modules/academy/AcademyModule.vue';
 import LessonRunner from './modules/academy/LessonRunner.vue';
 import { type Lesson } from './modules/academy/lessons';
@@ -81,6 +82,13 @@ const ALL_TOOLS = [
     color: 'from-indigo-600 to-sky-500'
   },
   {
+    id: 'melodymirror',
+    name: 'Melody Mirror',
+    description: 'Ear training game. Listen to melodies and play them back.',
+    icon: '👂',
+    color: 'from-emerald-500 to-teal-600'
+  },
+  {
     id: 'academy',
     name: 'Spectral Academy',
     description: 'Interactive music theory lessons. Learn via active performance.',
@@ -98,6 +106,7 @@ const enabledTools = ref<Record<string, boolean>>( {
   tracktracer: true,
   harmonicorbit: true,
   chordforge: true,
+  melodymirror: true,
   academy: false
 } )
 
@@ -299,6 +308,10 @@ const handleGainChange = ( event: Event ) => {
       />
       <ChordForgeModule
         v-else-if=" currentModule === 'chordforge' && enabledTools.chordforge "
+        @back="currentModule = 'dashboard'"
+      />
+      <MelodyMirrorModule
+        v-else-if=" currentModule === 'melodymirror' && enabledTools.melodymirror "
         @back="currentModule = 'dashboard'"
       />
       <AcademyModule

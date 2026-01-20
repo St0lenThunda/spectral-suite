@@ -90,7 +90,7 @@ describe( 'useMelodyMirror', () => {
     await store.startGame();
     await vi.runAllTimersAsync();
 
-    const synthSpy = vi.spyOn( store, 'replayTargetMelody' );
+    // const synthSpy = vi.spyOn( store, 'replayTargetMelody' );
     // Actually we need to check if playNote was called again
     // But playNote is buried in playMelody. 
     // Let's trust the logic if the function runs without error for now as we mocked SynthEngine globally

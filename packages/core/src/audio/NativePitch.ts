@@ -10,9 +10,12 @@ export class NativePitch {
   private bufferSize: number;
   // private buffer: Float32Array; // Removed unused buffer
   private sampleRate: number;
-  private cutoff: number = 0.5; // Relaxed to allow downstream filtering
-  public useLowPass: boolean = false;
-  public downsample: number = 1;
+  // Tweak for Bass:
+  // 1. Cutoff: 0.4 (Allow slightly noisier signals typical of low strings)
+  // 2. Downsample: 4 (Focus analysis on 0-2000Hz range, ignores high harmonics)
+  private cutoff: number = 0.4;
+  public useLowPass: boolean = true; // Enable by default for bass stability
+  public downsample: number = 4;
   private lpfState: number = 0;
 
   constructor( bufferSize: number = 4096, sampleRate: number = 44100 ) {
@@ -48,8 +51,8 @@ export class NativePitch {
     // A Low Pass filter gently reduces volume of high frequencies, making the base note clearer.
     if ( this.useLowPass ) {
       // "Alpha" controls how heavy the filtering is.
-      // 0.15 is roughly a 1000Hz cutoff. Frequencies above this start getting quiet.
-      const alpha = 0.15; 
+      // 0.4 is aggressive. It crushes high harmonics (2nd/3rd octave) which often confuse bass detection.
+      const alpha = 0.4; 
       let last = this.lpfState;
 
       // Mutating workingBuffer (assuming it's safe to mutate analysis buffer)

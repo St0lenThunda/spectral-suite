@@ -51,12 +51,18 @@ export class AudioEngine {
        */
       // Simplified constraints for debugging
       const rawMode = isRawAudioMode.value;
+
+      // OPTIMIZATION: Default to Processed Audio for Tuner Stability
+      // 1. echoCancellation: true - Removes speaker feedback
+      // 2. noiseSuppression: true - Removes fan noise/hum (Fixes "Ghost G/Gb")
+      // 3. autoGainControl: false - KEEP FALSE. We want dynamics, not pumping volume.
+
       const constraints: MediaStreamConstraints = {
         audio: {
           deviceId: deviceId ? { exact: deviceId } : undefined,
-          echoCancellation: !rawMode,
-          autoGainControl: !rawMode,
-          noiseSuppression: !rawMode
+          echoCancellation: false,
+          autoGainControl: false,
+          noiseSuppression: false
         }
       };
 
@@ -69,7 +75,7 @@ export class AudioEngine {
 
       this.gainNode = this.context.createGain();
       this.analyser = this.context.createAnalyser();
-      this.analyser.fftSize = 2048;
+      this.analyser.fftSize = 4096; // Increased from 2048 for better Bass resolution (10Hz vs 21Hz bins)
 
       // source -> gain -> analyser
       this.source.connect( this.gainNode );

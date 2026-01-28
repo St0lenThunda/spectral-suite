@@ -544,9 +544,9 @@ const emit = defineEmits<{
             </div>
             <div class="flex gap-2">
               <button
-                v-if=" chordHistory.length > 0 "
                 @click="clearHistory"
-                class="px-2 py-1 text-[9px] font-black text-slate-600 hover:text-red-400 transition-colors uppercase tracking-widest"
+                :disabled="chordHistory.length === 0"
+                class="px-2 py-1 text-[9px] font-black text-slate-600 hover:text-red-400 disabled:opacity-30 disabled:hover:text-slate-600 disabled:cursor-not-allowed transition-colors uppercase tracking-widest"
               >Clear</button>
               <button
                 v-if=" chordHistory.length > 0 "

@@ -57,7 +57,7 @@ export function usePitch ( config: PitchConfig = {} ) {
   const medianBuffer: ( number | null )[] = [];
   const MEDIAN_SIZE = config.smoothing ?? 7; // Default to stable (7), allow agile (1-3)
   let nullFrameCount = 0;
-  const NULL_GRACE_PERIOD = 10; // Frames to wait before giving up on a note
+  const NULL_GRACE_PERIOD = 20; // Increased to 20 to handle acoustic envelope dropouts
 
   // Averaging Buffer for long-term stability
   // default to 0 (disabled) unless configured
@@ -205,8 +205,47 @@ export function usePitch ( config: PitchConfig = {} ) {
 
       averagingBuffer.push( { pitch: p, time: now } );
 
-      // Prune old values
-      while ( averagingBuffer.length > 0 && ( now - averagingBuffer[0]!.time > AVERAGING_WINDOW ) ) {
+      // 4a. Variable Smoothing (The "Magnetic" Effect)
+      // Calculate deviation from the nearest semitone to determine "Stability".
+      // Close to note = High Stability (Long Window).
+      // Far from note = Low Stability (Short Window).
+
+      let effectiveWindow = AVERAGING_WINDOW;
+
+      // We calculate a theoretical target based on the *current raw* pitch
+      // This allows the window to react instantaneously to the signal state
+      const calibratedFreq = p * ( 440 / concertA.value );
+      const rawNoteName = Note.fromFreq( calibratedFreq );
+      const targetFreq = Note.get( rawNoteName ).freq;
+
+      if ( targetFreq ) {
+        // Calculate distance in cents
+        const centsDiff = Math.abs( 1200 * Math.log2( calibratedFreq / targetFreq ) );
+
+        // PHYSICS: Variable Viscosity - TUNED FOR ACOUSTIC GUITAR
+        // < 15 cents: Stable (Keep full window)
+        // > 80 cents: Agile (Shrink window to 10% for fast tracking)
+        // In-between: Linear interpolation
+
+        const STABLE_THRESHOLD = 15;
+        const AGILE_THRESHOLD = 80;
+
+        if ( centsDiff <= STABLE_THRESHOLD ) {
+          effectiveWindow = AVERAGING_WINDOW;
+        } else if ( centsDiff >= AGILE_THRESHOLD ) {
+          effectiveWindow = AVERAGING_WINDOW * 0.1;
+        } else {
+          // Lerp factor (0 to 1)
+          const t = ( centsDiff - STABLE_THRESHOLD ) / ( AGILE_THRESHOLD - STABLE_THRESHOLD );
+          // Interpolate: Window shrinks as t goes from 0 to 1
+          effectiveWindow = AVERAGING_WINDOW * ( 1 - ( 0.9 * t ) );
+        }
+      }
+
+      averagingBuffer.push( { pitch: p, time: now } );
+
+      // Prune old values using the DYNAMIC window
+      while ( averagingBuffer.length > 0 && ( now - averagingBuffer[0]!.time > effectiveWindow ) ) {
         averagingBuffer.shift();
       }
 
@@ -246,6 +285,10 @@ export function usePitch ( config: PitchConfig = {} ) {
         // We round to 1 decimal place for display stability.
         cents.value = Math.round( 1200 * Math.log2( calibratedFreq / refFreq ) * 10 ) / 10;
         const now = performance.now();
+
+        // PUSH DATA: This was missing! reviving the vibrato graph.
+        pitchHistory.value.push( { time: now, cents: cents.value } );
+
         // Remove entries older than or equal to the history window (HISTORY_MS)
         while ( pitchHistory.value.length > 0 && ( now - ( pitchHistory.value[0]?.time ?? 0 ) ) >= HISTORY_MS ) {
           pitchHistory.value.shift();

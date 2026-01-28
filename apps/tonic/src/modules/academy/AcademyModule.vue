@@ -13,8 +13,37 @@ const currentSort = ref<SortMode>('recommended');
 
 const difficultyOrder = { 'beginner': 1, 'intermediate': 2, 'advanced': 3 };
 
+/**
+ * Tool metadata containing icons and colors for each tool module.
+ * This is used to display the tool icon on each lesson card.
+ */
+const TOOL_ICONS: Record<string, { icon: string; color: string }> = {
+  auratune: { icon: '✨', color: 'from-sky-500 to-blue-600' },
+  chordcapture: { icon: '🎙️', color: 'from-indigo-500 to-purple-600' },
+  pocketengine: { icon: '⏱️', color: 'from-rose-500 to-orange-600' },
+  frequencyflow: { icon: '🌊', color: 'from-cyan-500 to-blue-600' },
+  tracktracer: { icon: '🧪', color: 'from-blue-600 to-cyan-500' },
+  harmonicorbit: { icon: '🎡', color: 'from-indigo-600 to-sky-500' },
+  scalesleuth: { icon: '🔍', color: 'from-violet-500 to-purple-600' },
+  chordforge: { icon: '🎸', color: 'from-amber-500 to-orange-600' },
+  melodymirror: { icon: '👂', color: 'from-emerald-500 to-teal-600' },
+  dashboard: { icon: '🏠', color: 'from-slate-500 to-gray-600' }
+};
+
+/**
+ * Gets the primary tool used in a lesson.
+ * This is determined by looking at the first step's targetTool.
+ */
 function getLessonTool(lesson: Lesson): string {
   return lesson.steps?.[0]?.targetTool || '';
+}
+
+/**
+ * Gets the icon emoji for a given tool.
+ * Returns a default icon if the tool is not found.
+ */
+function getToolIcon(toolId: string): string {
+  return TOOL_ICONS[toolId]?.icon || '🎵';
 }
 
 const sortedLessons = computed(() => {
@@ -112,16 +141,19 @@ function startLesson ( lesson: Lesson ) {
             class="group bg-slate-800/50 hover:bg-slate-800 border border-slate-700 hover:border-emerald-500/50 rounded-2xl p-6 cursor-pointer transition-all duration-300 hover:shadow-2xl hover:shadow-emerald-500/10 hover:-translate-y-1"
           >
             <div class="flex justify-between items-start mb-4">
-              <span
-                class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
-                :class="{
-                  'bg-indigo-500/20 text-indigo-400': lesson.category === 'theory',
-                  'bg-rose-500/20 text-rose-400': lesson.category === 'audio',
-                  'bg-amber-500/20 text-amber-400': lesson.category === 'rhythm'
-                }"
-              >
-                {{ lesson.category }}
-              </span>
+              <div class="flex items-center gap-2">
+                <span class="text-2xl">{{ getToolIcon(getLessonTool(lesson)) }}</span>
+                <span
+                  class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
+                  :class="{
+                    'bg-indigo-500/20 text-indigo-400': lesson.category === 'theory',
+                    'bg-rose-500/20 text-rose-400': lesson.category === 'audio',
+                    'bg-amber-500/20 text-amber-400': lesson.category === 'rhythm'
+                  }"
+                >
+                  {{ lesson.category }}
+                </span>
+              </div>
               <span class="text-xs text-slate-500 font-mono">{{ lesson.difficulty }}</span>
             </div>
 

@@ -8,6 +8,7 @@ export * from './audio/SpectralAnalysis';
 export * from './audio/usePitch';
 export * from './composables/useAudioRecorder';
 export * from './composables/useInputDiagnostics';
+export * from './stores/useHarmonicOrbit';
 export * from './stores/rhythm';
 export * from './stores/platform';
 export * from './analysis/TrackAnalyzer';

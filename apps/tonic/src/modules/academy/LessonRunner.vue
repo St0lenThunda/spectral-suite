@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { marked } from 'marked';
 import { type Lesson } from './lessons';
-import { usePitch, useChordCapture, useRhythmStore, useScaleSleuth, Note, Chord, useAudioEngine } from '@spectralsuite/core';
+import { usePitch, useChordCapture, useRhythmStore, useScaleSleuth, useHarmonicOrbit, Note, Chord, useAudioEngine } from '@spectralsuite/core';
 import { TOOL_METADATA } from '../../data/toolMetadata';
 import MorphContainer from '../../components/MorphContainer.vue';
 
@@ -25,6 +26,7 @@ const isMorphed = ref( false );
 const { currentNote, cents } = usePitch();
 const { detectedChords, capturedNotes } = useChordCapture();
 const { potentialScales, clearNotes: clearScale } = useScaleSleuth();
+const { selectedKey } = useHarmonicOrbit();
 
 const rhythmStore = useRhythmStore();
 const { stats: rhythmStats } = rhythmStore;
@@ -43,7 +45,17 @@ const isOverlayVisible = computed( () => {
   return props.currentModule === currentStep.value.targetTool;
 } );
 
-watch( [currentNote, cents, detectedChords, () => rhythmStats.perfect], ( [newNote] ) => {
+/**
+ * Renders the lesson content as HTML from markdown.
+ * We use the 'marked' library to convert markdown syntax (like **bold** and - lists)
+ * into proper HTML that can be displayed in the browser.
+ */
+const renderedContent = computed( () => {
+  if ( !currentStep.value ) return '';
+  return marked.parse( currentStep.value.content, { breaks: true } );
+} );
+
+watch( [currentNote, cents, detectedChords, () => rhythmStats.perfect, selectedKey], ( [newNote] ) => {
   if ( isStepComplete.value ) return;
   if ( !currentStep.value ) return;
   const criteria = currentStep.value.validationCriteria;
@@ -97,6 +109,12 @@ watch( [currentNote, cents, detectedChords, () => rhythmStats.perfect], ( [newNo
   if ( criteria.type === 'scale' ) {
     const match = potentialScales.value.some( s => s.name === criteria.target );
     if ( match ) isStepComplete.value = true;
+  }
+
+  if ( criteria.type === 'orbit' ) {
+    if ( selectedKey.value && selectedKey.value.major === criteria.target ) {
+      isStepComplete.value = true;
+    }
   }
 } );
 
@@ -182,8 +200,7 @@ function nextStep () {
       class="h-full p-8 overflow-y-auto custom-scrollbar"
     >
       <h3 class="text-xl font-bold text-white mb-4">{{ currentStep.title }}</h3>
-      <div class="prose prose-invert prose-emerald leading-relaxed text-slate-300">
-        <p>{{ currentStep.content }}</p>
+      <div class="prose prose-invert prose-emerald leading-relaxed text-slate-300" v-html="renderedContent">
       </div>
 
       <div

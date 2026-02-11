@@ -54,3 +54,14 @@ exports[`SynthEngine > Audio Graph Snapshots > should match distortion curve sha
   "thirdQuarter": 1.687877893447876,
 }
 `;
+
+exports[`SynthEngine > PURE Voice (Additive Synthesis) > should match PURE voice audio graph structure 1`] = `
+{
+  "bufferSources": 0,
+  "delays": 0,
+  "filters": 1,
+  "gains": 9,
+  "oscillators": 8,
+  "waveShapers": 0,
+}
+`;

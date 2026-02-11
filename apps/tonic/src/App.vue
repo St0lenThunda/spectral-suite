@@ -7,6 +7,7 @@ import PocketEngineModule from './modules/pocketengine/PocketEngineModule.vue';
 import FrequencyFlowModule from './modules/frequencyflow/FrequencyFlowModule.vue';
 import TrackTracerModule from './modules/tracktracer/TrackTracerModule.vue';
 import HarmonicOrbitModule from './modules/harmonicorbit/HarmonicOrbitModule.vue';
+import TonnetzModule from './modules/tonnetz/TonnetzModule.vue';
 import ChordForgeModule from './modules/chordforge/ChordForgeModule.vue';
 import MelodyMirrorModule from './modules/melodymirror/MelodyMirrorModule.vue';
 import AcademyModule from './modules/academy/AcademyModule.vue';
@@ -41,7 +42,7 @@ const ALL_TOOLS = [
     id: 'auratune',
     name: 'AuraTune',
     description: 'Immersive reactive visualizer for melodic exploration and visual performance.',
-    icon: '✨',
+    icon: '🎵',
     color: 'from-sky-500 to-blue-600'
   },
 
@@ -49,7 +50,7 @@ const ALL_TOOLS = [
     id: 'chordcapture',
     name: 'Session View',
     description: 'Real-time harmonic recognition, editing, and analysis flow.',
-    icon: '🎙️',
+    icon: '🎸',
     color: 'from-indigo-500 to-purple-600'
   },
   {
@@ -78,8 +79,15 @@ const ALL_TOOLS = [
     id: 'harmonicorbit',
     name: 'Harmonic Orbit',
     description: 'Explore the colorful world of Musical Families on the Harmony Wheel.',
-    icon: '🎡',
+    icon: '🪐',
     color: 'from-indigo-600 to-sky-500'
+  },
+  {
+    id: 'tonnetz',
+    name: 'Tonnetz Lab',
+    description: 'Neo-Riemannian tone network. Explore triads as geometric triangles.',
+    icon: '🔺',
+    color: 'from-violet-600 to-indigo-500'
   },
   {
     id: 'melodymirror',
@@ -105,6 +113,7 @@ const enabledTools = ref<Record<string, boolean>>( {
   frequencyflow: true,
   tracktracer: true,
   harmonicorbit: true,
+  tonnetz: false,
   chordforge: true,
   melodymirror: true,
   academy: false
@@ -304,6 +313,11 @@ const handleGainChange = ( event: Event ) => {
       />
       <HarmonicOrbitModule
         v-else-if=" currentModule === 'harmonicorbit' && enabledTools.harmonicorbit "
+        @back="currentModule = 'dashboard'"
+        @navigate-tonnetz="currentModule = 'tonnetz'"
+      />
+      <TonnetzModule
+        v-else-if=" currentModule === 'tonnetz' && enabledTools.tonnetz "
         @back="currentModule = 'dashboard'"
       />
       <ChordForgeModule

@@ -1,7 +1,21 @@
 import { Note } from 'tonal';
 import { AudioEngine } from './AudioEngine';
 
-export type TonePreset = 'RETRO' | 'PLUCKED' | 'ELECTRIC' | 'STEEL_STRING' | 'OVERDRIVE' | 'DISTORTION';
+/**
+ * All available tone generation strategies.
+ *
+ * RETRO:        Sawtooth subtractive synth (chiptune/vintage)
+ * PLUCKED:      Karplus-Strong nylon guitar
+ * ELECTRIC:     FM synthesis electric piano (DX7-ish)
+ * STEEL_STRING: Karplus-Strong bright acoustic guitar
+ * OVERDRIVE:    Plucked + soft-clip waveshaper (blues crunch)
+ * DISTORTION:   Plucked + hard-clip waveshaper + cabinet sim (metal)
+ * PURE:         Additive synthesis — 8 sine harmonics with natural decay.
+ *               Sounds like a clean, bell-like piano. Zero downloads needed.
+ * SAMPLED:      Plays real instrument samples loaded from CDN/IndexedDB.
+ *               Falls back to PURE if no samples are loaded.
+ */
+export type TonePreset = 'RETRO' | 'PLUCKED' | 'ELECTRIC' | 'STEEL_STRING' | 'OVERDRIVE' | 'DISTORTION' | 'PURE' | 'SAMPLED';
 
 /**
  * SynthEngine
@@ -24,8 +38,15 @@ export class SynthEngine {
   // Default to Nylon (Plucked)
   private currentPreset: TonePreset = 'PLUCKED';
 
-  // Excitation Buffers (Generated once)
+  // Excitation Buffers (Generated once for Karplus-Strong noise bursts)
   private buffers: { [key: string]: AudioBuffer } = {};
+
+  /**
+   * Sample buffers for the SAMPLED preset.
+   * Keyed by note name (e.g. 'C3', 'Eb3', 'A4') → decoded AudioBuffer.
+   * These are injected from external code (SampleManager) via `setSampleBuffers()`.
+   */
+  private sampleBuffers: Map<string, AudioBuffer> = new Map();
 
   // Private constructor ensures only one instance is created (Singleton pattern).
   // This prevents multiple synth engines from fighting for audio hardware resources.
@@ -51,6 +72,27 @@ export class SynthEngine {
   public setPreset ( preset: TonePreset ) {
     this.currentPreset = preset;
     console.log( '[SynthEngine] Preset changed to:', preset );
+  }
+
+  /**
+   * Injects pre-decoded sample AudioBuffers for the SAMPLED preset.
+   *
+   * Called by SampleManager after fetching/loading instrument samples.
+   * Keys should be note names like 'C3', 'Eb3', 'A4', etc.
+   *
+   * @param buffers - Map of note name → decoded AudioBuffer
+   */
+  public setSampleBuffers ( buffers: Map<string, AudioBuffer> ) {
+    this.sampleBuffers = buffers;
+    console.log( `[SynthEngine] Loaded ${buffers.size} sample buffers` );
+  }
+
+  /**
+   * Returns true if sample buffers have been loaded for the SAMPLED preset.
+   * Useful for UI to show whether real samples are available.
+   */
+  public hasSampleBuffers (): boolean {
+    return this.sampleBuffers.size > 0;
   }
 
   /**
@@ -207,6 +249,12 @@ export class SynthEngine {
         break;
       case 'ELECTRIC':
         this._playElectricVoice( freq, volume, duration, now );
+        break;
+      case 'PURE':
+        this._playPureVoice( freq, volume, duration, now );
+        break;
+      case 'SAMPLED':
+        this._playSampledVoice( freq, volume, duration, now );
         break;
       case 'RETRO':
       default:
@@ -567,5 +615,217 @@ export class SynthEngine {
 
     source.start( now );
     source.stop( now + duration + 0.1 );
+  }
+
+  // ─── PURE VOICE (Additive Synthesis) ──────────────────────────────
+
+  /**
+   * 7. PURE — Additive Synthesis "Piano"
+   *
+   * Creates a clean, bell-like tone by stacking 8 sine wave harmonics.
+   *
+   * How additive synthesis works:
+   *   A real piano string vibrates at its fundamental frequency (e.g. 440Hz for A4)
+   *   AND at integer multiples called "harmonics" (880Hz, 1320Hz, 1760Hz, etc.).
+   *   Each harmonic gets quieter as the frequency goes up.
+   *
+   * We simulate this by creating 8 separate sine oscillators, one per harmonic.
+   * Each harmonic has:
+   *   - Amplitude proportional to 1/n (higher harmonics are quieter)
+   *   - A faster decay for higher harmonics (they die out sooner, like a real piano)
+   *
+   * The result is a clean, warm, piano-like tone with zero file downloads.
+   *
+   * @param freq     - The fundamental frequency (e.g. 440 = A4)
+   * @param volume   - Master volume (0.0 to 1.0)
+   * @param duration - How long the note lasts in seconds
+   * @param now      - Current AudioContext time for sample-accurate scheduling
+   */
+  private _playPureVoice ( freq: number, volume: number, duration: number, now: number ) {
+    if ( !this.context || !this.gainNode ) return;
+
+    /**
+     * Number of harmonics to stack.
+     * 8 gives a rich, realistic timbre without excessive CPU.
+     * Real pianos have dozens of harmonics, but the upper ones are so quiet
+     * that 8 is perceptually indistinguishable for our purposes.
+     */
+    const HARMONIC_COUNT = 8;
+
+    /**
+     * Envelope timings (in seconds):
+     *   attack  = how fast the note reaches full volume (5ms = percussive "hit")
+     *   decay   = how fast it drops from peak to sustain level
+     *   sustain = the volume level held during the main body of the note
+     *   release = how fast it fades to silence at the end
+     */
+    const attack = 0.005;  // 5ms — instant, percussive onset
+    const decay = 0.15;    // 150ms — quick falloff to sustain
+    const sustainLevel = 0.4;  // 40% of peak — natural piano sustain
+    const release = 0.2;   // 200ms — smooth fade-out
+
+    for ( let n = 1; n <= HARMONIC_COUNT; n++ ) {
+      const osc = this.context.createOscillator();
+      const env = this.context.createGain();
+
+      // Each harmonic is at n × the fundamental frequency
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime( freq * n, now );
+
+      /**
+       * Amplitude for this harmonic: 1/n²
+       *
+       * Why 1/n² instead of 1/n?
+       *   - 1/n gives a "bright" tone (like a sawtooth wave)
+       *   - 1/n² gives a "warm" tone (like a piano or vibraphone)
+       *   - We want warmth, so we use the steeper rolloff
+       *
+       * n=1: 1.00 (full), n=2: 0.25, n=3: 0.11, n=4: 0.0625, etc.
+       */
+      const harmonicAmplitude = volume / ( n * n );
+
+      /**
+       * Higher harmonics decay faster — this is how real instruments work.
+       * A piano's high harmonics die out in milliseconds while the
+       * fundamental rings for seconds.
+       *
+       * We model this by scaling the decay and sustain times by 1/n.
+       */
+      const harmonicDecay = decay / n;
+      const harmonicSustain = sustainLevel / n;
+
+      // ADSR envelope for this harmonic
+      env.gain.setValueAtTime( 0, now );
+      // Attack: silence → peak
+      env.gain.linearRampToValueAtTime( harmonicAmplitude, now + attack );
+      // Decay: peak → sustain level
+      env.gain.exponentialRampToValueAtTime(
+        Math.max( harmonicAmplitude * harmonicSustain, 0.0001 ), // exponentialRamp can't go to 0
+        now + attack + harmonicDecay
+      );
+      // Hold at sustain until release begins
+      env.gain.setValueAtTime(
+        Math.max( harmonicAmplitude * harmonicSustain, 0.0001 ),
+        now + duration - release
+      );
+      // Release: sustain → silence
+      env.gain.linearRampToValueAtTime( 0, now + duration );
+
+      // Routing: Oscillator → Envelope Gain → Master Gain
+      osc.connect( env );
+      env.connect( this.gainNode );
+
+      osc.start( now );
+      osc.stop( now + duration + 0.05 ); // Small buffer to avoid clicks
+    }
+  }
+
+  // ─── SAMPLED VOICE (Pre-loaded AudioBuffers) ──────────────────────
+
+  /**
+   * 8. SAMPLED — Real Instrument Sample Playback
+   *
+   * Plays a pre-loaded AudioBuffer that was decoded from a real recording.
+   * If no sample buffers have been loaded, falls back to the PURE voice.
+   *
+   * How sample-based playback works:
+   *   1. We store decoded audio recordings keyed by note name (e.g. 'C3', 'A4')
+   *   2. Given a frequency, we find the closest available sample
+   *   3. We adjust the `playbackRate` to pitch-shift to the exact target frequency
+   *      - playbackRate = targetFreq / sampleFreq
+   *      - e.g. to play D3 from a C3 sample: playbackRate = 293.66 / 261.63 ≈ 1.122
+   *   4. Small pitch shifts (±2 semitones) sound natural; larger shifts sound artificial
+   *
+   * @param freq     - Target frequency to play
+   * @param volume   - Master volume (0.0 to 1.0)
+   * @param duration - Note duration in seconds
+   * @param now      - AudioContext scheduling time
+   */
+  private _playSampledVoice ( freq: number, volume: number, duration: number, now: number ) {
+    if ( !this.context || !this.gainNode ) return;
+
+    // If no samples loaded, fall back to the PURE additive voice
+    if ( this.sampleBuffers.size === 0 ) {
+      this._playPureVoice( freq, volume, duration, now );
+      return;
+    }
+
+    // Find the closest sample to our target frequency
+    const match = this._findClosestSample( freq );
+    if ( !match ) {
+      // No matching sample found — fall back to PURE
+      this._playPureVoice( freq, volume, duration, now );
+      return;
+    }
+
+    const { buffer, sampleFreq } = match;
+
+    // Create a BufferSourceNode to play the sample
+    const source = this.context.createBufferSource();
+    source.buffer = buffer;
+
+    /**
+     * Pitch shifting via playbackRate:
+     * If our target is 293.66Hz (D3) and the sample is 261.63Hz (C3),
+     * we speed up playback by 293.66/261.63 ≈ 1.122x.
+     * This shifts the pitch up by ~2 semitones.
+     */
+    source.playbackRate.setValueAtTime( freq / sampleFreq, now );
+
+    // Volume envelope — fade in/out to avoid clicks
+    const env = this.context.createGain();
+    env.gain.setValueAtTime( 0, now );
+    env.gain.linearRampToValueAtTime( volume, now + 0.005 ); // 5ms attack
+    env.gain.setValueAtTime( volume, now + duration - 0.1 );
+    env.gain.linearRampToValueAtTime( 0, now + duration ); // 100ms release
+
+    // Routing: Sample Source → Envelope → Master Gain
+    source.connect( env );
+    env.connect( this.gainNode );
+
+    source.start( now );
+    source.stop( now + duration + 0.1 );
+  }
+
+  /**
+   * Finds the closest loaded sample to a target frequency.
+   *
+   * We compare the target frequency against every loaded sample's frequency
+   * (derived from its note name, e.g. 'C3' → 261.63Hz) and pick the one
+   * with the smallest pitch distance in semitones.
+   *
+   * @param targetFreq - The frequency we want to play
+   * @returns The closest sample buffer and its frequency, or null if none found
+   */
+  private _findClosestSample ( targetFreq: number ): { buffer: AudioBuffer; sampleFreq: number } | null {
+    let closestBuffer: AudioBuffer | null = null;
+    let closestFreq = 0;
+    let smallestDistance = Infinity;
+
+    for ( const [noteName, buffer] of this.sampleBuffers ) {
+      // Note.freq() from tonal converts 'C3' → 261.63, 'A4' → 440, etc.
+      const sampleFreq = Note.freq( noteName );
+      if ( !sampleFreq ) continue;
+
+      /**
+       * Calculate pitch distance in semitones using the formula:
+       *   semitones = 12 × log2( targetFreq / sampleFreq )
+       *
+       * We use absolute value because we don't care about direction,
+       * just how far apart they are.
+       */
+      const semitoneDistance = Math.abs(
+        12 * Math.log2( targetFreq / sampleFreq )
+      );
+
+      if ( semitoneDistance < smallestDistance ) {
+        smallestDistance = semitoneDistance;
+        closestBuffer = buffer;
+        closestFreq = sampleFreq;
+      }
+    }
+
+    if ( !closestBuffer ) return null;
+    return { buffer: closestBuffer, sampleFreq: closestFreq };
   }
 }

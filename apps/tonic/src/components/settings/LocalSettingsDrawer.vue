@@ -91,7 +91,7 @@ watch( () => props.isOpen, ( newVal ) => {
           <!-- Level 2: Expanded Content -->
           <div
             v-else
-            class="bg-slate-800 rounded-2xl border border-slate-700 flex flex-col overflow-hidden shadow-2xl h-[500px]"
+            class="bg-slate-800 rounded-2xl border border-slate-700 flex flex-col overflow-hidden shadow-2xl max-h-[70vh]"
           >
             <div class="flex-1 flex flex-col animate-content-swell">
               <!-- Header -->
@@ -127,7 +127,7 @@ watch( () => props.isOpen, ( newVal ) => {
 .drawer-enter-active,
 .drawer-leave-active {
   transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  max-height: 600px;
+  max-height: 90vh;
   margin-bottom: 2rem;
   opacity: 1;
 }

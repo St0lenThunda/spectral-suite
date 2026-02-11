@@ -4,6 +4,7 @@ export * from './config/sensitivity';
 export * from './config/useGlobalEngine';
 export * from './audio/useAudioEngine';
 export * from './audio/SynthEngine';
+export * from './audio/SampleManager';
 export * from './audio/SpectralAnalysis';
 export * from './audio/usePitch';
 export * from './composables/useAudioRecorder';

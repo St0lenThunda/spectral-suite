@@ -48,8 +48,14 @@ const props = withDefaults( defineProps<{
   /** Pitch class names to highlight as a triad triangle (e.g. ['C', 'E', 'G']) */
   highlightTriad?: string[];
 
+  /** Pitch class names to highlight as suggestions (e.g. ['G', 'F', 'Am']) */
+  suggestedNotes?: string[];
+
   /** Show P, L, R Neo-Riemannian transform labels on triangle edges */
   showTransformLabels?: boolean;
+
+  /** The harmonic path to visualize on the lattice */
+  path?: Array<{ x: number, y: number }>;
 }>(), {
   width: 600,
   height: 400,
@@ -57,7 +63,9 @@ const props = withDefaults( defineProps<{
   visibleRadius: 2,
   interactive: true,
   highlightTriad: () => [],
-  showTransformLabels: false
+  suggestedNotes: () => [],
+  showTransformLabels: false,
+  path: () => []
 } );
 
 // ─── EMITS ──────────────────────────────────────────────────────────
@@ -324,9 +332,11 @@ const trianglePointsStr = ( tri: TonnetzTriangle ): string => {
  */
 const getNodeFill = ( name: string ): string => {
   const isHighlighted = props.highlightTriad.includes( name );
+  const isSuggested = props.suggestedNotes?.includes( name );
   const isHovered = hoveredNode.value === name;
 
   if ( isHighlighted ) return '#818cf8'; // Indigo-400 (bright, selected)
+  if ( isSuggested ) return 'rgba(167, 139, 250, 0.4)'; // Violet-400 (softer glow)
   if ( isHovered ) return 'rgba(129, 140, 248, 0.6)'; // Indigo-400 at 60%
   return 'rgba(255, 255, 255, 0.15)'; // Subtle default
 };
@@ -339,7 +349,9 @@ const getNodeFill = ( name: string ): string => {
  */
 const getNodeRadius = ( name: string ): number => {
   const isHighlighted = props.highlightTriad.includes( name );
+  const isSuggested = props.suggestedNotes?.includes( name );
   if ( isHighlighted ) return 18;
+  if ( isSuggested ) return 15;
   if ( hoveredNode.value === name ) return 16;
   return 13;
 };
@@ -536,6 +548,93 @@ watch( () => props.centerNote, async ( newVal, oldVal ) => {
     }, 650 );
   } );
 } );
+// ─── PATH RENDERING ─────────────────────────────────────────────────
+
+/**
+ * Converts the abstract harmonic path into SVG polyline coordinates.
+ * We start from the end of the path (assumed to be near the center)
+ * and walk backwards, unwrapping the toroidal coordinates to find
+ * valid visual neighbors.
+ */
+const pathPoints = computed( () => {
+  if ( !props.path || props.path.length < 2 ) return '';
+
+  // Center of the viewport
+  const cx = props.width / 2;
+  const cy = props.height / 2;
+
+  // The visual path points in pixels
+  const visualPoints: { x: number, y: number }[] = [];
+
+  // We assume the LAST point in the path corresponds to the current centerNote.
+  visualPoints.push( { x: cx, y: cy } );
+  
+  for ( let i = props.path.length - 1; i > 0; i-- ) {
+    const curr = props.path[i]!;
+    const prev = props.path[i - 1]!;
+    
+    // Calculate toroidal delta
+    let dx = prev.x - curr.x;
+    let dy = prev.y - curr.y;
+    
+    // Unwrap on 4x3 grid
+    // Width 4: -2..1
+    if ( dx > 1 ) dx -= 4;
+    if ( dx < -2 ) dx += 4;
+    
+    // Height 3: -1..1
+    if ( dy > 1 ) dy -= 3;
+    if ( dy < -1 ) dy += 3;
+    
+    // Convert to Grid Delta
+    // col = x + y, row = -y
+    const dCol = dx + dy;
+    const dRow = -dy;
+    
+    // Update walker (backwards from center)
+    // IMPORTANT: Since we are walking BACKWARDS from curr to prev,
+    // the delta (prev - curr) represents the step we need to take
+    // to find where the *previous* point was relative to the *current* point.
+    
+    // Note: The walker tracks the *cumulative offset* from the center.
+    // Initialize walker at 0,0 (center).
+    // add delta to find position of previous point.
+    
+    // Wait... walkerCol/Row should accumulate.
+    // We need to define them outside the loop.
+  }
+
+  // Correction: I need to declare walkerCol/Row outside the loop so they persist.
+  let walkerCol = 0;
+  let walkerRow = 0;
+
+  for ( let i = props.path.length - 1; i > 0; i-- ) {
+    const curr = props.path[i]!;
+    const prev = props.path[i - 1]!;
+    
+    let dx = prev.x - curr.x;
+    let dy = prev.y - curr.y;
+    
+    if ( dx > 1 ) dx -= 4;
+    if ( dx < -2 ) dx += 4;
+    
+    if ( dy > 1 ) dy -= 3;
+    if ( dy < -1 ) dy += 3;
+    
+    const dCol = dx + dy;
+    const dRow = -dy;
+    
+    walkerCol += dCol;
+    walkerRow += dRow;
+    
+    const px = cx + ( walkerCol * COL_SPACING ) + ( walkerRow * COL_SPACING * 0.5 );
+    const py = cy + ( walkerRow * ROW_SPACING );
+    
+    visualPoints.push( { x: px, y: py } );
+  }
+  
+  return visualPoints.map( p => `${p.x},${p.y}` ).join( ' ' );
+} );
 </script>
 
 <template>
@@ -678,8 +777,23 @@ watch( () => props.centerNote, async ( newVal, oldVal ) => {
     </g>
 
     <!--
-      LAYER 3: Nodes (pitch class circles + labels)
-      These are the main interactive elements of the lattice.
+      LAYER 2.5: Harmonic Path
+      Visualizes the user's journey through the Tonnetz.
+    -->
+    <g class="tonnetz-path">
+      <polyline
+        v-if="pathPoints"
+        :points="pathPoints"
+        fill="none"
+        stroke="rgba(255, 255, 255, 0.4)"
+        stroke-width="3"
+        stroke-dasharray="8 4"
+        class="tonnetz-path-line"
+      />
+    </g>
+
+    <!--
+      LAYER 3: Nodes ...
     -->
     <g class="tonnetz-nodes">
       <g

@@ -54,3 +54,9 @@ docs/*
 test-results/
 playwright-report/
 blob-report/
+
+# Large data files
+apps/tonic/public/data/spectral-songs.json
+packages/core/data/chordonomicon_v2.csv
+packages/core/data/chordonomicon.csv
+

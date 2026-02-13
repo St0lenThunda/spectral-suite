@@ -67,25 +67,25 @@ const INSTRUMENT_REGISTRY: InstrumentInfo[] = [
     baseUrl: 'https://tonejs.github.io/audio/salamander',
     format: 'mp3',
     // Salamander piano samples use note names like 'A3.mp3', 'C4.mp3'
-    availableNotes: ['C3', 'Eb3', 'Gb3', 'A3', 'C4', 'Eb4', 'Gb4', 'A4'],
+    availableNotes: ['C3', 'Ds3', 'Fs3', 'A3', 'C4', 'Ds4', 'Fs4', 'A4'],
     attribution: 'Salamander Grand Piano by Alexander Holm (CC BY 3.0)'
   },
   {
     id: 'guitar-acoustic',
     name: 'Acoustic Guitar',
     icon: '🎸',
-    baseUrl: 'https://tonejs.github.io/audio/guitar-acoustic',
+    baseUrl: 'https://cdn.jsdelivr.net/gh/nbrosowsky/tonejs-instruments@master/samples/guitar-acoustic',
     format: 'mp3',
-    availableNotes: ['C3', 'Eb3', 'Gb3', 'A3', 'C4', 'Eb4', 'Gb4', 'A4'],
+    availableNotes: ['C3', 'Ds3', 'Fs3', 'A3', 'C4', 'Ds4', 'Fs4', 'A4'],
     attribution: 'Acoustic Guitar samples (CC BY 3.0)'
   },
   {
     id: 'harmonium',
     name: 'Harmonium',
     icon: '🎼',
-    baseUrl: 'https://tonejs.github.io/audio/harmonium',
+    baseUrl: 'https://cdn.jsdelivr.net/gh/nbrosowsky/tonejs-instruments@master/samples/harmonium',
     format: 'mp3',
-    availableNotes: ['C3', 'Eb3', 'Gb3', 'A3', 'C4', 'Eb4', 'Gb4', 'A4'],
+    availableNotes: ['C3', 'Ds3', 'Fs3', 'A3', 'C4', 'Ds4', 'Fs4', 'A4'],
     attribution: 'Harmonium samples (CC BY 3.0)'
   }
 ];

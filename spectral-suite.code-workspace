@@ -1,7 +1,10 @@
 {
 	"folders": [
 		{
-			"path": "../mtool"
+			"path": "."
+		},
+		{
+			"path": "../../../../mnt/c/Users/tonym/My Drive/Vault 2/01 Projects"
 		}
 	],
 	"settings": {}

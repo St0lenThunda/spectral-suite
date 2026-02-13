@@ -28,3 +28,11 @@ export * from './storage/StorageService'
 export * from './rhythm/MetronomeEngine'
 export * from './rhythm/TransientDetector'
 export { Note, Interval, Chord } from 'tonal';
+
+// Data & Recommendations
+export * from './data/types';
+export * from './data/SongDatabase';
+export * from './data/TonnetzMapper';
+export * from './data/RecommendationEngine';
+export * from './data/HarmonicPathRecorder';
+export * from './data/SpotifyService';

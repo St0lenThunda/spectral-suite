@@ -24,6 +24,7 @@ import {
 } from '@spectralsuite/core';
 import { useHarmonicTheory } from '../../composables/useHarmonicTheory';
 import { useToolInfo } from '../../composables/useToolInfo';
+import { useSongDatabase } from '../../composables/useSongDatabase';
 import {
   HARMONIC_SELECTION_KEY,
   type HarmonicSelectionState
@@ -33,6 +34,7 @@ import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.v
 import SettingsTrigger from '../../components/settings/SettingsTrigger.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import InstrumentBrowser from '../../components/settings/InstrumentBrowser.vue';
+import type { ScoredSuggestion, SongEntry } from '@spectralsuite/core';
 
 // ─── COMPOSABLES ────────────────────────────────────────────────────
 
@@ -45,18 +47,53 @@ const {
   PITCH_CLASSES
 } = useHarmonicTheory();
 
+const {
+  trackMovement,
+  isDatabaseReady,
+  isImporting,
+  importProgress,
+  currentPath,
+  initDatabase,
+  getHybridSuggestions,
+  clearHistory
+} = useSongDatabase();
+
 // ─── AUDIO ENGINE LIFECYCLE ─────────────────────────────────────────
 // Register when mounted, unregister when unmounted
-onMounted( () => activate() );
+onMounted( () => {
+  activate();
+  initDatabase();
+  console.log( 'TonnetzModule: Database status:', { isDatabaseReady: isDatabaseReady.value, isImporting: isImporting.value } );
+} );
 onUnmounted( () => deactivate() );
 
 // ─── EMITS ──────────────────────────────────────────────────────────
 
-const emit = defineEmits( ['back'] );
+const emit = defineEmits( ['back', 'reset'] );
 
 // ─── STATE ──────────────────────────────────────────────────────────
 
 const isSettingsOpen = ref( false );
+
+/**
+ * Data-driven chord recommendations
+ */
+const suggestions = ref<ScoredSuggestion[]>( [] );
+
+/**
+ * Songs with similar harmonic paths
+ */
+const similarSongs = ref<{ song: SongEntry, score: number }[]>( [] );
+
+/**
+ * Resolved Spotify metadata for the similar songs
+ */
+const resolvedMetadata = ref<Record<string, any>>( {} );
+
+/**
+ * Tracks if we've hit Spotify Development Mode restrictions (403s)
+ */
+const hasSpotifyDevRestriction = ref( false );
 
 /**
  * The pitch class name at the center of the lattice.
@@ -93,6 +130,11 @@ const lastTransform = ref<string | null>( null );
  * Animation key — bumped on each transform to restart CSS animations.
  */
 const transformAnimKey = ref( 0 );
+
+/**
+ * Active tab for the sidebar panel.
+ */
+const activeTab = ref<'selection' | 'suggestions' | 'songs'>( 'selection' );
 
 // ─── PROVIDE/INJECT ─────────────────────────────────────────────────
 
@@ -265,7 +307,7 @@ const applyR = () => {
  * @param n3 - Third pitch class name (5th)
  * @param type - Whether this triad is Major or minor
  */
-const selectTriad = ( n1: string, n2: string, n3: string, type: 'major' | 'minor' ) => {
+const selectTriad = async ( n1: string, n2: string, n3: string, type: 'major' | 'minor' ) => {
   selectedTriad.value = [n1, n2, n3];
   selectedTriadType.value = type;
   selectedRoot.value = n1;
@@ -273,6 +315,28 @@ const selectTriad = ( n1: string, n2: string, n3: string, type: 'major' | 'minor
 
   // Play the triad (using the shared playTriad from useHarmonicTheory)
   playTriad( n1, type );
+
+  // Data-Driven Features
+  const chordSymbol = `${n1}${type === 'minor' ? 'm' : ''}`;
+  suggestions.value = await getHybridSuggestions( chordSymbol );
+
+  const matches = await trackMovement( chordSymbol );
+  similarSongs.value = matches;
+
+  // Resolve metadata for new matches
+  for ( const item of matches ) {
+    if ( item.song.spotifyId && !resolvedMetadata.value[item.song.spotifyId] ) {
+      // Pass both SpotifyID and internal SongID to enable sidecar caching
+      useSongDatabase().resolveSongMetadata( item.song.spotifyId, item.song.id ).then( meta => {
+        if ( meta ) {
+          resolvedMetadata.value[item.song.spotifyId!] = meta;
+        } else {
+          // If we get null back, it's likely a 403 restriction in Dev Mode
+          hasSpotifyDevRestriction.value = true;
+        }
+      } );
+    }
+  }
 };
 
 /**
@@ -416,36 +480,67 @@ const intervalDisplay = computed( () => {
               :visible-radius="3"
               :interactive="true"
               :highlight-triad="selectedTriad"
+              :suggested-notes="suggestions.map( s => s.chord.replace( /m$/, '' ) )"
+              :path="currentPath"
               :show-transform-labels="true"
               @select-note="handleNodeSelect"
             />
 
-            <!-- Center Note Badge -->
-            <div class="absolute top-4 left-4 px-3 py-1.5 rounded-full bg-violet-500/10 border border-violet-500/20">
-              <span class="text-[10px] font-black text-violet-400 uppercase tracking-widest">
-                Center: {{ centerNote }}
-              </span>
-            </div>
-
-            <!-- Last Transform Badge (shows briefly after a transform) -->
-            <transition
-              enter-active-class="transition duration-300 ease-out"
-              enter-from-class="opacity-0 translate-y-2"
-              enter-to-class="opacity-100 translate-y-0"
-              leave-active-class="transition duration-500 ease-in"
-              leave-from-class="opacity-100"
-              leave-to-class="opacity-0"
-            >
+            <!-- Floating Action Button for Indicators -->
+            <div class="absolute bottom-6 left-6 flex flex-col items-start gap-2 group z-10">
+              <!-- Expanded State (Unraveled) -->
               <div
-                v-if=" lastTransform "
-                :key="transformAnimKey"
-                class="absolute top-4 right-4 px-4 py-2 rounded-full bg-emerald-500/10 border border-emerald-500/20"
+                class="flex flex-col gap-2 transition-all duration-300 origin-bottom-left scale-0 opacity-0 group-hover:scale-100 group-hover:opacity-100"
               >
-                <span class="text-xs font-black text-emerald-400 uppercase tracking-widest">
-                  Transform: {{ lastTransform }}
-                </span>
+                <!-- Center Note Badge -->
+                <div
+                  class="px-4 py-2 rounded-xl bg-white border border-violet-500/30 backdrop-blur-md shadow-xl flex items-center gap-3 "
+                >
+                  <div class="text-[9px] text-centfont-black text-slate-400 uppercase tracking-widest">Center</div>
+                  <div class="text-xs text-centerfont-black text-violet-400">{{ centerNote }}</div>
+                </div>
+
+                <!-- Last Transform Badge -->
+                <div
+                  v-if=" lastTransform "
+                  class="px-4 py-2 rounded-xl bg-spectral-900/90 border border-emerald-500/30 backdrop-blur-md shadow-xl flex items-center gap-3"
+                >
+                  <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Action</div>
+                  <div class="text-xs font-black text-emerald-400">{{ lastTransform }}</div>
+                </div>
+
+                <!-- Reset Path Button -->
+                <button
+                  v-if=" currentPath.length > 0 "
+                  @click="clearHistory(); $emit( 'reset' )"
+                  class="px-4 py-2 rounded-xl bg-spectral-900/90 border border-red-500/30 backdrop-blur-md shadow-xl flex items-center gap-3 hover:bg-red-500/10 transition-colors text-left"
+                >
+                  <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Path</div>
+                  <div class="text-xs font-bold text-red-400">Clear History (Reset)</div>
+                </button>
+
+                <!-- Legend / Help -->
+                <div
+                  class="px-4 py-3 rounded-xl bg-spectral-900/90 border border-white/10 backdrop-blur-md shadow-xl flex flex-col gap-2"
+                >
+                  <div class="flex items-center gap-2">
+                    <div class="w-3 h-0.5 bg-white/30 border-t border-white/50 border-dashed"></div>
+                    <span class="text-[9px] text-slate-400 uppercase tracking-wider">Dotted Line = Your Path</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <div class="w-2 h-2 rounded-full border border-yellow-500/50"></div>
+                    <span class="text-[9px] text-slate-400 uppercase tracking-wider">Yellow Ring = Selected</span>
+                  </div>
+                </div>
               </div>
-            </transition>
+
+              <!-- FAB Trigger -->
+              <button
+                class="w-8 h-8 rounded-full bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center hover:bg-white/10 hover:text-white hover:border-white/20 transition-all active:scale-95 group-hover:bg-violet-500/20 group-hover:text-violet-300 group-hover:border-violet-500/30"
+              >
+                <span class="text-xs">ℹ️</span>
+              </button>
+            </div>
           </div>
 
           <!-- Quick Instructions -->
@@ -455,126 +550,326 @@ const intervalDisplay = computed( () => {
         </div>
       </div>
 
-      <!-- Right Panel: Selection Info + Transforms -->
-      <div class="lg:col-span-4 space-y-6">
+      <!-- Right Panel: Tabbed Interface -->
+      <div class="lg:col-span-4 flex flex-col h-full">
 
-        <!-- Selected Triad Info -->
-        <div class="glass-container p-8 min-h-[300px] flex flex-col">
-          <div
-            v-if=" selectedTriad.length === 3 "
-            class="space-y-6 animate-in slide-in-from-right-4 duration-500"
-            :key="transformAnimKey"
-          >
-            <!-- Chord Name -->
-            <div>
-              <p class="text-[13px] font-black text-violet-400 uppercase tracking-[0.4em] mb-3">
-                Selected Triad
-              </p>
-              <h3 class="text-4xl font-black text-white italic tracking-tighter">
-                {{ chordDisplayName }}
-              </h3>
-              <p class="text-[10px] text-slate-500 uppercase tracking-widest mt-2">
-                {{ selectedTriadType === 'major' ? '▲ Major (upward triangle)' : '▼ Minor (downward triangle)' }}
-              </p>
-            </div>
+        <!-- Unified Tabbed Sidebar -->
+        <div class="glass-container p-0 overflow-hidden flex flex-col min-h-[600px]">
+          <!-- Tab Headers -->
+          <div class="flex border-b border-white/5 bg-white/5">
+            <button
+              @click="activeTab = 'selection'"
+              class="flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors hover:bg-white/5"
+              :class="activeTab === 'selection' ? 'text-indigo-400 bg-white/5 border-b-2 border-indigo-500' : 'text-slate-500'"
+            >
+              Current
+            </button>
+            <button
+              @click="activeTab = 'suggestions'"
+              class="flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors hover:bg-white/5"
+              :class="activeTab === 'suggestions' ? 'text-violet-400 bg-white/5 border-b-2 border-violet-500' : 'text-slate-500'"
+            >
+              Ex. Moves
+            </button>
+            <button
+              @click="activeTab = 'songs'"
+              class="flex-1 py-3 text-[10px] font-black uppercase tracking-widest transition-colors hover:bg-white/5"
+              :class="activeTab === 'songs' ? 'text-emerald-400 bg-white/5 border-b-2 border-emerald-500' : 'text-slate-500'"
+            >
+              Songs
+            </button>
+          </div>
 
-            <!-- Interval Breakdown -->
-            <div class="space-y-2">
-              <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                Intervals
-              </h4>
+          <!-- Tab Content -->
+          <div class="p-6 flex-1 flex flex-col relative">
+
+            <!-- SELECTION TAB -->
+            <div
+              v-if=" activeTab === 'selection' "
+              class="flex-1 flex flex-col animate-in fade-in slide-in-from-left-4 duration-300"
+            >
               <div
-                v-for=" ( interval, i ) in intervalDisplay "
-                :key="i"
-                class="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5"
+                v-if=" selectedTriad.length === 3 "
+                class="space-y-6"
+                :key="transformAnimKey"
+              >
+                <!-- Chord Name -->
+                <div>
+                  <p class="text-[13px] font-black text-violet-400 uppercase tracking-[0.4em] mb-3">
+                    Selected Triad
+                  </p>
+                  <h3 class="text-4xl font-black text-white italic tracking-tighter">
+                    {{ chordDisplayName }}
+                  </h3>
+                  <p class="text-[10px] text-slate-500 uppercase tracking-widest mt-2">
+                    {{ selectedTriadType === 'major' ? '▲ Major (upward triangle)' : '▼ Minor (downward triangle)' }}
+                  </p>
+                </div>
+
+                <!-- Interval Breakdown -->
+                <div class="space-y-2">
+                  <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    Intervals
+                  </h4>
+                  <div
+                    v-for=" ( interval, i ) in intervalDisplay "
+                    :key="i"
+                    class="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/5"
+                  >
+                    <div
+                      class="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center font-black text-[15px]"
+                      :class="interval.color"
+                    >
+                      {{ interval.note }}
+                    </div>
+                    <span class="text-xs font-bold text-slate-400">{{ interval.label }}</span>
+                  </div>
+                </div>
+
+                <!-- Neo-Riemannian Transform Buttons -->
+                <div class="space-y-3 pt-4 border-t border-white/5">
+                  <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                    Transforms
+                  </h4>
+                  <div class="grid grid-cols-3 gap-2">
+                    <!-- P (Parallel) -->
+                    <button
+                      @click="applyP"
+                      class="transform-btn group p-4 rounded-2xl border transition-all text-center bg-indigo-500/5 border-indigo-500/20 hover:bg-indigo-500/15 hover:border-indigo-500/40 active:scale-95"
+                    >
+                      <span
+                        class="block text-2xl font-black text-indigo-400 mb-1 group-hover:scale-110 transition-transform"
+                      >P</span>
+                      <span class="text-[9px] font-bold text-slate-500">Parallel</span>
+                    </button>
+
+                    <!-- L (Leading-tone) -->
+                    <button
+                      @click="applyL"
+                      class="transform-btn group p-4 rounded-2xl border transition-all text-center bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/15 hover:border-emerald-500/40 active:scale-95"
+                    >
+                      <span
+                        class="block text-2xl font-black text-emerald-400 mb-1 group-hover:scale-110 transition-transform"
+                      >L</span>
+                      <span class="text-[9px] font-bold text-slate-500">Leading</span>
+                    </button>
+
+                    <!-- R (Relative) -->
+                    <button
+                      @click="applyR"
+                      class="transform-btn group p-4 rounded-2xl border transition-all text-center bg-rose-500/5 border-rose-500/20 hover:bg-rose-500/15 hover:border-rose-500/40 active:scale-95"
+                    >
+                      <span
+                        class="block text-2xl font-black text-rose-400 mb-1 group-hover:scale-110 transition-transform"
+                      >R</span>
+                      <span class="text-[9px] font-bold text-slate-500">Relative</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Empty State -->
+              <div
+                v-else
+                class="flex-1 flex flex-col items-center justify-center opacity-20 text-center py-12"
               >
                 <div
-                  class="w-8 h-8 rounded-lg bg-black/30 flex items-center justify-center font-black text-[15px]"
-                  :class="interval.color"
+                  class="w-20 h-20 rounded-full border border-dashed border-white/20 mb-6 flex items-center justify-center text-4xl"
                 >
-                  {{ interval.note }}
+                  🔺
                 </div>
-                <span class="text-xs font-bold text-slate-400">{{ interval.label }}</span>
+                <p class="font-black uppercase tracking-widest text-[10px] text-white">Explore the Lattice</p>
+                <p class="text-xs text-slate-500 px-10 mt-2 italic">
+                  Click any node to build a triad and explore harmonic relationships on the Tonnetz.
+                </p>
               </div>
             </div>
 
-            <!-- Neo-Riemannian Transform Buttons -->
-            <div class="space-y-3 pt-4 border-t border-white/5">
-              <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                Transforms
-              </h4>
-              <div class="grid grid-cols-3 gap-2">
-                <!-- P (Parallel) -->
-                <button
-                  @click="applyP"
-                  class="transform-btn group p-4 rounded-2xl border transition-all text-center bg-indigo-500/5 border-indigo-500/20 hover:bg-indigo-500/15 hover:border-indigo-500/40 active:scale-95"
-                >
-                  <span
-                    class="block text-2xl font-black text-indigo-400 mb-1 group-hover:scale-110 transition-transform"
-                  >P</span>
-                  <span class="text-[9px] font-bold text-slate-500">Parallel</span>
-                </button>
-
-                <!-- L (Leading-tone) -->
-                <button
-                  @click="applyL"
-                  class="transform-btn group p-4 rounded-2xl border transition-all text-center bg-emerald-500/5 border-emerald-500/20 hover:bg-emerald-500/15 hover:border-emerald-500/40 active:scale-95"
-                >
-                  <span
-                    class="block text-2xl font-black text-emerald-400 mb-1 group-hover:scale-110 transition-transform"
-                  >L</span>
-                  <span class="text-[9px] font-bold text-slate-500">Leading</span>
-                </button>
-
-                <!-- R (Relative) -->
-                <button
-                  @click="applyR"
-                  class="transform-btn group p-4 rounded-2xl border transition-all text-center bg-rose-500/5 border-rose-500/20 hover:bg-rose-500/15 hover:border-rose-500/40 active:scale-95"
-                >
-                  <span
-                    class="block text-2xl font-black text-rose-400 mb-1 group-hover:scale-110 transition-transform">R</span>
-                  <span class="text-[9px] font-bold text-slate-500">Relative</span>
-                </button>
-              </div>
-            </div>
-
-            <!-- Educational Tip -->
-            <div class="p-5 rounded-2xl bg-violet-500/5 border border-violet-500/10">
-              <span class="text-2xl">💡</span>
-              <p class="text-[11px] text-slate-400 leading-relaxed mt-2">
-                <span class="font-black text-violet-300">Neo-Riemannian theory</span> shows
-                how chords connect by moving just
-                <span class="text-white font-bold">one note</span> at a time. Try chaining
-                transforms: <span class="font-mono text-violet-400">P → L → R</span> to
-                explore "parsimonious voice leading."
-              </p>
-            </div>
-          </div>
-
-          <!-- Empty State -->
-          <div
-            v-else
-            class="flex-1 flex flex-col items-center justify-center opacity-20 text-center"
-          >
+            <!-- SUGGESTIONS TAB -->
             <div
-              class="w-20 h-20 rounded-full border border-dashed border-white/20 mb-6 flex items-center justify-center text-4xl"
+              v-else-if=" activeTab === 'suggestions' "
+              class="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300"
             >
-              🔺
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-[10px] text-slate-500 uppercase tracking-widest">
+                  Next Moves
+                </p>
+                <div
+                  v-if=" !isDatabaseReady "
+                  class="text-[8px] text-amber-500 animate-pulse font-black uppercase"
+                >
+                  Loading Database...
+                </div>
+              </div>
+
+              <div
+                v-if=" suggestions.length > 0 "
+                class="grid grid-cols-2 gap-2"
+              >
+                <button
+                  v-for=" s in suggestions "
+                  :key="s.chord"
+                  @click="handleNodeSelect( s.chord.replace( /m$/, '' ) )"
+                  class="p-3 rounded-xl bg-white/5 border border-white/5 hover:bg-violet-500/10 hover:border-violet-500/30 transition-all text-left group"
+                >
+                  <div class="flex justify-between items-center mb-1">
+                    <span class="text-sm font-black text-white">{{ s.chord }}</span>
+                    <span class="text-[9px] font-mono text-slate-500">
+                      {{ Math.round( s.score * 100 ) }}%
+                    </span>
+                  </div>
+                  <div class="text-[8px] uppercase tracking-tighter text-slate-500 group-hover:text-violet-400">
+                    {{ s.reason }}
+                  </div>
+                </button>
+              </div>
+              <div
+                v-else
+                class="py-8 text-center opacity-30"
+              >
+                <p class="text-[9px] uppercase tracking-widest">Select a chord to see best-fit paths</p>
+              </div>
             </div>
-            <p class="font-black uppercase tracking-widest text-[10px] text-white">Explore the Lattice</p>
-            <p class="text-xs text-slate-500 px-10 mt-2 italic mb-6">
-              Click any node to build a triad and explore harmonic relationships on the Tonnetz.
-            </p>
-            <div class="px-8 mt-4 border-t border-white/5 pt-8">
-              <p class="text-[10px] text-slate-500 leading-relaxed max-w-[200px] mx-auto">
-                Each triangle is a chord. Upward ▲ = Major, Downward ▼ = minor. Nodes along
-                each axis are separated by fifths, major thirds, and minor thirds.
-              </p>
+
+            <!-- SIMILAR SONGS TAB -->
+            <div
+              v-else-if=" activeTab === 'songs' "
+              class="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300"
+            >
+              <div class="flex items-center justify-between mb-2">
+                <p class="text-[10px] text-slate-500 uppercase tracking-widest">
+                  Matches Pattern
+                </p>
+                <div
+                  v-if=" hasSpotifyDevRestriction "
+                  class="group relative"
+                >
+                  <span
+                    class="text-[10px] bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full cursor-help font-black tracking-tighter"
+                  >DEV MODE LIMIT</span>
+                  <div
+                    class="absolute right-0 bottom-full mb-2 w-48 p-3 rounded-xl bg-slate-900 border border-white/10 text-[9px] text-slate-400 leading-relaxed shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50"
+                  >
+                    Spotify restricts major label metadata (Beatles, etc.) for apps in Development Mode. Only
+                    whitelisted
+                    test users can see these.
+                  </div>
+                </div>
+              </div>
+
+              <div
+                v-if=" similarSongs.length > 0 "
+                class="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar"
+              >
+                <div
+                  v-for=" item in similarSongs "
+                  :key="item.song.id"
+                  class="p-3 rounded-xl bg-spectral-900/50 border border-white/5 flex gap-4 items-center group transition-all hover:bg-white/5"
+                >
+                  <!-- Album Art -->
+                  <div
+                    v-if=" item.song.spotifyId && resolvedMetadata[item.song.spotifyId] "
+                    class="w-12 h-12 shrink-0 rounded-lg overflow-hidden bg-black/40 border border-white/10"
+                  >
+                    <img
+                      :src="resolvedMetadata[item.song.spotifyId].artwork"
+                      class="w-full h-full object-cover"
+                    >
+                  </div>
+                  <div
+                    v-else
+                    class="w-12 h-12 shrink-0 rounded-lg bg-white/5 flex items-center justify-center text-xs opacity-20"
+                  >
+                    🎵
+                  </div>
+
+                  <div class="flex-1 min-w-0">
+                    <template v-if=" item.song.spotifyId && resolvedMetadata[item.song.spotifyId] ">
+                      <p class="text-xs font-bold text-white truncate">{{ resolvedMetadata[item.song.spotifyId].title }}
+                      </p>
+                      <p class="text-[10px] text-indigo-400 truncate">{{ resolvedMetadata[item.song.spotifyId].artist }}
+                      </p>
+                    </template>
+                    <template v-else>
+                      <p class="text-xs font-bold text-white mb-0.5">Song #{{ item.song.id }}</p>
+                    </template>
+
+                    <div class="flex items-center gap-2 mt-1">
+                      <p class="text-[8px] text-slate-500 uppercase tracking-widest">{{ item.song.genre }} •
+                        {{ item.song.decade }}
+                      </p>
+                      <a
+                        v-if=" item.song.spotifyId "
+                        :href="`https://open.spotify.com/track/${item.song.spotifyId}`"
+                        target="_blank"
+                        class="text-[10px] grayscale hover:grayscale-0 opacity-50 hover:opacity-100 transition-all"
+                        title="Open in Spotify"
+                      >
+                        Spotify ↗
+                      </a>
+                    </div>
+                  </div>
+                  <!-- Score Badge -->
+                  <div class="text-[10px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-2 py-1 rounded-md">
+                    {{ Math.round( item.score * 100 ) }}%
+                  </div>
+                </div>
+              </div>
+              <div
+                v-else
+                class="py-8 text-center opacity-30"
+              >
+                <p class="text-[9px] uppercase tracking-widest">
+                  {{ currentPath.length < 2 ? 'Play 2+ chords to find matches' : 'No similar songs found' }}
+                </p>
+              </div>
             </div>
+
           </div>
         </div>
+
       </div>
+
+
     </div>
+
+
+
+    <!-- Data Import Overlay -->
+    <transition
+      enter-active-class="transition duration-500 ease-out"
+      enter-from-class="opacity-0 scale-105"
+      enter-to-class="opacity-100 scale-100"
+      leave-active-class="transition duration-1000 ease-in"
+      leave-from-class="opacity-100"
+      leave-to-class="opacity-0"
+    >
+      <div
+        v-if=" isImporting "
+        class="fixed inset-0 z-100 bg-spectral-950/90 backdrop-blur-3xl flex flex-col items-center justify-center p-6 text-center"
+      >
+        <div class="w-16 h-16 border-4 border-violet-500/20 border-t-violet-500 rounded-full animate-spin mb-8"></div>
+        <h3 class="text-3xl font-black text-white tracking-tighter uppercase italic mb-4">
+          Syncing <span class="text-violet-500">Chordonomicon</span>
+        </h3>
+        <p class="text-slate-400 max-w-sm text-sm leading-relaxed mb-8">
+          We are downloading the compressed Spectral Database (20MB). This only happens once.
+        </p>
+        <div class="w-64 h-1.5 bg-white/5 rounded-full overflow-hidden mb-2">
+          <div
+            class="h-full bg-violet-500 transition-all duration-300 ease-out"
+            :style="{ width: `${importProgress}%` }"
+          ></div>
+
+ 
+      </div>
+        <p class="text-[10px] font-mono text-violet-400 font-bold opacity-80">
+          {{ Math.round( importProgress ) }}%
+        </p>
+
+ 
+    </div>
+    </transition>
   </div>
 </template>
 
@@ -582,7 +877,7 @@ const intervalDisplay = computed( () => {
 @reference "tailwindcss";
 
 .glass-container {
-  @apply rounded-[3rem] bg-white/5 border border-white/5 backdrop-blur-xl;
+  @apply rounded-lg bg-white/5 border border-white/5 backdrop-blur-xl;
 }
 
 /* Animations */

@@ -113,7 +113,7 @@ const enabledTools = ref<Record<string, boolean>>( {
   frequencyflow: true,
   tracktracer: true,
   harmonicorbit: true,
-  tonnetz: false,
+  tonnetz: true,
   chordforge: true,
   melodymirror: true,
   academy: false

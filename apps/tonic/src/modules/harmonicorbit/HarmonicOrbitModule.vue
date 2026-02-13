@@ -8,7 +8,7 @@
  * @module modules/harmonicorbit/HarmonicOrbitModule.vue
  */
 
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, provide } from 'vue';
 import {
   SynthEngine,
   Note,
@@ -17,9 +17,15 @@ import {
   useHarmonicOrbit // Import the store
 } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
+import {
+  HARMONIC_SELECTION_KEY,
+  HARMONIC_NAVIGATE_KEY
+} from '../../composables/harmonicKeys';
+import TonnetzPreview from './TonnetzPreview.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsTrigger from '../../components/settings/SettingsTrigger.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
+import InstrumentBrowser from '../../components/settings/InstrumentBrowser.vue';
 
 const { openInfo } = useToolInfo();
 const { activate, deactivate } = useAudioEngine();
@@ -86,6 +92,11 @@ const drawerCategories = computed( () => [
     label: 'General',
     description: 'Orbit Display & Theory',
     showIndicator: !isFifthsMode.value || showDegrees.value
+  },
+  {
+    id: 'instruments',
+    label: 'Instruments',
+    description: 'Real Tone Samples'
   },
   {
     id: 'engine',
@@ -257,7 +268,22 @@ const selectChordByName = ( chordName: string ) => {
 };
 
 // --- EMITS ---
-const emit = defineEmits( ['back'] );
+const emit = defineEmits( ['back', 'navigate-tonnetz'] );
+
+// ─── PROVIDE/INJECT STATE ─────────────────────────────────────────────
+// Provide selection state so TonnetzPreview can inject it.
+// This is Vue's way of passing data to deeply-nested children
+// without threading props through intermediate layers.
+provide( HARMONIC_SELECTION_KEY, {
+  selectedKeyIdx,
+  selectedType,
+  activeKeys,
+  currentTriadNotes
+} );
+
+provide( HARMONIC_NAVIGATE_KEY, {
+  navigateToTonnetz: () => emit( 'navigate-tonnetz' )
+} );
 
 onMounted( () => activate() );
 onUnmounted( () => deactivate() );
@@ -392,6 +418,10 @@ onUnmounted( () => deactivate() );
 
       <template #engine>
         <EngineSettings />
+      </template>
+
+      <template #instruments>
+        <InstrumentBrowser />
       </template>
     </LocalSettingsDrawer>
 
@@ -788,6 +818,9 @@ onUnmounted( () => deactivate() );
                 </p>
               </div>
             </div>
+
+            <!-- Tonnetz Mini Preview Accordion -->
+            <TonnetzPreview />
           </div>
 
           <!-- Empty State -->

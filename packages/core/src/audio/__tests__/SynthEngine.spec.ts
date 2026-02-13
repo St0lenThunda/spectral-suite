@@ -40,6 +40,7 @@ const mockAudioContext = {
   createBufferSource: vi.fn( () => ( {
     buffer: null,
     loop: false,
+    playbackRate: { value: 1, setValueAtTime: vi.fn() },
     connect: vi.fn(),
     start: vi.fn(),
     stop: vi.fn()
@@ -154,13 +155,15 @@ describe( 'SynthEngine', () => {
 
   it( 'should handle all voice types without errors', () => {
     const synth = SynthEngine.getInstance();
-    const presets: Array<'RETRO' | 'PLUCKED' | 'ELECTRIC' | 'STEEL_STRING' | 'OVERDRIVE' | 'DISTORTION'> = [
+    const presets: Array<'RETRO' | 'PLUCKED' | 'ELECTRIC' | 'STEEL_STRING' | 'OVERDRIVE' | 'DISTORTION' | 'PURE' | 'SAMPLED'> = [
       'RETRO',
       'PLUCKED',
       'ELECTRIC',
       'STEEL_STRING',
       'OVERDRIVE',
-      'DISTORTION'
+      'DISTORTION',
+      'PURE',
+      'SAMPLED'
     ];
 
     presets.forEach( preset => {
@@ -503,6 +506,133 @@ describe( 'SynthEngine', () => {
       // Quarter and three-quarter points should show saturation
       expect( Math.abs( samples.quarterPoint ) ).toBeGreaterThan( 0.3 );
       expect( Math.abs( samples.threeQuarterPoint ) ).toBeGreaterThan( 0.3 );
+    } );
+  } );
+
+  // PURE Voice (Additive Synthesis) Tests
+  describe( 'PURE Voice (Additive Synthesis)', () => {
+    it( 'should create 8 sine oscillators for harmonic series', () => {
+      const synth = SynthEngine.getInstance();
+      synth.setPreset( 'PURE' );
+
+      const oscBefore = mockAudioContext.createOscillator.mock.calls.length;
+      synth.playNote( 440, 1.0, 300 );
+      const oscAfter = mockAudioContext.createOscillator.mock.calls.length;
+
+      // PURE voice should create exactly 8 oscillators (one per harmonic)
+      expect( oscAfter - oscBefore ).toBe( 8 );
+    } );
+
+    it( 'should set all oscillators to sine type', () => {
+      const synth = SynthEngine.getInstance();
+      synth.setPreset( 'PURE' );
+
+      const oscBefore = mockAudioContext.createOscillator.mock.results.length;
+      synth.playNote( 440 );
+      const oscAfter = mockAudioContext.createOscillator.mock.results.length;
+
+      // Every oscillator created should be a sine wave
+      const newOscs = mockAudioContext.createOscillator.mock.results.slice( oscBefore, oscAfter );
+      newOscs.forEach( osc => {
+        expect( osc.value?.type ).toBe( 'sine' );
+      } );
+    } );
+
+    it( 'should create one gain node per harmonic for ADSR envelopes', () => {
+      const synth = SynthEngine.getInstance();
+      synth.setPreset( 'PURE' );
+
+      const gainBefore = mockAudioContext.createGain.mock.calls.length;
+      synth.playNote( 440, 1.0, 300 );
+      const gainAfter = mockAudioContext.createGain.mock.calls.length;
+
+      // 8 harmonics = 8 envelope gain nodes (plus possibly 1 master gain from init)
+      // We check >= 8 to account for the master gain node created during init()
+      expect( gainAfter - gainBefore ).toBeGreaterThanOrEqual( 8 );
+    } );
+
+    it( 'should match PURE voice audio graph structure', () => {
+      const synth = SynthEngine.getInstance();
+      const before = {
+        oscillators: mockAudioContext.createOscillator.mock.calls.length,
+        gains: mockAudioContext.createGain.mock.calls.length,
+        filters: mockAudioContext.createBiquadFilter.mock.calls.length,
+        delays: mockAudioContext.createDelay.mock.calls.length,
+        bufferSources: mockAudioContext.createBufferSource.mock.calls.length,
+        waveShapers: mockAudioContext.createWaveShaper.mock.calls.length
+      };
+
+      synth.setPreset( 'PURE' );
+      synth.playNote( 440, 1.0, 300 );
+
+      const after = {
+        oscillators: mockAudioContext.createOscillator.mock.calls.length,
+        gains: mockAudioContext.createGain.mock.calls.length,
+        filters: mockAudioContext.createBiquadFilter.mock.calls.length,
+        delays: mockAudioContext.createDelay.mock.calls.length,
+        bufferSources: mockAudioContext.createBufferSource.mock.calls.length,
+        waveShapers: mockAudioContext.createWaveShaper.mock.calls.length
+      };
+
+      const delta = {
+        oscillators: after.oscillators - before.oscillators,
+        gains: after.gains - before.gains,
+        filters: after.filters - before.filters,
+        delays: after.delays - before.delays,
+        bufferSources: after.bufferSources - before.bufferSources,
+        waveShapers: after.waveShapers - before.waveShapers
+      };
+
+      // PURE voice: 8 oscillators, 8 gains, 0 filters, 0 delays, 0 buffers, 0 shapers
+      expect( delta ).toMatchSnapshot();
+    } );
+  } );
+
+  // SAMPLED Voice Tests
+  describe( 'SAMPLED Voice (Sample Playback)', () => {
+    it( 'should fall back to PURE when no sample buffers are loaded', () => {
+      const synth = SynthEngine.getInstance();
+      synth.setPreset( 'SAMPLED' );
+
+      // Ensure no sample buffers are set
+      synth.setSampleBuffers( new Map() );
+
+      const oscBefore = mockAudioContext.createOscillator.mock.calls.length;
+      synth.playNote( 440, 1.0, 300 );
+      const oscAfter = mockAudioContext.createOscillator.mock.calls.length;
+
+      // Should fall back to PURE, which creates 8 oscillators
+      expect( oscAfter - oscBefore ).toBe( 8 );
+    } );
+
+    it( 'should play buffer source when sample buffers are available', () => {
+      const synth = SynthEngine.getInstance();
+      synth.setPreset( 'SAMPLED' );
+
+      // Create a mock AudioBuffer for A4 (440Hz)
+      const mockBuffer = { duration: 2, length: 88200, sampleRate: 44100 };
+      const sampleMap = new Map<string, any>();
+      sampleMap.set( 'A4', mockBuffer );
+      synth.setSampleBuffers( sampleMap );
+
+      const bufSrcBefore = mockAudioContext.createBufferSource.mock.calls.length;
+      synth.playNote( 440, 1.0, 300 );
+      const bufSrcAfter = mockAudioContext.createBufferSource.mock.calls.length;
+
+      // Should create a BufferSource (not oscillators)
+      expect( bufSrcAfter - bufSrcBefore ).toBe( 1 );
+    } );
+
+    it( 'should report sample buffer availability correctly', () => {
+      const synth = SynthEngine.getInstance();
+
+      synth.setSampleBuffers( new Map() );
+      expect( synth.hasSampleBuffers() ).toBe( false );
+
+      const sampleMap = new Map<string, any>();
+      sampleMap.set( 'C3', {} );
+      synth.setSampleBuffers( sampleMap );
+      expect( synth.hasSampleBuffers() ).toBe( true );
     } );
   } );
 } );

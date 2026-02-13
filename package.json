@@ -49,6 +49,7 @@
     "vue-tsc": "3.1.4"
   },
   "overrides": {
-    "vue-tsc": "3.1.4"
+    "vue-tsc": "3.1.4",
+    "esbuild": "^0.25.0"
   }
 }

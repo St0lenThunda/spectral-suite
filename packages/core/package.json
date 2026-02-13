@@ -5,6 +5,7 @@
   "type": "module",
   "main": "./src/index.ts",
   "dependencies": {
+    "idb": "^8.0.3",
     "pinia-plugin-persistedstate": "^3.2.3",
     "tonal": "^6.3.0"
   },
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.0.16",
+    "csv-parser": "^3.2.0",
     "happy-dom": "^20.1.0",
     "vitest": "^4.0.16"
   }

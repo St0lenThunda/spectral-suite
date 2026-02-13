@@ -64,6 +64,14 @@ export const TOOL_METADATA: Record<string, ToolMetadata> = {
     practicalApplication: 'Master functional harmony by exploring chord relationships visually. See how ii-V-I progressions connect, understand chord substitutions, and learn key signatures at a glance. Perfect for songwriters needing quick chord family references and theory students learning the Circle of Fifths.',
     howItWorks: 'The Orbit renders 60 SVG text labels (12 Major + 36 Minor + 12 Dim) positioned on concentric rings. Only text labels are clickable (paths are decorative). Selection stores the specific chord type (ii/iii/vi) for accurate display. The Key Family is calculated using Circle of Fifths neighbor positions (IV = CCW, V = CW).'
   },
+  tonnetz: {
+    id: 'tonnetz',
+    name: 'Tonnetz Lab',
+    whatAmISeeing: 'A hexagonal lattice where every node is a pitch class and every triangle is a triad. Nodes along the horizontal axis are separated by Perfect 5ths, the upper-right diagonal by Major 3rds, and the lower-right diagonal by minor 3rds. Upward-pointing triangles (▲) represent Major triads; downward triangles (▼) represent minor triads. The highlighted triangle is the currently selected chord.',
+    instructions: '1. Click any node on the lattice to select that pitch as a triad root.\n2. The right panel shows the selected triad with interval labels (Root, 3rd, 5th).\n3. Use the P (Parallel), L (Leading-tone), and R (Relative) buttons to apply Neo-Riemannian transforms.\n4. Chain transforms (e.g., P → L → R) to explore "parsimonious voice leading" — smooth chord transitions.\n5. Change the center note in Settings to re-center the lattice.',
+    practicalApplication: 'Discover how chords connect by moving just one note at a time. Use Neo-Riemannian transforms to find smooth voice-leading paths between distant chords. Essential for film scoring, jazz reharmonization, and understanding chromatic harmony beyond traditional key-based thinking.',
+    howItWorks: 'The Tonnetz renders pitch class nodes on a triangular SVG grid. Moving right = +7 semitones (P5), upper-right = +4 semitones (M3), lower-right = +3 semitones (m3). Triangle detection identifies all adjacent 3-node groups as triads. Neo-Riemannian transforms (P, L, R) each move exactly one note by 1-2 semitones, re-selecting the resulting triad with animated transitions.'
+  },
   chordforge: {
     id: 'chordforge',
     name: 'Chord Forge',

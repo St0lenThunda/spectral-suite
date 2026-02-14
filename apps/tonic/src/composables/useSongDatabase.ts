@@ -25,7 +25,7 @@ const chordHistory = ref( pathRecorder.getHistory() );
  * useSongDatabase — Frontend Data Integration
  */
 export function useSongDatabase () {
-  const { showSuccess, showError } = useToast();
+  const { showError } = useToast();
 
   /**
    * Initializes the database connection and imports seed data if needed.

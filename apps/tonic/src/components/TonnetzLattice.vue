@@ -78,6 +78,9 @@ const props = withDefaults( defineProps<{
 const emit = defineEmits<{
   /** Fired when a node is clicked (only when interactive=true) */
   ( e: 'select-note', note: string ): void;
+
+  /** Fired when a triad triangle is clicked (only when interactive=true) */
+  ( e: 'select-triad', notes: string[], type: 'major' | 'minor' ): void;
 }>();
 
 // ─── LATTICE GEOMETRY ───────────────────────────────────────────────
@@ -316,6 +319,18 @@ const handleNodeClick = ( note: string ) => {
   animationKey.value++;
 
   emit( 'select-note', note );
+};
+
+/**
+ * Handles clicking a triangle (triad) on the lattice.
+ * This allows selecting both Major and Minor chords directly.
+ * 
+ * @param notes - The pitch class names of the triad
+ * @param type - Whether it's a major or minor triangle
+ */
+const handleTriadClick = ( notes: string[], type: 'major' | 'minor' ) => {
+  if ( !props.interactive ) return;
+  emit( 'select-triad', notes, type );
 };
 
 // ─── SVG HELPERS ────────────────────────────────────────────────────
@@ -756,6 +771,14 @@ const comparisonPathPoints = computed( () => unwrapPath( props.comparisonPath ||
         v-for=" ( tri, i ) in triangles "
         :key="'tri-' + i"
       >
+        <!-- Background interactive triangle area (Hit area) -->
+        <polygon
+          :points="trianglePointsStr( tri )"
+          class="tonnetz-triangle-hit-area"
+          :class="{ 'is-interactive': interactive }"
+          @click="handleTriadClick( tri.notes, tri.type )"
+        />
+
         <polygon
           v-if=" tri.isHighlighted "
           :points="trianglePointsStr( tri )"
@@ -1120,5 +1143,20 @@ const comparisonPathPoints = computed( () => unwrapPath( props.comparisonPath ||
 .tonnetz-triangles {
   transition: opacity 0.3s ease 0.3s;
   /* 300ms delay so nodes settle first */
+}
+.tonnetz-triangle-hit-area {
+  fill: transparent;
+  stroke: transparent;
+  pointer-events: none;
+  transition: fill 0.2s ease;
+}
+
+.tonnetz-triangle-hit-area.is-interactive {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.tonnetz-triangle-hit-area.is-interactive:hover {
+  fill: rgba(255, 255, 255, 0.05);
 }
 </style>

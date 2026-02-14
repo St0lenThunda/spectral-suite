@@ -22,6 +22,7 @@ import {
   useAudioEngine,
   useGlobalEngine
 } from '@spectralsuite/core';
+import { Chord, Note } from 'tonal';
 import { useHarmonicTheory } from '../../composables/useHarmonicTheory';
 import { useToolInfo } from '../../composables/useToolInfo';
 import { useSongDatabase } from '../../composables/useSongDatabase';
@@ -366,6 +367,23 @@ const handleNodeSelect = ( note: string ) => {
 };
 
 /**
+ * Handles clicking a triangle (triad) on the lattice.
+ * This is the primary way to select both Major and Minor chords.
+ */
+const handleTriadSelect = ( notes: string[], type: 'major' | 'minor' ) => {
+  if ( notes.length < 3 ) return;
+
+  // Use Tonal to get canonical name (e.g. "Am", "C")
+  const detected = Chord.detect( notes );
+  const chordName = detected[0] || ( notes[0] + ( type === 'minor' ? 'm' : '' ) );
+
+  // Re-center on the first note
+  centerNote.value = notes[0];
+
+  selectTriad( notes[0], notes[1], notes[2], type );
+};
+
+/**
  * Gets a human-readable chord name from the triad.
  * e.g. ['C', 'E', 'G'] + 'major' → "C Major"
  *      ['A', 'C', 'E'] + 'minor' → "A minor"
@@ -510,6 +528,7 @@ const resetLattice = () => {
               :suggested-notes="suggestions.map( s => s.chord.replace( /m$/, '' ) )"
               :show-transform-labels="true"
               @select-note="handleNodeSelect"
+              @select-triad="handleTriadSelect"
             />
 
             <!-- Floating Action Button for Indicators -->

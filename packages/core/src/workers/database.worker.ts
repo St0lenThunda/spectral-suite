@@ -26,7 +26,7 @@ self.onmessage = async ( event ) => {
 };
 
 async function loadBinaryDatabase () {
-  const db = await openDB( DB_NAME, 2 );
+  const db = await openDB( DB_NAME, 1 );
 
   // Check if already populated
   const count = await db.count( STORE_SONGS );

@@ -264,7 +264,7 @@ const triangles = computed<TonnetzTriangle[]>( () => {
       const a = nodeMap.get( `${row},${col}` );
       const b = nodeMap.get( `${row},${col + 1}` );
 
-      // ▲ Upward triangle: current row nodes + node below-right
+      // ▼ Downward triangle: current row nodes + node below-right
       const cDown = nodeMap.get( `${row + 1},${col}` );
       if ( a && b && cDown ) {
         const notes = [a.name, b.name, cDown.name];
@@ -272,12 +272,12 @@ const triangles = computed<TonnetzTriangle[]>( () => {
         result.push( {
           notes,
           points: [{ x: a.x, y: a.y }, { x: b.x, y: b.y }, { x: cDown.x, y: cDown.y }],
-          type: 'major',
+          type: 'minor',
           isHighlighted
         } );
       }
 
-      // ▼ Downward triangle: current row nodes + node above-right
+      // ▲ Upward triangle: current row nodes + node above-right
       const cUp = nodeMap.get( `${row - 1},${col + 1}` );
       if ( a && b && cUp ) {
         const notes = [a.name, b.name, cUp.name];
@@ -285,7 +285,7 @@ const triangles = computed<TonnetzTriangle[]>( () => {
         result.push( {
           notes,
           points: [{ x: a.x, y: a.y }, { x: b.x, y: b.y }, { x: cUp.x, y: cUp.y }],
-          type: 'minor',
+          type: 'major',
           isHighlighted
         } );
       }
@@ -568,43 +568,7 @@ const pathPoints = computed( () => {
 
   // We assume the LAST point in the path corresponds to the current centerNote.
   visualPoints.push( { x: cx, y: cy } );
-  
-  for ( let i = props.path.length - 1; i > 0; i-- ) {
-    const curr = props.path[i]!;
-    const prev = props.path[i - 1]!;
-    
-    // Calculate toroidal delta
-    let dx = prev.x - curr.x;
-    let dy = prev.y - curr.y;
-    
-    // Unwrap on 4x3 grid
-    // Width 4: -2..1
-    if ( dx > 1 ) dx -= 4;
-    if ( dx < -2 ) dx += 4;
-    
-    // Height 3: -1..1
-    if ( dy > 1 ) dy -= 3;
-    if ( dy < -1 ) dy += 3;
-    
-    // Convert to Grid Delta
-    // col = x + y, row = -y
-    const dCol = dx + dy;
-    const dRow = -dy;
-    
-    // Update walker (backwards from center)
-    // IMPORTANT: Since we are walking BACKWARDS from curr to prev,
-    // the delta (prev - curr) represents the step we need to take
-    // to find where the *previous* point was relative to the *current* point.
-    
-    // Note: The walker tracks the *cumulative offset* from the center.
-    // Initialize walker at 0,0 (center).
-    // add delta to find position of previous point.
-    
-    // Wait... walkerCol/Row should accumulate.
-    // We need to define them outside the loop.
-  }
 
-  // Correction: I need to declare walkerCol/Row outside the loop so they persist.
   let walkerCol = 0;
   let walkerRow = 0;
 
@@ -612,20 +576,45 @@ const pathPoints = computed( () => {
     const curr = props.path[i]!;
     const prev = props.path[i - 1]!;
     
-    let dx = prev.x - curr.x;
-    let dy = prev.y - curr.y;
+    // Raw delta in Mapper coordinates
+    const dX = prev.x - curr.x;
+    const dY = prev.y - curr.y;
     
-    if ( dx > 1 ) dx -= 4;
-    if ( dx < -2 ) dx += 4;
+    /**
+     * TOROIDAL UNWRAP (Pitch-Preserving)
+     * On our (3x4) Tonnetz torus, shifting by the basis cycle vectors 
+     * preserves the pitch class mod 12:
+     * V1 = (3, 1)  -> 3*7 + 1*3 = 24 = 0 mod 12
+     * V2 = (0, 4)  -> 0*7 + 4*3 = 12 = 0 mod 12
+     * 
+     * We search for n, m in {-1, 0, 1} to find the shortest visual path 
+     * that reaches the SAME pitch class.
+     */
+    let bestDX = dX;
+    let bestDY = dY;
+    let minDist = Infinity;
+
+    for ( let n = -1; n <= 1; n++ ) {
+      for ( let m = -1; m <= 1; m++ ) {
+        // Apply wrap vectors
+        const candidateDX = dX + ( n * 3 );
+        const candidateDY = dY + ( n * 1 ) + ( m * 4 );
+
+        // Visual distance check (accounting for skewed grid x = col + row*0.5)
+        const visualX = candidateDX * COL_SPACING + candidateDY * COL_SPACING * 0.5;
+        const visualY = candidateDY * ROW_SPACING;
+        const dist = Math.sqrt( visualX * visualX + visualY * visualY );
+
+        if ( dist < minDist ) {
+          minDist = dist;
+          bestDX = candidateDX;
+          bestDY = candidateDY;
+        }
+      }
+    }
     
-    if ( dy > 1 ) dy -= 3;
-    if ( dy < -1 ) dy += 3;
-    
-    const dCol = dx + dy;
-    const dRow = -dy;
-    
-    walkerCol += dCol;
-    walkerRow += dRow;
+    walkerCol += bestDX;
+    walkerRow += bestDY;
     
     const px = cx + ( walkerCol * COL_SPACING ) + ( walkerRow * COL_SPACING * 0.5 );
     const py = cy + ( walkerRow * ROW_SPACING );

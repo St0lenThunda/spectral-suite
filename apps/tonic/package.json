@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@spectralsuite/core": "^1.0.0",
+    "idb": "^8.0.3",
     "marked": "^17.0.1",
     "pinia": "^2.3.0",
     "pinia-plugin-persistedstate": "^3.2.3",

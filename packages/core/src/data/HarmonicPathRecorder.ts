@@ -42,6 +42,24 @@ export class HarmonicPathRecorder {
   }
 
   /**
+   * Returns the list of chord names in the current progression.
+   */
+  public getHistory (): string[] {
+    return [...this.history];
+  }
+
+  /**
+   * Removes a specific chord from the session history by index.
+   * 
+   * @param index - The index of the chord to remove
+   */
+  public removeChord ( index: number ): void {
+    if ( index < 0 || index >= this.history.length ) return;
+    this.history.splice( index, 1 );
+    this.path.splice( index, 1 );
+  }
+
+  /**
    * Resets the recorder for a new song.
    */
   public clear (): void {

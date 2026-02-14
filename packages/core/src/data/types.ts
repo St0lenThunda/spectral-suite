@@ -42,6 +42,16 @@ export interface SongEntry {
   decade: string;
   /** Optional reference to Spotify for future integration */
   spotifyId?: string;
+  /** Song Title */
+  title?: string;
+  /** Primary Artist Name */
+  artist?: string;
+  /** Album Artwork URL */
+  artwork?: string;
+  /** 30s Audio Preview URL */
+  previewUrl?: string;
+  /** External Spotify Link */
+  spotifyUrl?: string;
   /** Map of section names (e.g., "verse_1") to their chord data */
   sections: Record<string, ChordSection>;
 }

@@ -33,24 +33,27 @@ export class TonnetzMapper {
      * P = (x * 7) + (y * 4) mod 12
      */
 
-    // This is a mapping lookup for a 4x3 wrapping grid.
-    // Why 4x3? 4 (Major 3rds) * 3 (minor 3rds) = 12 total pitch classes.
-    // This creates a repeating pattern that tile the infinite lattice.
+    // This is a mapping lookup for a 3x4 wrapping grid.
+    // Why 3x4? 3 (Perfect 5ths) * 4 (minor 3rds) = 12 total pitch classes.
+    // This creates a repeating pattern that matches the Tonnetz visual axes:
+    // x-axis: Perfect 5ths (+7)
+    // y-axis: minor 3rds (+3)
     const pcMap: Record<number, TonnetzPoint> = {
-      0: { x: 0, y: 0 },  // C
-      7: { x: 1, y: 0 },  // G
-      2: { x: 2, y: 0 },  // D
-      9: { x: 3, y: 0 },  // A
+      0: { x: 0, y: 0 }, // C
+      7: { x: 1, y: 0 }, // G
+      2: { x: 2, y: 0 }, // D
 
-      4: { x: 0, y: 1 },  // E
-      11: { x: 1, y: 1 }, // B
-      6: { x: 2, y: 1 },  // F#
-      1: { x: 3, y: 1 },  // C#
+      3: { x: 0, y: 1 }, // Eb
+      10: { x: 1, y: 1 }, // Bb
+      5: { x: 2, y: 1 }, // F
 
-      8: { x: 0, y: 2 },  // Ab
-      3: { x: 1, y: 2 },  // Eb
-      10: { x: 2, y: 2 }, // Bb
-      5: { x: 3, y: 2 }   // F
+      6: { x: 0, y: 2 }, // Gb/F#
+      1: { x: 1, y: 2 }, // Db/C#
+      8: { x: 2, y: 2 }, // Ab
+
+      9: { x: 0, y: 3 }, // A
+      4: { x: 1, y: 3 }, // E
+      11: { x: 2, y: 3 }  // B
     };
 
     return pcMap[pc % 12] || { x: 0, y: 0 };

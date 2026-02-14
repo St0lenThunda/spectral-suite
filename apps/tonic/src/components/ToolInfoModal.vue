@@ -3,7 +3,13 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useToolInfo } from '../composables/useToolInfo';
 import { TOOL_METADATA } from '../data/toolMetadata';
 
+import { marked } from 'marked';
+
 const { isInfoModalOpen, activeToolId, closeInfo } = useToolInfo();
+
+const renderMarkdown = ( text: string ) => {
+  return marked.parse( text );
+};
 
 const activeTab = ref( 'visuals' );
 
@@ -84,6 +90,24 @@ onUnmounted( () => window.removeEventListener( 'keydown', handleKeydown ) );
 
         <!-- Content Area -->
         <div class="flex-1 overflow-y-auto p-8 custom-scrollbar">
+
+          <!-- Image Carousel / Grid (New) -->
+          <div
+            v-if=" metadata.images && metadata.images.length > 0 && activeTab === 'visuals' "
+            class="mb-8 grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-2"
+          >
+            <div
+              v-for=" ( img, idx ) in metadata.images "
+              :key="idx"
+              class="rounded-2xl overflow-hidden border border-white/10 bg-black/20"
+            >
+              <img
+                :src="img"
+                class="w-full h-auto object-cover hover:scale-105 transition-transform duration-500"
+              />
+            </div>
+          </div>
+
           <Transition
             name="slide-fade"
             mode="out-in"
@@ -96,9 +120,10 @@ onUnmounted( () => window.removeEventListener( 'keydown', handleKeydown ) );
                 v-if=" activeTab === 'visuals' "
                 class="animate-in fade-in slide-in-from-bottom-4"
               >
-                <p class="text-lg text-slate-300 leading-relaxed font-medium italic">
-                  "{{ metadata.whatAmISeeing }}"
-                </p>
+                <p
+                  class="text-lg text-slate-300 leading-relaxed font-medium italic"
+                  v-html="renderMarkdown( metadata.whatAmISeeing )"
+                ></p>
               </div>
 
               <div
@@ -111,8 +136,10 @@ onUnmounted( () => window.removeEventListener( 'keydown', handleKeydown ) );
                     <span class="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em]">Deployment
                       Protocol</span>
                   </div>
-                  <pre class="whitespace-pre-wrap font-sans text-slate-400 leading-loose">{{ metadata.instructions }}
-                  </pre>
+                  <div
+                    class="whitespace-pre-wrap font-sans text-slate-400 leading-loose"
+                    v-html="renderMarkdown( metadata.instructions )"
+                  ></div>
                 </div>
               </div>
 
@@ -122,9 +149,10 @@ onUnmounted( () => window.removeEventListener( 'keydown', handleKeydown ) );
               >
                 <div class="flex gap-4 items-start">
                   <div class="text-3xl text-blue-500/50">🎯</div>
-                  <p class="text-slate-400 leading-relaxed italic border-l-2 border-white/5 pl-4">
-                    {{ metadata.practicalApplication }}
-                  </p>
+                  <div
+                    class="text-slate-400 leading-relaxed italic border-l-2 border-white/5 pl-4"
+                    v-html="renderMarkdown( metadata.practicalApplication )"
+                  ></div>
                 </div>
               </div>
 
@@ -135,9 +163,10 @@ onUnmounted( () => window.removeEventListener( 'keydown', handleKeydown ) );
                 <div class="p-8 rounded-3xl bg-indigo-500/5 border border-indigo-500/10 font-mono">
                   <h4 class="text-indigo-400 text-[10px] font-bold uppercase mb-4 tracking-[0.3em]">//
                     LOGICAL_ENGINEERING_DATA</h4>
-                  <p class="text-xs text-slate-400 leading-relaxed">
-                    {{ metadata.howItWorks }}
-                  </p>
+                  <div
+                    class="text-xs text-slate-400 leading-relaxed"
+                    v-html="renderMarkdown( metadata.howItWorks )"
+                  ></div>
                   <div class="mt-6 flex gap-2">
                     <span
                       class="px-2 py-1 bg-indigo-500/10 rounded text-[9px] text-indigo-400 border border-indigo-500/20"

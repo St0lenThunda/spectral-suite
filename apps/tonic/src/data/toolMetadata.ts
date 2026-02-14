@@ -5,6 +5,7 @@ export interface ToolMetadata {
   instructions: string;
   practicalApplication: string;
   howItWorks: string;
+  images?: string[];
 }
 
 export const TOOL_METADATA: Record<string, ToolMetadata> = {
@@ -67,10 +68,14 @@ export const TOOL_METADATA: Record<string, ToolMetadata> = {
   tonnetz: {
     id: 'tonnetz',
     name: 'Tonnetz Lab',
-    whatAmISeeing: 'A hexagonal lattice where every node is a pitch class and every triangle is a triad. Nodes along the horizontal axis are separated by Perfect 5ths, the upper-right diagonal by Major 3rds, and the lower-right diagonal by minor 3rds. Upward-pointing triangles (▲) represent Major triads; downward triangles (▼) represent minor triads. The highlighted triangle is the currently selected chord.',
-    instructions: '1. Click any node on the lattice to select that pitch as a triad root.\n2. The right panel shows the selected triad with interval labels (Root, 3rd, 5th).\n3. Use the P (Parallel), L (Leading-tone), and R (Relative) buttons to apply Neo-Riemannian transforms.\n4. Chain transforms (e.g., P → L → R) to explore "parsimonious voice leading" — smooth chord transitions.\n5. Change the center note in Settings to re-center the lattice.',
-    practicalApplication: 'Discover how chords connect by moving just one note at a time. Use Neo-Riemannian transforms to find smooth voice-leading paths between distant chords. Essential for film scoring, jazz reharmonization, and understanding chromatic harmony beyond traditional key-based thinking.',
-    howItWorks: 'The Tonnetz renders pitch class nodes on a triangular SVG grid. Moving right = +7 semitones (P5), upper-right = +4 semitones (M3), lower-right = +3 semitones (m3). Triangle detection identifies all adjacent 3-node groups as triads. Neo-Riemannian transforms (P, L, R) each move exactly one note by 1-2 semitones, re-selecting the resulting triad with animated transitions.'
+    whatAmISeeing: 'A hexagonal lattice where every node is a pitch class and every triangle is a triad. The new **Chordonomicon** side panel (right) displays AI-driven "Next Move" suggestions and "Similar Song" matches based on your harmonic path.',
+    instructions: '1. **Click Nodes**: Build triads on the lattice.\n2. **Transforms**: Use P, L, R buttons to morph chords smoothly.\n3. **Suggestions**: The "Ex. Moves" tab shows statistically likely chords based on 600k+ songs.\n4. **Similar Songs**: The "Songs" tab finds tracks that use your exact chord progression.\n5. **Sync**: The database syncs automatically (20MB) for offline use.',
+    practicalApplication: 'Composer\'s blockage breaker. Stuck on a chord? The "Next Moves" tab suggests where to go next based on hit songs. Want to know who else used this progression? The "Similar Songs" tab reveals the harmonic DNA shared by Bach, Beatles, and Bruno Mars.',
+    howItWorks: 'The Tonnetz renders a geometric pitch lattice. The "Intelligence" engine uses a Vector Database (IndexedDB) to search 666,000+ songs. It calculates a "Path Similarity Score" using Manhattan distance on the lattice to find songs with geometrically similar shapes to your playing.',
+    images: [
+      '/screenshots/tonnetz_lattice.png',
+      '/screenshots/tonnetz_suggestions.png'
+    ]
   },
   chordforge: {
     id: 'chordforge',

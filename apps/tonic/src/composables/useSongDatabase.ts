@@ -19,6 +19,7 @@ const isDatabaseReady = ref( false );
 const pathRecorder = new HarmonicPathRecorder();
 const metadataCache = new Map<string, any>();
 const currentPath = ref( pathRecorder.getPath() );
+const chordHistory = ref( pathRecorder.getHistory() );
 
 /**
  * useSongDatabase — Frontend Data Integration
@@ -58,32 +59,7 @@ export function useSongDatabase () {
     }
   }
 
-  /**
-   * Fetches the large spectral-songs.json and streams it into IndexedDB.
-   */
-  async function importSeedData () {
-    isImporting.value = true;
-    importProgress.value = 0;
 
-    try {
-      console.log( 'useSongDatabase: Fetching seed data...' );
-      const response = await fetch( '/data/spectral-songs.json' );
-      if ( !response.ok ) throw new Error( 'Could not find seed data at /data/spectral-songs.json' );
-
-      const songs: SongEntry[] = await response.json();
-      console.log( `useSongDatabase: Downloaded ${songs.length} songs. Starting IndexedDB import...` );
-
-      await SongDatabase.importSongs( songs );
-
-      isDatabaseReady.value = true;
-      showSuccess( 'Chordonomicon is ready for real-time analysis.' );
-    } catch ( err: any ) {
-      console.error( 'Data import failed:', err );
-      showError( err.message || 'Check your connection or disk space.' );
-    } finally {
-      isImporting.value = false;
-    }
-  }
 
   /**
    * Gets hybrid chord suggestions for a given chord.
@@ -109,6 +85,7 @@ export function useSongDatabase () {
   async function trackMovement ( chord: string ): Promise<{ song: SongEntry, score: number }[]> {
     pathRecorder.recordChord( chord );
     currentPath.value = pathRecorder.getPath(); // Update reactive state
+    chordHistory.value = pathRecorder.getHistory();
 
     if ( !isDatabaseReady.value ) return [];
 
@@ -160,13 +137,20 @@ export function useSongDatabase () {
     isImporting,
     importProgress,
     currentPath,
+    chordHistory,
     initDatabase,
     getHybridSuggestions,
     trackMovement,
     resolveSongMetadata,
+    removeChord: ( index: number ) => {
+      pathRecorder.removeChord( index );
+      currentPath.value = pathRecorder.getPath();
+      chordHistory.value = pathRecorder.getHistory();
+    },
     clearHistory: () => {
       pathRecorder.clear();
       currentPath.value = [];
+      chordHistory.value = [];
     }
   };
 }

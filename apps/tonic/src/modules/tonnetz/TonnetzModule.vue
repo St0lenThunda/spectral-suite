@@ -53,8 +53,10 @@ const {
   isImporting,
   importProgress,
   currentPath,
+  chordHistory,
   initDatabase,
   getHybridSuggestions,
+  removeChord,
   clearHistory
 } = useSongDatabase();
 
@@ -389,6 +391,17 @@ const intervalDisplay = computed( () => {
     ];
   }
 } );
+const resetLattice = () => {
+  centerNote.value = 'C';
+  selectedTriad.value = [];
+  selectedRoot.value = '';
+  suggestions.value = [];
+  similarSongs.value = [];
+  lastTransform.value = null;
+  activeTab.value = 'selection';
+  clearHistory();
+  emit( 'reset' );
+};
 </script>
 
 <template>
@@ -412,6 +425,14 @@ const intervalDisplay = computed( () => {
         </p>
       </div>
       <div class="flex items-center gap-3">
+        <!-- Reset Button -->
+        <button
+          @click="resetLattice"
+          class="w-10 h-10 rounded-xl bg-white/5 border border-white/10 text-slate-400 flex items-center justify-center hover:bg-white/10 hover:text-white transition-all active:scale-95"
+          title="Reset Lattice"
+        >
+          <span class="text-lg">↻</span>
+        </button>
         <button
           @click="openInfo( 'tonnetz' )"
           class="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center hover:bg-violet-500/20 transition-all active:scale-95"
@@ -509,14 +530,13 @@ const intervalDisplay = computed( () => {
                   <div class="text-xs font-black text-emerald-400">{{ lastTransform }}</div>
                 </div>
 
-                <!-- Reset Path Button -->
+                <!-- Reset Lattice Button -->
                 <button
-                  v-if=" currentPath.length > 0 "
-                  @click="clearHistory(); $emit( 'reset' )"
+                  @click="resetLattice"
                   class="px-4 py-2 rounded-xl bg-spectral-900/90 border border-red-500/30 backdrop-blur-md shadow-xl flex items-center gap-3 hover:bg-red-500/10 transition-colors text-left"
                 >
-                  <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Path</div>
-                  <div class="text-xs font-bold text-red-400">Clear History (Reset)</div>
+                  <div class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Reset</div>
+                  <div class="text-xs font-bold text-red-400">Reset Lattice</div>
                 </button>
 
                 <!-- Legend / Help -->
@@ -547,6 +567,78 @@ const intervalDisplay = computed( () => {
           <p class="text-[10px] text-slate-500 font-mono uppercase tracking-widest mt-4 text-center">
             Click any node to select a triad • Use P / L / R to transform
           </p>
+
+          <!-- Progression Ledger (Visual Chord History) -->
+          <div
+            v-if=" chordHistory.length > 0 "
+            class="mt-6 pt-6 border-t border-white/5 animate-in fade-in slide-in-from-bottom-2 duration-500"
+          >
+            <div class="flex items-center justify-between mb-4 px-2">
+              <h4 class="text-[10px] font-black text-slate-500 uppercase tracking-widest flex items-center gap-2">
+                <span>Progression Ledger</span>
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+              </h4>
+              <span class="text-[9px] font-mono text-slate-600 uppercase">{{ chordHistory.length }} steps</span>
+            </div>
+
+            <div class="flex items-center gap-3 overflow-x-auto pb-4 custom-scrollbar px-1">
+              <div
+                v-for=" ( chord, idx ) in chordHistory "
+                :key="idx"
+                class="flex items-center shrink-0"
+              >
+                <!-- Chord Card -->
+                <div
+                  class="group relative px-5 py-3 rounded-2xl bg-white/5 border border-white/5 flex flex-col items-center justify-center min-w-[70px] hover:bg-violet-500/10 hover:border-violet-500/20 transition-all duration-300"
+                >
+                  <!-- Delete Button -->
+                  <button
+                    @click.stop="removeChord( idx )"
+                    class="absolute top-1 right-1 p-1 text-red-500/60 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-all duration-200 z-10"
+                    title="Remove chord"
+                  >
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="3"
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                    >
+                      <line
+                        x1="18"
+                        y1="6"
+                        x2="6"
+                        y2="18"
+                      ></line>
+                      <line
+                        x1="6"
+                        y1="6"
+                        x2="18"
+                        y2="18"
+                      ></line>
+                    </svg>
+                  </button>
+
+                  <span class="text-lg font-black text-white italic tracking-tighter">{{ chord }}</span>
+                  <span
+                    class="text-[8px] font-bold text-slate-500 uppercase tracking-tighter opacity-0 group-hover:opacity-100 transition-opacity"
+                  >Beat {{ idx + 1 }}</span>
+                </div>
+
+                <!-- Connector -->
+                <div
+                  v-if=" idx < chordHistory.length - 1 "
+                  class="mx-2 w-6 h-0.5 bg-gradient-to-r from-white/10 to-transparent rounded-full flex items-center justify-center"
+                >
+                  <div class="w-1 h-1 rounded-full bg-white/20"></div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 

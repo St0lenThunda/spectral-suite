@@ -222,6 +222,27 @@ export class SongDatabase {
    */
   public static async getSong ( id: string ): Promise<SongEntry | undefined> {
     if ( !this.db ) await this.init();
-    return this.db!.get( this.STORE_SONGS, id );
+    return this.db!.transaction( this.STORE_SONGS ).objectStore( this.STORE_SONGS ).get( id );
+  }
+
+  /**
+   * Updates the metadata for a specific song.
+   */
+  public static async updateMetadata ( id: string, metadata: Partial<SongEntry> ): Promise<void> {
+    if ( !this.db ) await this.init();
+
+    const tx = this.db!.transaction( this.STORE_SONGS, 'readwrite' );
+    const store = tx.objectStore( this.STORE_SONGS );
+
+    const song = await store.get( id );
+    if ( !song ) {
+      console.warn( `SongDatabase: Cannot update metadata, song ${id} not found.` );
+      return;
+    }
+
+    // Merge metadata
+    const updatedSong = { ...song, ...metadata };
+    await store.put( updatedSong );
+    await tx.done;
   }
 }

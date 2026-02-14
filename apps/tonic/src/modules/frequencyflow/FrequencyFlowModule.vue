@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
-import { useAudioEngine, MagnitudeSpectrum, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion, useGlobalEngine } from '@spectralsuite/core';
+import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
+import { useAudioEngine, MagnitudeSpectrum, Spectrogram3D, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion, useGlobalEngine } from '@spectralsuite/core';
 import { useToolInfo } from '../../composables/useToolInfo';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
@@ -11,6 +11,7 @@ const isSettingsOpen = ref( false );
 
 const drawerCategories = [
   { id: 'Engine', label: 'Engine', description: 'Global Audio Settings', showIndicator: useGlobalEngine().isGlobalEngineActive.value },
+  { id: 'Visuals', label: '3D Config', description: 'Visualizer Perspective', showIndicator: false },
   { id: 'Exports', label: 'Exports', description: 'Save Analysis Data', showIndicator: false }
 ];
 // We'll import the same visualizers. In a real monorepo we'd share them more cleanly, 
@@ -66,66 +67,7 @@ class MiniOsc {
   }
 }
 
-/**
- * Scrolling Spectrogram (Waterfall) Visualizer.
- * Displays frequency intensity over time (History).
- * Uses a "sliding texture" technique where we draw the previous frame offset by 1 pixel.
- */
-class MiniSpec {
-  canvas: HTMLCanvasElement;
-  analyser: AnalyserNode;
-  temp: HTMLCanvasElement;
 
-  constructor( canvas: HTMLCanvasElement, analyser: AnalyserNode ) {
-    this.canvas = canvas;
-    this.analyser = analyser;
-    this.temp = document.createElement( 'canvas' );
-    // Temp canvas matches dimensions to act as a buffer
-    this.temp.width = canvas.width;
-    this.temp.height = canvas.height;
-  }
-
-  draw () {
-    const ctx = this.canvas.getContext( '2d' );
-    const tCtx = this.temp.getContext( '2d' );
-    if ( !ctx || !tCtx ) return;
-
-    // ByteFrequencyData gives us values 0-255 (Decibels mapped to integers)
-    // 0 = Silence (-Infinity dB), 255 = Max Volume (0 dB)
-    const data = new Uint8Array( this.analyser.frequencyBinCount );
-    this.analyser.getByteFrequencyData( data );
-
-    // 1. Copy current canvas to temp buffer
-    tCtx.drawImage( this.canvas, 0, 0 );
-
-    // 2. Generate a new vertical slice (1px wide) for the current moment
-    const imgData = ctx.createImageData( this.canvas.width, 1 );
-    for ( let x = 0; x < this.canvas.width; x++ ) {
-      // Map x-coordinate (linear) to frequency bin index
-      // We only use the lower half of data usually, but here we span the full width
-      const freqIdx = Math.floor( ( x / this.canvas.width ) * data.length * 0.5 );
-      const val = data[freqIdx] || 0;
-
-      // Calculate pixel index (Red, Green, Blue, Alpha)
-      const i = x * 4;
-
-      // Heatmap Color Logic:
-      // Low volume = Dark Purple/Blue
-      // Med volume = Green/Cyan
-      // High volume = Red/White (clipping)
-      imgData.data[i] = val > 128 ? 255 : val * 2;     // Red channel boost properties
-      imgData.data[i + 1] = val > 128 ? ( val - 128 ) * 2 : 0; // Green kicks in late
-      imgData.data[i + 2] = val * 0.5;                 // Always some Blue for "cool" background
-      imgData.data[i + 3] = 255;                       // Alpha (Opaque)
-    }
-
-    // 3. Draw the OLD history shifted down by 1 pixel
-    ctx.drawImage( this.temp, 0, 1 );
-
-    // 4. Draw the NEW slice at the top (y=0)
-    ctx.putImageData( imgData, 0, 0 );
-  }
-}
 
 // MiniOsc and MiniSpec classes kept for now as they are simple and specific to this module's legacy view (if used)
 // or just as placeholders.
@@ -139,7 +81,7 @@ const specCanvas = ref<HTMLCanvasElement | null>( null );
 const magCanvas = ref<HTMLCanvasElement | null>( null );
 
 let osc: MiniOsc | null = null;
-let spec: MiniSpec | null = null;
+let spec3d: Spectrogram3D | null = null;
 let mag: MagnitudeSpectrum | null = null;
 let animId: number | null = null;
 
@@ -150,6 +92,40 @@ const frozenData = ref<Uint8Array | null>( null );
 const scaleMode = ref<'linear' | 'log'>( 'log' );
 const dominantFreq = ref( 0 );
 const dominantNote = ref( "-" );
+
+// 3D Controls
+const hueShift = ref( 200 );
+const verticalScale = ref( 1.5 );
+const perspective = ref( 0.8 );
+
+// Focus State for Layout Reflow
+const activeFocus = ref<'magnitude' | 'waveform' | 'topology'>( 'topology' );
+
+/**
+ * Resizes the canvases to match their physical display size.
+ * We multiply by devicePixelRatio to ensure the visuals stay crisp on Retina/4K displays.
+ */
+const resizeCanvases = () => {
+  [magCanvas.value, oscCanvas.value, specCanvas.value].forEach( canvas => {
+    if ( !canvas ) return;
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    
+    // Only resize if different to avoid redundant context resets
+    if ( canvas.width !== Math.floor( rect.width * dpr ) || 
+         canvas.height !== Math.floor( rect.height * dpr ) ) {
+      canvas.width = Math.floor( rect.width * dpr );
+      canvas.height = Math.floor( rect.height * dpr );
+    }
+  } );
+};
+
+// Watch for focus changes to trigger a layout-driven resize
+watch( activeFocus, async () => {
+  // Wait for Vue to update the DOM (grid reflow) before measuring new rects
+  await nextTick();
+  resizeCanvases();
+} );
 
 // Pro Features
 const showInstrumentLabels = ref( true );
@@ -181,8 +157,8 @@ const tick = () => {
   // Draw Time Domain (Oscilloscope)
   if ( osc ) osc.draw();
 
-  // Draw Frequency History (Spectrogram)
-  if ( spec ) spec.draw();
+  // Draw 3D Spectrogram (Waterfall)
+  if ( spec3d ) spec3d.draw( isFrozen.value, verticalScale.value, perspective.value, hueShift.value );
 
   // Draw Main Frequency Spectrum
   if ( mag && isInitialized.value ) {
@@ -314,7 +290,7 @@ onMounted( async () => {
   }
 
   if ( analyser && specCanvas.value ) {
-    spec = new MiniSpec( specCanvas.value, analyser );
+    spec3d = new Spectrogram3D( specCanvas.value, analyser );
   }
 
   if ( analyser && magCanvas.value ) {
@@ -322,6 +298,7 @@ onMounted( async () => {
   }
 
   // 3. Start Loop
+  resizeCanvases();
   tick();
 } );
 
@@ -349,6 +326,7 @@ onUnmounted( () => {
         <p class="text-slate-500 text-[10px] font-mono uppercase tracking-[0.2em] mt-1">Real-time spectral analysis and
           waveform diagnostics.</p>
       </div>
+
       <div class="flex items-center gap-4">
         <SettingsToggle
           :is-open="isSettingsOpen"
@@ -363,6 +341,7 @@ onUnmounted( () => {
       </div>
     </header>
 
+
     <LocalSettingsDrawer
       :is-open="isSettingsOpen"
       :categories="drawerCategories"
@@ -370,6 +349,55 @@ onUnmounted( () => {
     >
       <template #Engine>
         <EngineSettings />
+      </template>
+      <template #Visuals>
+        <div class="space-y-6">
+          <div class="space-y-4">
+            <label class="flex justify-between text-[9px] text-slate-400 uppercase tracking-[0.2em] font-bold">
+              Vertical Scale
+              <span class="text-indigo-400 font-mono">{{ verticalScale.toFixed(1) }}x</span>
+            </label>
+            <input
+              type="range"
+              v-model.number="verticalScale"
+              min="0.5"
+              max="3.0"
+              step="0.1"
+              class="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-indigo-400"
+            >
+          </div>
+
+          <div class="space-y-4">
+            <label class="flex justify-between text-[9px] text-slate-400 uppercase tracking-[0.2em] font-bold">
+              Depth perspective
+              <span class="text-indigo-400 font-mono">{{ perspective.toFixed(1) }}x</span>
+            </label>
+            <input
+              type="range"
+              v-model.number="perspective"
+              min="0.1"
+              max="1.0"
+              step="0.1"
+              class="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-indigo-400"
+            >
+          </div>
+
+          <div class="space-y-4">
+            <label class="flex justify-between text-[9px] text-slate-400 uppercase tracking-[0.2em] font-bold">
+              Heatmap Hue Shift
+              <span class="text-indigo-400 font-mono">{{ hueShift }}°</span>
+            </label>
+            <input
+              type="range"
+              v-model.number="hueShift"
+              min="0"
+              max="360"
+              step="1"
+              class="w-full h-1.5 bg-white/5 rounded-full appearance-none cursor-pointer accent-indigo-400"
+              aria-label="Spectrum Hue Shift"
+            >
+          </div>
+        </div>
       </template>
       <template #Exports>
         <div class="space-y-4">
@@ -396,17 +424,32 @@ onUnmounted( () => {
       </template>
     </LocalSettingsDrawer>
 
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 auto-rows-max">
+      
+      <!-- 1. Hero / Focus Section -->
+      <!-- The element that is "focused" moves here and grows -->
+      
       <!-- Interactive Spectrum Analyzer (Magnitude) -->
       <div
-        class="lg:col-span-2 bg-slate-800/40 rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-xl relative h-[28rem]"
+        :class="activeFocus === 'magnitude' 
+          ? 'lg:col-span-3 h-[36rem] order-1' 
+          : 'lg:col-span-1 h-72 order-2'"
+        class="bg-slate-800/40 rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-xl relative transition-all duration-500 ease-out overflow-hidden"
       >
         <div class="flex justify-between items-center mb-6">
           <div>
             <span class="text-[10px] uppercase font-bold tracking-[0.3em] text-slate-500">Spectral Magnitude</span>
             <p class="text-[8px] text-slate-600 font-mono uppercase mt-1">Magnitude vs Frequency Analysis</p>
           </div>
-          <div class="flex gap-1 bg-white/5 p-1 rounded-lg border border-white/5">
+          <div class="flex gap-1 bg-white/5 p-1 rounded-lg border border-white/5 shrink-0">
+            <button
+               v-if="activeFocus !== 'magnitude'"
+               @click="activeFocus = 'magnitude'"
+               class="px-3 py-1 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 text-[10px] font-black uppercase tracking-widest rounded-md transition-all flex items-center gap-2"
+               title="Maximize Magnitude Spectrum"
+            >
+               <span>⛶</span> Full
+            </button>
             <button
               @click="scaleMode = 'log'"
               :class="scaleMode === 'log' ? 'bg-sky-500/20 text-sky-400' : 'text-slate-500 hover:text-slate-300'"
@@ -435,11 +478,9 @@ onUnmounted( () => {
           </div>
         </div>
 
-        <div class="relative flex-1 h-80">
+        <div class="relative flex-1" :class="activeFocus === 'magnitude' ? 'h-[28rem]' : 'h-40'">
           <canvas
             ref="magCanvas"
-            width="1000"
-            height="320"
             class="w-full h-full"
           ></canvas>
 
@@ -460,7 +501,7 @@ onUnmounted( () => {
 
       <!-- Precision Control Panel -->
       <div
-        class="bg-slate-800/40 rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-xl flex flex-col gap-8 h-[28rem]"
+        class="bg-slate-800/40 rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-xl flex flex-col gap-8 h-auto lg:h-[28rem] order-4"
       >
         <div>
           <h4 class="text-[11px] font-black uppercase tracking-[0.4em] text-sky-400 mb-2">Forensic Controls</h4>
@@ -533,34 +574,57 @@ onUnmounted( () => {
       </div>
 
       <!-- Waveform (Time Domain) -->
-      <div class="bg-slate-800/40 rounded-[2rem] p-8 border border-white/5 backdrop-blur-xl h-72">
-        <span class="text-[10px] uppercase font-bold tracking-[0.3em] text-slate-500 block mb-6">Time Domain
-          (Waveform)</span>
+      <div 
+        :class="activeFocus === 'waveform' 
+          ? 'lg:col-span-3 h-[36rem] order-1' 
+          : 'lg:col-span-1 h-72 order-2'"
+        class="bg-slate-800/40 rounded-[2rem] p-8 border border-white/5 backdrop-blur-xl transition-all duration-500 ease-out overflow-hidden relative group"
+      >
+        <div class="flex justify-between items-start mb-6">
+          <span class="text-[10px] uppercase font-bold tracking-[0.3em] text-slate-500">Time Domain (Waveform)</span>
+          <button
+            v-if="activeFocus !== 'waveform'"
+            @click="activeFocus = 'waveform'"
+            class="px-3 py-1 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 text-[10px] font-black uppercase tracking-widest rounded-md transition-all flex items-center gap-2 opacity-0 group-hover:opacity-100"
+            title="Maximize Waveform"
+          >
+            <span>⛶</span> Full
+          </button>
+        </div>
         <canvas
           ref="oscCanvas"
-          width="400"
-          height="160"
-          class="w-full h-40"
+          class="w-full"
+          :class="activeFocus === 'waveform' ? 'h-[28rem]' : 'h-40'"
         ></canvas>
       </div>
 
-      <!-- Waterfall (Visualizing History) -->
-      <div
-        class="bg-slate-800/40 rounded-[2rem] p-8 border border-white/5 backdrop-blur-xl h-72 relative overflow-hidden"
+    <!-- 3D Stage (Spectral Topology) -->
+    <div
+      :class="activeFocus === 'topology' 
+        ? 'lg:col-span-3 h-[42rem] order-1' 
+        : 'lg:col-span-1 h-72 order-2'"
+      class="bg-black rounded-[2.5rem] p-4 border border-white/5 relative overflow-hidden group shadow-2xl transition-all duration-500 ease-out"
+    >
+      <!-- Inline Maximize for Topology -->
+      <button
+        v-if="activeFocus !== 'topology'"
+        @click="activeFocus = 'topology'"
+        class="absolute top-8 right-8 z-50 px-3 py-1 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 text-[10px] font-black uppercase tracking-widest rounded-md transition-all flex items-center gap-2 opacity-0 group-hover:opacity-100"
+        title="Maximize Topology"
       >
-        <span class="text-[10px] uppercase font-bold tracking-[0.3em] text-slate-500 block mb-6">Spectral History
-          (Waterfall)</span>
-        <canvas
-          ref="specCanvas"
-          width="400"
-          height="160"
-          class="w-full h-40 opacity-80"
-        ></canvas>
-      </div>
+        <span>⛶</span> Full
+      </button>
+      
+      <canvas
+        ref="specCanvas"
+        class="w-full h-full opacity-100"
+      ></canvas>
+
+    </div>
 
       <!-- Peak Note Detector HUD -->
       <div
-        class="bg-slate-800/40 rounded-[2rem] p-8 border border-white/5 backdrop-blur-xl h-72 flex flex-col items-center justify-center relative group"
+        class="bg-slate-800/40 rounded-[2rem] p-8 border border-white/5 backdrop-blur-xl h-72 flex flex-col items-center justify-center relative group order-last"
       >
         <div class="absolute inset-0 bg-sky-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-[2rem]">
         </div>
@@ -576,7 +640,7 @@ onUnmounted( () => {
       </div>
 
       <!-- EQ Suggestions (Pro Feature) -->
-      <div class="bg-slate-800/40 rounded-[2rem] p-8 border border-white/5 backdrop-blur-xl h-72">
+      <div class="bg-slate-800/40 rounded-[2rem] p-8 border border-white/5 backdrop-blur-xl h-72 order-last">
         <span class="text-[10px] uppercase font-bold tracking-[0.3em] text-amber-400 block mb-6">EQ Suggestions</span>
         <div
           v-if=" eqSuggestions.length === 0 "

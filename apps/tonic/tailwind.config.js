@@ -13,6 +13,14 @@ export default {
         'music-bg': '#0f172a',
         'music-accent': '#38bdf8',
       },
+      keyframes: {
+        shimmer: {
+          '100%': { transform: 'translateX(100%)' },
+        },
+      },
+      animation: {
+        shimmer: 'shimmer 2s infinite',
+      },
     },
   },
   plugins: [],

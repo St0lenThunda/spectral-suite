@@ -24,6 +24,7 @@ export { default as Fretboard } from './ui/Fretboard.vue';
 export { default as InfoPanel } from './ui/InfoPanel.vue';
 export { default as PlayButton } from './ui/PlayButton.vue';
 export * from './visualizers/MagnitudeSpectrum';
+export * from './visualizers/Spectrogram3D';
 
 export * from './storage/StorageService'
 export * from './rhythm/MetronomeEngine'

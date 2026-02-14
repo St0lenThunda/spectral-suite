@@ -30,6 +30,7 @@ import {
   type HarmonicSelectionState
 } from '../../composables/harmonicKeys';
 import TonnetzLattice from '../../components/TonnetzLattice.vue';
+import HarmonicDNA from '../../components/HarmonicDNA.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsTrigger from '../../components/settings/SettingsTrigger.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
@@ -59,6 +60,10 @@ const {
   removeChord,
   clearHistory
 } = useSongDatabase();
+
+// ─── LOCAL STATE ──────────────────────────────────────────────────
+
+const activeComparisonPath = ref<any[]>( [] );
 
 // ─── AUDIO ENGINE LIFECYCLE ─────────────────────────────────────────
 // Register when mounted, unregister when unmounted
@@ -397,6 +402,7 @@ const resetLattice = () => {
   selectedRoot.value = '';
   suggestions.value = [];
   similarSongs.value = [];
+  activeComparisonPath.value = [];
   lastTransform.value = null;
   activeTab.value = 'selection';
   clearHistory();
@@ -498,11 +504,10 @@ const resetLattice = () => {
               :width="650"
               :height="450"
               :center-note="centerNote"
-              :visible-radius="3"
-              :interactive="true"
+              :path="currentPath"
+              :comparison-path="activeComparisonPath"
               :highlight-triad="selectedTriad"
               :suggested-notes="suggestions.map( s => s.chord.replace( /m$/, '' ) )"
-              :path="currentPath"
               :show-transform-labels="true"
               @select-note="handleNodeSelect"
             />
@@ -856,7 +861,9 @@ const resetLattice = () => {
                 <div
                   v-for=" item in similarSongs "
                   :key="item.song.id"
-                  class="p-3 rounded-xl bg-spectral-900/50 border border-white/5 flex gap-4 items-center group transition-all hover:bg-white/5"
+                  @click="activeComparisonPath = ( activeComparisonPath === item.matchedPath ? [] : item.matchedPath )"
+                  class="p-3 rounded-xl bg-spectral-900/50 border flex gap-4 items-center group transition-all hover:bg-white/5 cursor-pointer"
+                  :class="activeComparisonPath === item.matchedPath ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/5'"
                 >
                   <!-- Album Art -->
                   <div
@@ -886,6 +893,22 @@ const resetLattice = () => {
                       <p class="text-xs font-bold text-white mb-0.5">Song #{{ item.song.id }}</p>
                     </template>
 
+                    <!-- Harmonic DNA Sparkline -->
+                    <div class="mt-2 flex items-center gap-2">
+                      <HarmonicDNA
+                        :path="item.matchedPath"
+                        :width="60"
+                        :height="15"
+                        :color="activeComparisonPath === item.matchedPath ? '#10b981' : '#64748b'"
+                        :glow="activeComparisonPath === item.matchedPath"
+                      />
+                      <span
+                        class="text-[8px] font-black uppercase tracking-tighter text-slate-500 group-hover:text-emerald-400 transition-colors"
+                      >
+                        {{ activeComparisonPath === item.matchedPath ? 'Plotted' : 'Plot DNA' }}
+                      </span>
+                    </div>
+
                     <div class="flex items-center gap-2 mt-1">
                       <p class="text-[8px] text-slate-500 uppercase tracking-widest">{{ item.song.genre }} •
                         {{ item.song.decade }}
@@ -896,6 +919,7 @@ const resetLattice = () => {
                         target="_blank"
                         class="text-[10px] grayscale hover:grayscale-0 opacity-50 hover:opacity-100 transition-all"
                         title="Open in Spotify"
+                        @click.stop
                       >
                         Spotify ↗
                       </a>

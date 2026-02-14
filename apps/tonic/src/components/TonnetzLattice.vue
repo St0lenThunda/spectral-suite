@@ -20,6 +20,7 @@
 
 import { computed, ref, watch, nextTick, onMounted } from 'vue';
 import { useHarmonicTheory } from '../composables/useHarmonicTheory';
+import type { TonnetzPoint } from '@spectralsuite/core';
 
 const { pitchClassName, pitchClassIndex } = useHarmonicTheory();
 
@@ -55,7 +56,10 @@ const props = withDefaults( defineProps<{
   showTransformLabels?: boolean;
 
   /** The harmonic path to visualize on the lattice */
-  path?: Array<{ x: number, y: number }>;
+  path?: TonnetzPoint[];
+
+  /** Optional comparison path (e.g., from a matched song) */
+  comparisonPath?: TonnetzPoint[];
 }>(), {
   width: 600,
   height: 400,
@@ -65,7 +69,8 @@ const props = withDefaults( defineProps<{
   highlightTriad: () => [],
   suggestedNotes: () => [],
   showTransformLabels: false,
-  path: () => []
+  path: () => [],
+  comparisonPath: () => []
 } );
 
 // ─── EMITS ──────────────────────────────────────────────────────────
@@ -556,38 +561,44 @@ watch( () => props.centerNote, async ( newVal, oldVal ) => {
  * and walk backwards, unwrapping the toroidal coordinates to find
  * valid visual neighbors.
  */
-const pathPoints = computed( () => {
-  if ( !props.path || props.path.length < 2 ) return '';
+/**
+ * TOROIDAL UNWRAP (Helper)
+ * Finds the visually shortest path between an array of TonnetzPoints
+ * on a 3x4 toroidal grid.
+ *
+ * @param path - The sequence of points to unwrap
+ */
+function unwrapPath ( path: TonnetzPoint[] ) {
+  if ( path.length < 2 ) return [];
 
-  // Center of the viewport
+  const visualPoints: { x: number; y: number }[] = [];
+  const start = path[path.length - 1]!;
+
+  // Starting visual position (Center of lattice)
   const cx = props.width / 2;
   const cy = props.height / 2;
 
-  // The visual path points in pixels
-  const visualPoints: { x: number, y: number }[] = [];
-
-  // We assume the LAST point in the path corresponds to the current centerNote.
   visualPoints.push( { x: cx, y: cy } );
 
   let walkerCol = 0;
   let walkerRow = 0;
 
-  for ( let i = props.path.length - 1; i > 0; i-- ) {
-    const curr = props.path[i]!;
-    const prev = props.path[i - 1]!;
-    
+  for ( let i = path.length - 1; i > 0; i-- ) {
+    const curr = path[i]!;
+    const prev = path[i - 1]!;
+
     // Raw delta in Mapper coordinates
     const dX = prev.x - curr.x;
     const dY = prev.y - curr.y;
-    
+
     /**
      * TOROIDAL UNWRAP (Pitch-Preserving)
-     * On our (3x4) Tonnetz torus, shifting by the basis cycle vectors 
+     * On our (3x4) Tonnetz torus, shifting by the basis cycle vectors
      * preserves the pitch class mod 12:
      * V1 = (3, 1)  -> 3*7 + 1*3 = 24 = 0 mod 12
      * V2 = (0, 4)  -> 0*7 + 4*3 = 12 = 0 mod 12
-     * 
-     * We search for n, m in {-1, 0, 1} to find the shortest visual path 
+     *
+     * We search for n, m in {-1, 0, 1} to find the shortest visual path
      * that reaches the SAME pitch class.
      */
     let bestDX = dX;
@@ -612,18 +623,20 @@ const pathPoints = computed( () => {
         }
       }
     }
-    
+
     walkerCol += bestDX;
     walkerRow += bestDY;
-    
+
     const px = cx + ( walkerCol * COL_SPACING ) + ( walkerRow * COL_SPACING * 0.5 );
     const py = cy + ( walkerRow * ROW_SPACING );
-    
+
     visualPoints.push( { x: px, y: py } );
   }
-  
-  return visualPoints.map( p => `${p.x},${p.y}` ).join( ' ' );
-} );
+  return visualPoints;
+}
+
+const pathPoints = computed( () => unwrapPath( props.path ) );
+const comparisonPathPoints = computed( () => unwrapPath( props.comparisonPath || [] ) );
 </script>
 
 <template>
@@ -770,14 +783,28 @@ const pathPoints = computed( () => {
       Visualizes the user's journey through the Tonnetz.
     -->
     <g class="tonnetz-path">
+      <!-- User Progression Path -->
       <polyline
-        v-if="pathPoints"
-        :points="pathPoints"
+        v-if=" pathPoints.length > 0 "
+        :points="pathPoints.map( p => `${p.x},${p.y}` ).join( ' ' )"
         fill="none"
-        stroke="rgba(255, 255, 255, 0.4)"
+        stroke="white"
         stroke-width="3"
-        stroke-dasharray="8 4"
-        class="tonnetz-path-line"
+        stroke-dasharray="1 6"
+        stroke-linecap="round"
+        class="drop-shadow-lg opacity-40 animate-in fade-in duration-700"
+      />
+
+      <!-- Comparison Path (Matched Song) -->
+      <polyline
+        v-if=" comparisonPathPoints.length > 0 "
+        :points="comparisonPathPoints.map( p => `${p.x},${p.y}` ).join( ' ' )"
+        fill="none"
+        stroke="#10b981"
+        stroke-width="4"
+        stroke-dasharray="4 8"
+        stroke-linecap="round"
+        class="drop-shadow-[0_0_8px_rgba(16,185,129,0.5)] opacity-60 animate-in fade-in slide-in-from-top-4 duration-500"
       />
     </g>
 

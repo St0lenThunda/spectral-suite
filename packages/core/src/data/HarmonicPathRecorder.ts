@@ -71,34 +71,34 @@ export class HarmonicPathRecorder {
    * Finds songs in the database that share a similar "Harmonic Shape" 
    * to what the user is currently playing.
    * 
-   * @returns Promise<SongEntry[]> - A list of similar songs
+   * @returns Promise - A list of similar songs with their matched paths
    */
-  public async findSimilarSongs (): Promise<{ song: SongEntry, score: number }[]> {
+  public async findSimilarSongs (): Promise<{ song: SongEntry, score: number, matchedPath: TonnetzPoint[] }[]> {
     if ( this.path.length < 2 ) return [];
 
-    // We search the database for a pool of candidates (e.g., first 500 songs)
-    // In a production app, we would use a spatial index or vector search.
     const candidates = await SongDatabase.search( { limit: 200 } );
-    const results: { song: SongEntry, score: number }[] = [];
+    const results: { song: SongEntry, score: number, matchedPath: TonnetzPoint[] }[] = [];
 
     for ( const song of candidates ) {
-      // Compare each section of the candidate song to our current path
       let maxSimilarity = 0;
+      let bestPath: TonnetzPoint[] = [];
 
       for ( const sectionKey in song.sections ) {
         const section = song.sections[sectionKey];
         if ( !section ) continue;
 
         const similarity = TonnetzMapper.calculatePathSimilarity( this.path, section.tonnetzPath );
-        if ( similarity > maxSimilarity ) maxSimilarity = similarity;
+        if ( similarity > maxSimilarity ) {
+          maxSimilarity = similarity;
+          bestPath = section.tonnetzPath;
+        }
       }
 
       if ( maxSimilarity > 0.6 ) { // 60% similarity threshold
-        results.push( { song, score: maxSimilarity } );
+        results.push( { song, score: maxSimilarity, matchedPath: bestPath } );
       }
     }
 
-    // Sort by most similar first
     return results.sort( ( a, b ) => b.score - a.score ).slice( 0, 5 );
   }
 }

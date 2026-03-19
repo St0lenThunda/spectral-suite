@@ -1,19 +1,20 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, onUnmounted } from 'vue'
-import AuraTuneModule from './modules/auratune/AuraTuneModule.vue';
-import ScaleSleuthModule from './modules/scalesleuth/ScaleSleuthModule.vue';
-import ChordCaptureModule from './modules/chordcapture/ChordCaptureModule.vue';
-import PocketEngineModule from './modules/pocketengine/PocketEngineModule.vue';
-import FrequencyFlowModule from './modules/frequencyflow/FrequencyFlowModule.vue';
-import TrackTracerModule from './modules/tracktracer/TrackTracerModule.vue';
-import HarmonicOrbitModule from './modules/harmonicorbit/HarmonicOrbitModule.vue';
-import TonnetzModule from './modules/tonnetz/TonnetzModule.vue';
-import ChordForgeModule from './modules/chordforge/ChordForgeModule.vue';
-import MelodyMirrorModule from './modules/melodymirror/MelodyMirrorModule.vue';
-import ResonanceLabModule from './modules/resonancelab/ResonanceLabModule.vue';
-import BendTrainerModule from './modules/bendtrainer/BendTrainerModule.vue';
-import AcademyModule from './modules/academy/AcademyModule.vue';
-import LessonRunner from './modules/academy/LessonRunner.vue';
+import { ref, onMounted, computed, watch, onUnmounted, defineAsyncComponent } from 'vue'
+
+const AuraTuneModule = defineAsyncComponent(() => import('./modules/auratune/AuraTuneModule.vue'));
+const ScaleSleuthModule = defineAsyncComponent(() => import('./modules/scalesleuth/ScaleSleuthModule.vue'));
+const ChordCaptureModule = defineAsyncComponent(() => import('./modules/chordcapture/ChordCaptureModule.vue'));
+const PocketEngineModule = defineAsyncComponent(() => import('./modules/pocketengine/PocketEngineModule.vue'));
+const FrequencyFlowModule = defineAsyncComponent(() => import('./modules/frequencyflow/FrequencyFlowModule.vue'));
+const TrackTracerModule = defineAsyncComponent(() => import('./modules/tracktracer/TrackTracerModule.vue'));
+const HarmonicOrbitModule = defineAsyncComponent(() => import('./modules/harmonicorbit/HarmonicOrbitModule.vue'));
+const TonnetzModule = defineAsyncComponent(() => import('./modules/tonnetz/TonnetzModule.vue'));
+const ChordForgeModule = defineAsyncComponent(() => import('./modules/chordforge/ChordForgeModule.vue'));
+const MelodyMirrorModule = defineAsyncComponent(() => import('./modules/melodymirror/MelodyMirrorModule.vue'));
+const ResonanceLabModule = defineAsyncComponent(() => import('./modules/resonancelab/ResonanceLabModule.vue'));
+const BendTrainerModule = defineAsyncComponent(() => import('./modules/bendtrainer/BendTrainerModule.vue'));
+const AcademyModule = defineAsyncComponent(() => import('./modules/academy/AcademyModule.vue'));
+const LessonRunner = defineAsyncComponent(() => import('./modules/academy/LessonRunner.vue'));
 import { type Lesson } from './modules/academy/lessons';
 import ToolManualOverlay from './components/ToolManualOverlay.vue';
 import IntelligenceButton from './components/IntelligenceButton.vue';
@@ -108,9 +109,9 @@ const ALL_TOOLS = [
   },
   {
     id: 'bendtrainer',
-    name: 'Bend Trainer',
-    description: 'Pitch staircase bend practice. Master half, full, and blues bends.',
-    icon: '🎯',
+    name: 'Pitch Stairway',
+    description: 'Precision pitch practice. Master half, full, and blues bends to heaven.',
+    icon: '🪜',
     color: 'from-amber-500 to-orange-600'
   },
   {
@@ -314,9 +315,10 @@ const handleGainChange = ( event: Event ) => {
       </div>
 
       <!-- MODULE VIEWS -->
-      <AuraTuneModule
-        v-else-if=" currentModule === 'auratune' && enabledTools.auratune "
-        @back="currentModule = 'dashboard'"
+      <KeepAlive>
+        <AuraTuneModule
+          v-if=" currentModule === 'auratune' && enabledTools.auratune "
+          @back="currentModule = 'dashboard'"
         @open-settings="openSettings( 'engine' )"
       />
       <ScaleSleuthModule
@@ -371,9 +373,10 @@ const handleGainChange = ( event: Event ) => {
         @start-lesson="( l ) => activeLesson = l"
         @back="currentModule = 'dashboard'"
       />
+      </KeepAlive>
 
       <div
-        v-else
+        v-if=" currentModule !== 'dashboard' && currentModule !== 'academy' && !enabledTools[currentModule] "
         class="flex flex-col items-center justify-center py-20 animate-pulse"
       >
         <div class="w-20 h-20 border-4 border-dashed border-slate-700 rounded-3xl mb-6"></div>

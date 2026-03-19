@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onActivated, onDeactivated } from 'vue';
 import { marked } from 'marked';
 import { type Lesson } from './lessons';
 import { usePitch, useChordCapture, useRhythmStore, useScaleSleuth, useHarmonicOrbit, Note, Chord, useAudioEngine } from '@spectralsuite/core';
@@ -8,8 +8,8 @@ import MorphContainer from '../../components/MorphContainer.vue';
 
 // Audio engine lifecycle for pitch detection
 const { activate, deactivate } = useAudioEngine();
-onMounted( () => activate() );
-onUnmounted( () => deactivate() );
+onActivated( () => activate() );
+onDeactivated( () => deactivate() );
 
 const props = defineProps<{
   lesson: Lesson;

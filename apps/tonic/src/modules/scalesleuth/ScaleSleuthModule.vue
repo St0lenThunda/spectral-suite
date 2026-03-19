@@ -6,12 +6,13 @@
  * It combines real-time frequency analysis with music theory to suggest
  * potential scales based on the notes a user plays.
  */
-import { ref, computed, Transition, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, Transition, onActivated, onDeactivated, watch } from 'vue';
 import { useScaleSleuth, useAudioEngine, SynthEngine, Fretboard, Note, useGlobalEngine } from '@spectralsuite/core';
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
+import { useToolInfo } from '../../composables/useToolInfo';
 
 /**
  * Destructuring the ScaleSleuth Composable
@@ -283,14 +284,11 @@ const getWeightColor = ( note: string ) => {
 };
 
 // Ensure audio is ready on mount
-onMounted( async () => {
- activate();
-  if ( !isInitialized.value ) {
-    await init();
-  }
+onActivated( () => {
+  activate();
 } );
 
-onUnmounted( () => {
+onDeactivated( () => {
  deactivate();
 });
 
@@ -651,6 +649,24 @@ class="flex gap-2 mt-4"
         {{ toastMessage }}
       </div>
     </Transition>
+
+    <!-- Initialization Overlay -->
+    <div
+      v-if="!isInitialized"
+      class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-md"
+    >
+      <button
+        @click="init()"
+        class="px-10 py-5 bg-sky-500/20 border border-sky-500/30 rounded-3xl text-sky-400 font-black uppercase tracking-widest text-sm hover:bg-sky-500/30 hover:border-sky-500/50 transition-all shadow-[0_0_40px_rgba(14,165,233,0.2)] hover:shadow-[0_0_60px_rgba(14,165,233,0.4)] flex items-center gap-4"
+      >
+        <div class="w-3 h-3 rounded-full bg-white animate-pulse"></div>
+        Enable Microphone
+      </button>
+      <p class="text-slate-500 text-[10px] font-mono uppercase tracking-widest mt-6">
+        Scale Sleuth requires live audio detection
+      </p>
+    </div>
+
   </div>
 </template>
 

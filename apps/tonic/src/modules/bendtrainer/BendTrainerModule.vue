@@ -15,11 +15,10 @@
  * A smooth cursor (circle) tracks the live pitch. No snapping — the cursor floats
  * freely to show micro-pitch accuracy.
  */
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
+import { ref, computed, watch, onActivated, onDeactivated } from 'vue';
 import {
   useBendTrainer,
   useAudioEngine,
-  useGlobalEngine,
   Fretboard,
   Note
 } from '@spectralsuite/core';
@@ -33,17 +32,11 @@ import EngineSettings from '../../components/settings/EngineSettings.vue';
 // ============================================================================
 
 const {
-  pitch,
-  clarity,
-  currentNote,
-  pitchCents,
   startingNote,
-  startingFreq,
   targetSemitones,
   tolerance,
   bendCents,
   targetCents,
-  bendFraction,
   isOnTarget,
   isInBluesZone,
   stairSteps,
@@ -55,8 +48,8 @@ const {
 const { init, isInitialized, activate, deactivate } = useAudioEngine();
 
 // Activate audio engine when component mounts
-onMounted( () => { activate(); } );
-onUnmounted( () => { deactivate(); } );
+onActivated( () => { activate(); } );
+onDeactivated( () => { deactivate(); } );
 
 // Auto-activate if user initializes from this screen
 watch( isInitialized, ( val ) => { if ( val ) activate(); } );
@@ -79,6 +72,29 @@ const emit = defineEmits<{
 
 const isSettingsOpen = ref( false );
 const isFretboardOpen = ref( false );
+const showLegend = ref( true );
+
+/**
+ * Pre-defined bend targets (in semitones) for the quick-select buttons.
+ * Guitars typically bend in 1-fret increments (1 semitone = 100 cents = ½ step).
+ * We export these so the template can loop over them and create the UI buttons.
+ */
+const TARGET_PRESETS = [
+  { label: '½ Step', semitones: 1.0 },
+  { label: 'Full', semitones: 2.0 },
+  { label: '1 ½', semitones: 3.0 },
+  { label: '2 Steps', semitones: 4.0 }
+];
+
+/** 
+ * Categories for the settings drawer corresponding to the named template slots 
+ * Must match the 'Category' interface in LocalSettingsDrawer: {id, label, description}
+ */
+const drawerCategories = [
+  { id: 'Targets', label: 'Bend Targets', description: 'Configure target intervals and tolerance' },
+  { id: 'Display', label: 'Display', description: 'Visual overlays and UI settings' },
+  { id: 'Engine', label: 'Audio Engine', description: 'Microphone and pitch tracking pipeline' }
+];
 
 /**
  * When the user taps a fret on the fretboard, we look up the note at
@@ -122,20 +138,81 @@ const CURSOR_RADIUS = 10;
 
 /** Total SVG height: steps stacked + padding top/bottom */
 const staircaseHeight = computed( () => {
-  return ( stairSteps.value.length * STEP_HEIGHT ) + ( STAIRCASE_PADDING * 2 );
+  // Use 8 as a default fallback when no note is selected (4 semitones * 2 steps per semitone).
+  // This prevents the SVG from collapsing before the user selects a note.
+  const steps = stairSteps.value.length > 0 ? stairSteps.value.length : 8;
+  return ( steps * STEP_HEIGHT ) + ( STAIRCASE_PADDING * 2 );
 } );
 
 /**
  * Converts a cents value to a Y position in the staircase SVG.
- * 0 cents = bottom, 400 cents = top.
+ * 0 cents = bottom, maxCents = top.
  * The staircase is drawn bottom-up (like a real staircase you climb).
+ * 
+ * @param cents - The pitch distance from the root note
+ * @returns number - The vertical Y position for the cursor
  */
 const centsToY = ( cents: number ): number => {
-  const maxCents = stairSteps.value.length * 50; // 50 cents per step
-  const clampedCents = Math.max( 0, Math.min( maxCents, cents ) );
-  const fraction = clampedCents / maxCents;
-  // Invert: 0 cents = bottom, maxCents = top
-  return STAIRCASE_PADDING + ( stairSteps.value.length * STEP_HEIGHT ) * ( 1 - fraction );
+  // Fall back to 8 steps to prevent division by zero when no note anchor is set
+  const steps = stairSteps.value.length > 0 ? stairSteps.value.length : 8;
+  const maxCents = steps * 50; // 50 cents per step (half semitone)
+  
+  // We clamp the value to [-50, maxCents + 50] to prevent the cursor from flying
+  // out of the SVG entirely, but allow a slight "dip" below 0 or above the top
+  // so the user knows they are flat/sharp.
+  const clampedCents = Math.max( -50, Math.min( maxCents + 50, cents ) );
+  
+  // Handle edge case where maxCents could theoretically be 0
+  const fraction = maxCents === 0 ? 0 : clampedCents / maxCents;
+  
+  // Invert the fraction because SVG Y=0 is at the *top*, and we want 0 cents at the *bottom*.
+  return STAIRCASE_PADDING + ( steps * STEP_HEIGHT ) * ( 1 - fraction );
+};
+
+const TREAD_H = 16;
+const FRONT_H = STEP_HEIGHT - TREAD_H;
+
+/**
+ * Calculates the width of the staircase bar at a given vertical step.
+ * By reducing the width as pitch increases, it visually forms a "staircase" leaning right.
+ * 
+ * @param idx - The index of the step (0 = bottom, max = top)
+ * @param total - Total number of steps
+ * @returns number - The pixel width of the bar
+ */
+const getStepWidth = ( idx: number, total: number ): number => {
+  const BASE_WIDTH = STAIRCASE_WIDTH - 40; // 280px wide at base
+  const MIN_WIDTH = 120; // 120px wide at top (vanishing point effect)
+  
+  if ( total <= 1 ) return BASE_WIDTH;
+  
+  // Linearly decrease width from base to top
+  const reductionPerStep = ( BASE_WIDTH - MIN_WIDTH ) / Math.max( 1, total - 1 );
+  return BASE_WIDTH - ( idx * reductionPerStep );
+};
+
+/** Calculates the centered X coordinate for a step block */
+const getStepX = ( idx: number, total: number ): number => {
+  return ( STAIRCASE_WIDTH - getStepWidth( idx, total ) ) / 2;
+};
+
+/**
+ * Generates the four SVG polygon points forming the 3D top tread.
+ * Connects the top edge of the current front face to the bottom edge of the next.
+ */
+const getTreadPoints = ( idx: number, total: number ): string => {
+  const w_curr = getStepWidth( idx, total );
+  const w_next = getStepWidth( idx + 1, total );
+  const x_curr = getStepX( idx, total );
+  const x_next = getStepX( idx + 1, total );
+  
+  // y_top is the absolute back edge of the tread (where it meets the next step)
+  const y_top = STAIRCASE_PADDING + ( total - 1 - idx ) * STEP_HEIGHT;
+  
+  return `${x_curr},${y_top + TREAD_H} ` +
+         `${x_curr + w_curr},${y_top + TREAD_H} ` +
+         `${x_next + w_next},${y_top} ` +
+         `${x_next},${y_top}`;
 };
 
 // ── Cursor Spring Physics ─────────────────────────────────────────
@@ -147,25 +224,57 @@ const centsToY = ( cents: number ): number => {
  * - TENSION: How strongly the spring pulls toward the target (higher = snappier)
  * - FRICTION: Resistance to overshoot (higher = more damped)
  */
-const cursorY = ref( centsToY( 0 ) );
+let cursorY = centsToY( 0 );
 let cursorVelocity = 0;
 const CURSOR_TENSION = 0.12;
 const CURSOR_FRICTION = 0.78;
 let rafId: number | null = null;
 
-onMounted( () => {
+// Hardware Refs
+const cursorDotEl = ref<SVGCircleElement | null>(null);
+const cursorTextEl = ref<SVGTextElement | null>(null);
+
+onActivated( () => {
   const animate = () => {
-    const targetY = centsToY( Math.max( 0, bendCents.value ) );
-    const delta = targetY - cursorY.value;
+    // We pass bendCents directly without Math.max(0, ...) so that the dot can visually 
+    // move slightly BELOW the starting pitch line, showing the user if they are flat.
+    const targetY = centsToY( bendCents.value );
+    
+    // Safety check: if the cursor previously became NaN (e.g. before fixing the division by zero),
+    // force it to the target immediately so physics math doesn't stay poisoned.
+    if ( Number.isNaN( cursorY ) ) {
+      cursorY = targetY;
+      cursorVelocity = 0;
+    }
+    
+    // Physics calculation
+    const delta = targetY - cursorY;
     cursorVelocity = ( cursorVelocity + delta * CURSOR_TENSION ) * CURSOR_FRICTION;
-    cursorY.value += cursorVelocity;
+    cursorY += cursorVelocity;
+
+    // DIRECT DOM MOUNTING (Bypasses Vue Reactivity for 60FPS)
+    if ( cursorDotEl.value && cursorTextEl.value ) {
+      cursorDotEl.value.setAttribute('cy', cursorY.toString());
+      cursorDotEl.value.setAttribute('fill', cursorColor.value);
+      
+      const filterUrl = isOnTarget.value ? 'url(#glow-green)' : isInBluesZone.value ? 'url(#glow-bend-cyan)' : '';
+      if (filterUrl) {
+        cursorDotEl.value.setAttribute('filter', filterUrl);
+      } else {
+        cursorDotEl.value.removeAttribute('filter');
+      }
+
+      cursorTextEl.value.setAttribute('y', (cursorY + 4).toString());
+      cursorTextEl.value.textContent = bendCentsDisplay.value;
+      cursorTextEl.value.setAttribute('fill', cursorColor.value);
+    }
 
     rafId = requestAnimationFrame( animate );
   };
   animate();
 } );
 
-onUnmounted( () => {
+onDeactivated( () => {
   if ( rafId ) cancelAnimationFrame( rafId );
 } );
 
@@ -185,20 +294,18 @@ const cursorColor = computed( () => {
   return '#e2e8f0'; // slate-200
 } );
 
-const cursorGlow = computed( () => {
-  if ( isOnTarget.value ) return '0 0 16px rgba(34, 197, 94, 0.6)';
-  if ( isInBluesZone.value ) return '0 0 12px rgba(245, 158, 11, 0.4)';
-  return '0 0 8px rgba(226, 232, 240, 0.2)';
-} );
-
 // ============================================================================
 // DISPLAY HELPERS
 // ============================================================================
 
-/** Format the starting note for display — show pitch class without octave */
+/** 
+ * Format the starting note for display.
+ * Includes the octave explicitly (e.g. "E4") to enforce that bending 
+ * is tied strictly to that exact physical pitch frequency.
+ */
 const startingNoteDisplay = computed( () => {
   if ( !startingNote.value ) return '—';
-  return Note.pitchClass( startingNote.value ) || startingNote.value;
+  return startingNote.value;
 } );
 
 /** Format bend cents for the sidebar HUD */
@@ -227,20 +334,85 @@ const accuracyPercent = computed( () => {
           <span>←</span> Back to Tonic
         </button>
         <h2 class="text-3xl font-black text-white italic uppercase tracking-tighter">
-          Bend <span class="text-amber-500">Trainer</span>
+          Pitch <span class="text-amber-500">Stairway</span>
         </h2>
         <p class="text-slate-500 text-[10px] font-mono uppercase tracking-[0.2em] mt-1">
-          Pitch Staircase · Precision Bend Practice
+          Precision Bend Practice · To Heaven
         </p>
       </div>
       <div class="flex items-center gap-4">
         <SettingsToggle
           :is-open="isSettingsOpen"
-          @toggle="isSettingsOpen = !isSettingsOpen"
+          @click="isSettingsOpen = !isSettingsOpen"
         />
         <IntelligenceButton toolId="bendtrainer" />
       </div>
     </header>
+
+    <!-- ─── SETTINGS DRAWER ───────────────────────────────────── -->
+    <LocalSettingsDrawer
+      :is-open="isSettingsOpen"
+      :categories="drawerCategories"
+      @close="isSettingsOpen = false"
+    >
+      <template #Targets>
+        <div class="space-y-4 p-4">
+          <div>
+            <label class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2">
+              Target Semitones
+            </label>
+            <input
+              type="range"
+              min="0.5"
+              max="3"
+              step="0.5"
+              v-model.number="targetSemitones"
+              class="w-full accent-amber-500"
+            />
+            <p class="text-[10px] text-slate-500 font-mono mt-1">
+              {{ targetSemitones }} semitones ({{ targetCents }}c)
+            </p>
+          </div>
+
+          <div>
+            <label class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2">
+              Tolerance (±cents)
+            </label>
+            <input
+              type="range"
+              min="5"
+              max="20"
+              step="5"
+              v-model.number="tolerance"
+              class="w-full accent-amber-500"
+            />
+            <p class="text-[10px] text-slate-500 font-mono mt-1">
+              ±{{ tolerance }}c
+            </p>
+          </div>
+        </div>
+      </template>
+
+      <template #Display>
+        <div class="p-4 space-y-4">
+          <label class="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10 transition-colors">
+            <div>
+              <span class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-1">Color Legend</span>
+              <span class="text-[9px] font-mono text-slate-500">Show step color meanings</span>
+            </div>
+            <div class="relative inline-flex items-center cursor-pointer pointer-events-auto">
+              <!-- Tailwind sliding toggle checkbox -->
+              <input type="checkbox" v-model="showLegend" class="sr-only peer" />
+              <div class="w-9 h-5 bg-black/40 rounded-full peer peer-checked:bg-amber-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full peer-checked:after:bg-white border border-white/10 shadow-inner"></div>
+            </div>
+          </label>
+        </div>
+      </template>
+
+      <template #Engine>
+        <EngineSettings />
+      </template>
+    </LocalSettingsDrawer>
 
     <!-- ─── INIT PROMPT (shown when audio engine isn't active) ── -->
     <div
@@ -296,8 +468,33 @@ const accuracyPercent = computed( () => {
           </transition>
 
           <div
+            @click="isFretboardOpen = !isFretboardOpen"
             class="relative p-6 rounded-3xl bg-white/5 border border-white/5 backdrop-blur-xl overflow-hidden min-h-[500px] flex items-center"
           >
+            <!-- COLOR LEGEND OVERLAY -->
+            <transition name="popover">
+              <div
+                v-if="showLegend"
+                class="absolute bottom-6 left-6 p-4 rounded-xl bg-slate-900/80 border border-white/10 backdrop-blur-md z-10 pointer-events-none"
+              >
+                <p class="text-[9px] font-black uppercase tracking-[0.3em] text-slate-500 mb-2">Color Legend</p>
+                <div class="space-y-2">
+                  <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded shadow-sm bg-amber-500/20 border border-amber-500/60"></div>
+                    <span class="text-[9px] font-bold text-slate-400 font-mono tracking-tight">Focus Target</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded shadow-sm bg-cyan-500/20 border border-cyan-500/60"></div>
+                    <span class="text-[9px] font-bold text-slate-400 font-mono tracking-tight">Blues Bend (¼)</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <div class="w-3 h-3 rounded shadow-sm bg-white/5 border border-white/10"></div>
+                    <span class="text-[9px] font-bold text-slate-400 font-mono tracking-tight">Half Step (½)</span>
+                  </div>
+                </div>
+              </div>
+            </transition>
+
             <!-- Decorative glow behind the staircase -->
             <div
               class="absolute -top-20 -left-20 w-60 h-60 bg-amber-500/10 blur-[80px] rounded-full pointer-events-none"
@@ -350,65 +547,84 @@ const accuracyPercent = computed( () => {
                 v-for=" ( step, idx ) in stairSteps "
                 :key="step.cents"
               >
-                <!-- Step background bar -->
-                <rect
-                  :x="40"
-                  :y="STAIRCASE_PADDING + ( stairSteps.length - 1 - idx ) * STEP_HEIGHT + 4"
-                  :width="STAIRCASE_WIDTH - 80"
-                  :height="STEP_HEIGHT - 8"
-                  :rx="8"
+                <!-- TOP TREAD (Polygon connecting this step to the next) -->
+                <polygon
+                  :points="getTreadPoints(idx, stairSteps.length)"
                   :fill="step.isTarget
-                    ? 'rgba(245, 158, 11, 0.15)'
+                    ? 'rgba(245, 158, 11, 0.25)'
                     : step.isBluesZone
-                      ? 'rgba(34, 211, 238, 0.25)'
-                      : 'rgba(255, 255, 255, 0.03)'"
+                      ? 'rgba(34, 211, 238, 0.15)'
+                      : 'rgba(255, 255, 255, 0.08)'"
                   :stroke="step.isTarget
                     ? 'rgba(245, 158, 11, 0.4)'
                     : step.isBluesZone
-                      ? 'rgba(34, 211, 238, 0.8)'
+                      ? 'rgba(34, 211, 238, 0.5)'
                       : 'rgba(255, 255, 255, 0.05)'"
+                  stroke-width="1"
+                  class="transition-all duration-300 backdrop-blur-sm"
+                />
+
+                <!-- FRONT FACE (Rectangle) -->
+                <rect
+                  :x="getStepX(idx, stairSteps.length)"
+                  :y="STAIRCASE_PADDING + ( stairSteps.length - 1 - idx ) * STEP_HEIGHT + TREAD_H"
+                  :width="getStepWidth(idx, stairSteps.length)"
+                  :height="FRONT_H"
+                  :rx="4"
+                  :fill="step.isTarget
+                    ? 'rgba(245, 158, 11, 0.15)'
+                    : step.isBluesZone
+                      ? 'rgba(34, 211, 238, 0.1)'
+                      : 'rgba(0, 0, 0, 0.4)'"
+                  :stroke="step.isTarget
+                    ? 'rgba(245, 158, 11, 0.6)'
+                    : step.isBluesZone
+                      ? 'rgba(34, 211, 238, 0.8)'
+                      : 'rgba(255, 255, 255, 0.1)'"
                   stroke-width="1.5"
-                  class="transition-all duration-300"
+                  class="transition-all duration-300 backdrop-blur-md"
                 />
 
                 <!-- Blues zone label (¼-tone indicator) -->
                 <text
                   v-if=" step.isBluesZone "
-                  :x="STAIRCASE_WIDTH - 44"
-                  :y="STAIRCASE_PADDING + ( stairSteps.length - 1 - idx ) * STEP_HEIGHT + STEP_HEIGHT / 2 + 3"
-                  text-anchor="middle"
+                  :x="STAIRCASE_WIDTH - 20"
+                  :y="STAIRCASE_PADDING + ( stairSteps.length - 1 - idx ) * STEP_HEIGHT + TREAD_H + FRONT_H / 2 + 3"
+                  text-anchor="end"
                   class="text-[8px] font-black select-none tracking-tighter"
                   fill="rgba(34, 211, 238, 1)"
                 >¼ BEND</text>
 
-                <!-- Target pulsing border (applied on top of the bar) -->
+                <!-- Target pulsing border (Front face only) -->
                 <rect
                   v-if=" step.isTarget "
-                  :x="40"
-                  :y="STAIRCASE_PADDING + ( stairSteps.length - 1 - idx ) * STEP_HEIGHT + 4"
-                  :width="STAIRCASE_WIDTH - 80"
-                  :height="STEP_HEIGHT - 8"
-                  :rx="8"
+                  :x="getStepX(idx, stairSteps.length)"
+                  :y="STAIRCASE_PADDING + ( stairSteps.length - 1 - idx ) * STEP_HEIGHT + TREAD_H"
+                  :width="getStepWidth(idx, stairSteps.length)"
+                  :height="FRONT_H"
+                  :rx="4"
                   fill="none"
-                  stroke="rgba(245, 158, 11, 0.6)"
+                  stroke="rgba(245, 158, 11, 0.8)"
                   stroke-width="2"
                   class="animate-pulse"
                 />
 
-                <!-- INLINE LABEL (note name + interval) — solves the learning curve -->
+                <!-- INLINE LABEL (Centered on Front Face) -->
                 <text
-                  :x="52"
-                  :y="STAIRCASE_PADDING + ( stairSteps.length - 1 - idx ) * STEP_HEIGHT + STEP_HEIGHT / 2 + 4"
-                  class="text-[11px] font-bold select-none"
-                  :fill="step.isTarget ? 'rgba(245, 158, 11, 0.9)' : 'rgba(226, 232, 240, 0.5)'"
+                  :x="STAIRCASE_WIDTH / 2"
+                  :y="STAIRCASE_PADDING + ( stairSteps.length - 1 - idx ) * STEP_HEIGHT + TREAD_H + FRONT_H / 2 + 4"
+                  text-anchor="middle"
+                  class="text-[12px] font-black select-none tracking-tight"
+                  :fill="step.isTarget ? 'rgba(255, 255, 255, 0.9)' : 'rgba(226, 232, 240, 0.5)'"
+                  :style="step.isTarget ? 'text-shadow: 0 0 8px rgba(245,158,11,0.5)' : ''"
                 >{{ step.label }}</text>
               </g>
 
               <!-- ZERO LINE (unbent starting position) -->
               <line
-                :x1="40"
+                :x1="getStepX(0, stairSteps.length)"
                 :y1="centsToY( 0 )"
-                :x2="STAIRCASE_WIDTH - 40"
+                :x2="getStepX(0, stairSteps.length) + getStepWidth(0, stairSteps.length)"
                 :y2="centsToY( 0 )"
                 stroke="rgba(226, 232, 240, 0.15)"
                 stroke-width="1"
@@ -416,8 +632,9 @@ const accuracyPercent = computed( () => {
               />
               <text
                 v-if=" startingNote "
-                :x="52"
+                :x="STAIRCASE_WIDTH / 2"
                 :y="centsToY( 0 ) + 16"
+                text-anchor="middle"
                 class="text-[10px] font-bold select-none"
                 fill="rgba(226, 232, 240, 0.3)"
               >{{ startingNoteDisplay }} (open)</text>
@@ -440,21 +657,18 @@ const accuracyPercent = computed( () => {
 
               <!-- SMOOTH CURSOR (the main feedback element) -->
               <circle
+                ref="cursorDotEl"
                 :cx="STAIRCASE_WIDTH / 2"
-                :cy="cursorY"
                 :r="CURSOR_RADIUS"
-                :fill="cursorColor"
-                :filter="isOnTarget ? 'url(#glow-green)' : isInBluesZone ? 'url(#glow-bend-cyan)' : ''"
                 class="transition-colors duration-150"
               />
 
               <!-- Cursor cents readout (floats next to the cursor) -->
               <text
+                ref="cursorTextEl"
                 :x="STAIRCASE_WIDTH / 2 + CURSOR_RADIUS + 8"
-                :y="cursorY + 4"
                 class="text-[10px] font-mono font-bold select-none"
-                :fill="cursorColor"
-              >{{ bendCentsDisplay }}</text>
+              ></text>
             </svg>
           </div>
         </div>
@@ -567,55 +781,6 @@ const accuracyPercent = computed( () => {
       </div>
 
     </div>
-
-    <!-- ─── SETTINGS DRAWER ───────────────────────────────────── -->
-    <LocalSettingsDrawer
-      :is-open="isSettingsOpen"
-      :categories="drawerCategories"
-      @close="isSettingsOpen = false"
-    >
-      <template #Targets>
-        <div class="space-y-4 p-4">
-          <div>
-            <label class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2">
-              Target Semitones
-            </label>
-            <input
-              type="range"
-              min="0.5"
-              max="3"
-              step="0.5"
-              v-model.number="targetSemitones"
-              class="w-full accent-amber-500"
-            />
-            <p class="text-[10px] text-slate-500 font-mono mt-1">
-              {{ targetSemitones }} semitones ({{ targetCents }}c)
-            </p>
-          </div>
-
-          <div>
-            <label class="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 block mb-2">
-              Tolerance (±cents)
-            </label>
-            <input
-              type="range"
-              min="5"
-              max="20"
-              step="5"
-              v-model.number="tolerance"
-              class="w-full accent-amber-500"
-            />
-            <p class="text-[10px] text-slate-500 font-mono mt-1">
-              ±{{ tolerance }}c
-            </p>
-          </div>
-        </div>
-      </template>
-
-      <template #Engine>
-        <EngineSettings />
-      </template>
-    </LocalSettingsDrawer>
   </div>
 </template>
 

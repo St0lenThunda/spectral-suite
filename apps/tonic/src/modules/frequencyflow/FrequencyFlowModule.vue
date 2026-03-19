@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
-import { useAudioEngine, MagnitudeSpectrum, Spectrogram3D, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion, useGlobalEngine } from '@spectralsuite/core';
+import { ref, onActivated, onDeactivated, watch, nextTick } from 'vue';
+import { useAudioEngine, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion, useGlobalEngine } from '@spectralsuite/core';
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
+import SpectrogramWorker from '../../../../../packages/core/src/visualizers/spectrogram.worker.ts?worker';
 
 const isSettingsOpen = ref( false );
 
@@ -14,81 +15,24 @@ const drawerCategories = [
   { id: 'Visuals', label: '3D Config', description: 'Visualizer Perspective', showIndicator: false },
   { id: 'Exports', label: 'Exports', description: 'Save Analysis Data', showIndicator: false }
 ];
-// We'll import the same visualizers. In a real monorepo we'd share them more cleanly, 
-// but for now I'll implement a slightly more compact version here or import if possible.
-// Actually, I'll just implement them here to ensure zero-dependency issues during integration.
-
-/**
- * Simple Waveform Visualizer (Mini Oscilloscope).
- * Renders the time-domain audio data as a line graph.
- * Kept local to avoid dependency overhead for this specific diagnostic view.
- */
-class MiniOsc {
-  canvas: HTMLCanvasElement;
-  analyser: AnalyserNode;
-
-  constructor( canvas: HTMLCanvasElement, analyser: AnalyserNode ) {
-    this.canvas = canvas;
-    this.analyser = analyser;
-  }
-
-  /**
-   * Renders a single frame of the waveform.
-   * We use `getFloatTimeDomainData` because it gives us the raw audio signal
-   * oscillating between -1.0 and 1.0, which maps directly to speaker cone movement.
-   */
-  draw () {
-    const ctx = this.canvas.getContext( '2d' );
-    if ( !ctx ) return;
-
-    // Fix for Netlify/TS: Explicitly use ArrayBuffer and cast to any
-    // We multiply FFT size by 4 bytes (Float32 is 4 bytes per sample)
-    const data = new Float32Array( new ArrayBuffer( this.analyser.fftSize * 4 ) );
-    this.analyser.getFloatTimeDomainData( data as any );
-
-    ctx.clearRect( 0, 0, this.canvas.width, this.canvas.height );
-    ctx.strokeStyle = '#00f3ff';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-
-    const sliceWidth = this.canvas.width / data.length;
-    let x = 0;
-
-    for ( let i = 0; i < data.length; i++ ) {
-      const v = data[i] ?? 0;
-      // Map [-1, 1] audio data to [0, canvasHeight] pixel coordinates
-      // (v + 1) shifts range to [0, 2], then we scale to height/2
-      const y = ( v + 1 ) * this.canvas.height / 2;
-
-      if ( i === 0 ) ctx.moveTo( x, y ); else ctx.lineTo( x, y );
-      x += sliceWidth;
-    }
-    ctx.stroke();
-  }
-}
-
-
-
-// MiniOsc and MiniSpec classes kept for now as they are simple and specific to this module's legacy view (if used)
-// or just as placeholders.
-// ... (MiniOsc and MiniSpec code remains) ...
-
-// ... (MiniOsc and MiniSpec code remains) ...
 
 const { init, isInitialized, getAnalyser, activate, deactivate } = useAudioEngine();
 const oscCanvas = ref<HTMLCanvasElement | null>( null );
 const specCanvas = ref<HTMLCanvasElement | null>( null );
 const magCanvas = ref<HTMLCanvasElement | null>( null );
 
-let osc: MiniOsc | null = null;
-let spec3d: Spectrogram3D | null = null;
-let mag: MagnitudeSpectrum | null = null;
+// Zero-Copy Web Worker State
+let worker: Worker | null = null;
+const sabFreq = typeof SharedArrayBuffer !== 'undefined' ? new SharedArrayBuffer(8192) : new ArrayBuffer(8192);
+const sabTime = typeof SharedArrayBuffer !== 'undefined' ? new SharedArrayBuffer(8192 * 4) : new ArrayBuffer(8192 * 4);
+const freqView = new Uint8Array(sabFreq);
+const timeView = new Float32Array(sabTime);
+
 let animId: number | null = null;
 
 const fftSize = ref( 2048 );
 const smoothing = ref( 0.85 );
 const isFrozen = ref( false );
-const frozenData = ref<Uint8Array | null>( null );
 const scaleMode = ref<'linear' | 'log'>( 'log' );
 const dominantFreq = ref( 0 );
 const dominantNote = ref( "-" );
@@ -101,28 +45,30 @@ const perspective = ref( 0.8 );
 // Focus State for Layout Reflow
 const activeFocus = ref<'magnitude' | 'waveform' | 'topology'>( 'topology' );
 
-/**
- * Resizes the canvases to match their physical display size.
- * We multiply by devicePixelRatio to ensure the visuals stay crisp on Retina/4K displays.
- */
 const resizeCanvases = () => {
-  [magCanvas.value, oscCanvas.value, specCanvas.value].forEach( canvas => {
+  [
+    { ref: magCanvas, id: 'mag' },
+    { ref: oscCanvas, id: 'osc' },
+    { ref: specCanvas, id: 'spec' }
+  ].forEach( canvasData => {
+    const canvas = canvasData.ref.value;
     if ( !canvas ) return;
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     
-    // Only resize if different to avoid redundant context resets
-    if ( canvas.width !== Math.floor( rect.width * dpr ) || 
-         canvas.height !== Math.floor( rect.height * dpr ) ) {
-      canvas.width = Math.floor( rect.width * dpr );
-      canvas.height = Math.floor( rect.height * dpr );
+    if ( worker ) {
+      worker.postMessage({
+        type: 'RESIZE',
+        target: canvasData.id,
+        width: Math.floor( rect.width * dpr ),
+        height: Math.floor( rect.height * dpr )
+      });
     }
   } );
 };
 
 // Watch for focus changes to trigger a layout-driven resize
 watch( activeFocus, async () => {
-  // Wait for Vue to update the DOM (grid reflow) before measuring new rects
   await nextTick();
   resizeCanvases();
 } );
@@ -130,7 +76,26 @@ watch( activeFocus, async () => {
 // Pro Features
 const showInstrumentLabels = ref( true );
 const showHarmonics = ref( false );
-const peakHoldData = ref<Uint8Array | null>( null );
+
+// Send Config Updates to Worker instantly
+watch([isFrozen, verticalScale, perspective, hueShift, scaleMode, showInstrumentLabels, showHarmonics, dominantFreq, fftSize], () => {
+  if (worker) {
+    worker.postMessage({
+      type: 'UPDATE_CONFIG',
+      isFrozen: isFrozen.value,
+      verticalScale: verticalScale.value,
+      perspective: perspective.value,
+      hueShift: hueShift.value,
+      scaleMode: scaleMode.value,
+      showInstrumentLabels: showInstrumentLabels.value,
+      showHarmonics: showHarmonics.value,
+      fundamentalFreq: dominantFreq.value,
+      instrumentRanges: INSTRUMENT_RANGES,
+      nyquist: getAnalyser()?.context.sampleRate ? getAnalyser()!.context.sampleRate / 2 : 22050
+    });
+  }
+}, { deep: true });
+
 
 // Instrument Frequency Ranges
 // instrumentRanges imported from core
@@ -141,72 +106,42 @@ const eqSuggestions = ref<EQSuggestion[]>( [] );
 const emit = defineEmits( ['back'] )
 
 /**
- * Main Animation Loop.
- * This function runs ~60 times per second to update the visualizers.
- * 
- * Physics Note:
- * We use `requestAnimationFrame` instead of `setInterval` because it syncs with the monitor's refresh rate,
- * preventing visual tearing and pausing automatically when the tab is inactive to save battery.
+ * Main Data Pipe Loop
+ * Captures Analyzer state directly into the lock-free Shared Array buffers.
+ * The WebWorker detects mutations instantly and renders visually.
  */
 const tick = () => {
-  if ( isFrozen.value ) {
+  if ( isFrozen.value || !isInitialized.value ) {
     animId = requestAnimationFrame( tick );
     return;
   }
 
-  // Draw Time Domain (Oscilloscope)
-  if ( osc ) osc.draw();
+  const analyser = getAnalyser();
+  if ( analyser ) {
+    // 1. Pipestream Data to SharedMemory Lock-Free
+    analyser.getFloatTimeDomainData(timeView as unknown as Float32Array);
+    analyser.getByteFrequencyData(freqView as unknown as Uint8Array);
 
-  // Draw 3D Spectrogram (Waterfall)
-  if ( spec3d ) spec3d.draw( isFrozen.value, verticalScale.value, perspective.value, hueShift.value );
-
-  // Draw Main Frequency Spectrum
-  if ( mag && isInitialized.value ) {
-    mag.draw(
-      frozenData.value,
-      scaleMode.value,
-      peakHoldData.value,
-      showInstrumentLabels.value,
-      INSTRUMENT_RANGES,
-      showHarmonics.value,
-      dominantFreq.value
-    );
-  }
-
-  // Update stats periodically (every ~60 frames or throttled via random check)
-  // We don't need to re-calculate complex math every single frame (16ms) for UI text updates.
-  if ( Math.random() > 0.95 && isInitialized.value ) {
-    const analyser = getAnalyser();
-    if ( analyser ) {
+    // 2. Throttle heavy UI String formatting
+    if ( Math.random() > 0.95 ) {
       const bufferLength = analyser.frequencyBinCount;
-      const dataArray = new Uint8Array( bufferLength );
-      analyser.getByteFrequencyData( dataArray );
-
-      // Simple peak detection: Find the louded frequency bin
       let maxVal = -1;
       let maxIndex = -1;
+      
       for ( let i = 0; i < bufferLength; i++ ) {
-        const val = dataArray[i] ?? 0;
+        const val = freqView[i] ?? 0;
         if ( val > maxVal ) {
           maxVal = val;
           maxIndex = i;
         }
       }
 
-      // Filter out low-level noise (Noise Floor)
       if ( maxVal > 100 ) {
-        // The Nyquist frequency is half the sample rate (e.g., 22050Hz for 44.1kHz).
-        // It represents the highest frequency correctly representable by the system.
         const nyquist = analyser.context.sampleRate / 2;
-
-        // Map the array index back to a frequency value (Hz)
         const freq = maxIndex * ( nyquist / bufferLength );
-
         dominantFreq.value = Math.round( freq );
         dominantNote.value = getNoteFromFreq( freq );
-
-        // Update EQ suggestions based on the full spectrum analysis
-        eqSuggestions.value = generateEqSuggestions( dataArray, nyquist );
+        eqSuggestions.value = generateEqSuggestions( freqView, nyquist );
       }
     }
   }
@@ -241,28 +176,18 @@ const toggleFreeze = () => {
   isFrozen.value = !isFrozen.value;
 };
 
-/**
- * Exports the current analysis data.
- * Useful for saving a "snapshot" of a sound's fingerprint.
- * 
- * @param format - 'png' for an image or 'json' for raw data.
- */
 const exportSpectrum = ( format: 'png' | 'json' ) => {
   if ( !magCanvas.value ) return;
 
   if ( format === 'png' ) {
-    const link = document.createElement( 'a' );
-    link.download = `spectral-analysis-${Date.now()}.png`;
-    link.href = magCanvas.value.toDataURL();
-    link.click();
+    alert("PNG Export is disabled in Pro mode due to OffscreenCanvas hardware acceleration. Please use your OS screen capture utility instead.");
+    return;
   } else {
     // JSON Export of current frequency data
     const analyser = getAnalyser();
     if ( analyser ) {
-      const data = new Uint8Array( analyser.frequencyBinCount );
-      analyser.getByteFrequencyData( data );
-
-      const json = JSON.stringify( Array.from( data ) );
+      analyser.getByteFrequencyData( freqView );
+      const json = JSON.stringify( Array.from( freqView.slice(0, analyser.frequencyBinCount) as unknown as Uint8Array ) );
       const blob = new Blob( [json], { type: 'application/json' } );
       const url = URL.createObjectURL( blob );
 
@@ -274,36 +199,53 @@ const exportSpectrum = ( format: 'png' | 'json' ) => {
   }
 };
 
-onMounted( async () => {
-  // 1. Activate Engine
-  // If the engine hasn't been started yet (e.g. fresh reload on this page), we must init it.
-  activate();
-  if ( !isInitialized.value ) {
-    await init();
-  }
-
-  // 2. Initialize Visualizers
+const setupVis = () => {
   const analyser = getAnalyser();
+  if (!analyser) return;
 
-  if ( analyser && oscCanvas.value ) {
-    osc = new MiniOsc( oscCanvas.value, analyser );
+  if (!worker) {
+    worker = new SpectrogramWorker();
   }
 
-  if ( analyser && specCanvas.value ) {
-    spec3d = new Spectrogram3D( specCanvas.value, analyser );
+  if (oscCanvas.value && !oscCanvas.value.dataset.transferred) {
+    const offOsc = oscCanvas.value.transferControlToOffscreen();
+    oscCanvas.value.dataset.transferred = 'true';
+    const offSpec = specCanvas.value!.transferControlToOffscreen();
+    specCanvas.value!.dataset.transferred = 'true';
+    const offMag = magCanvas.value!.transferControlToOffscreen();
+    magCanvas.value!.dataset.transferred = 'true';
+
+    worker.postMessage({
+      type: 'INIT',
+      oscCanvas: offOsc,
+      specCanvas: offSpec,
+      magCanvas: offMag,
+      sabFreq,
+      sabTime,
+      nyquist: analyser.context.sampleRate / 2
+    }, [offOsc, offSpec, offMag]);
   }
 
-  if ( analyser && magCanvas.value ) {
-    mag = new MagnitudeSpectrum( magCanvas.value, analyser );
-  }
-
-  // 3. Start Loop
   resizeCanvases();
-  tick();
+};
+
+watch( isInitialized, ( val ) => {
+  if ( val ) {
+    activate();
+    setupVis();
+  }
 } );
 
-onUnmounted( () => {
+onActivated( () => {
+  activate();
+  if ( isInitialized.value ) setupVis();
+  
+  if ( !animId ) tick();
+} );
+
+onDeactivated( () => {
   if ( animId ) cancelAnimationFrame( animId );
+  animId = null;
   deactivate();
 } );
 </script>
@@ -433,7 +375,7 @@ onUnmounted( () => {
       <!-- Interactive Spectrum Analyzer (Magnitude) -->
       <div
         :class="activeFocus === 'magnitude' 
-          ? 'lg:col-span-3 h-[36rem] order-1' 
+          ? 'lg:col-span-3 h-144 order-1' 
           : 'lg:col-span-1 h-72 order-2'"
         class="bg-slate-800/40 rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-xl relative transition-all duration-500 ease-out overflow-hidden"
 
@@ -480,7 +422,7 @@ onUnmounted( () => {
           </div>
         </div>
 
-        <div class="relative flex-1" :class="activeFocus === 'magnitude' ? 'h-[28rem]' : 'h-40'">
+        <div class="relative flex-1" :class="activeFocus === 'magnitude' ? 'h-112' : 'h-40'">
           <canvas
             ref="magCanvas"
             class="w-full h-full"
@@ -503,7 +445,7 @@ onUnmounted( () => {
 
       <!-- Precision Control Panel -->
       <div
-        class="bg-slate-800/40 rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-xl flex flex-col gap-8 h-auto lg:h-[28rem] order-4"
+        class="bg-slate-800/40 rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-xl flex flex-col gap-8 h-auto lg:h-112 order-4"
 
       >
         <div>
@@ -579,9 +521,9 @@ onUnmounted( () => {
       <!-- Waveform (Time Domain) -->
       <div 
         :class="activeFocus === 'waveform' 
-          ? 'lg:col-span-3 h-[36rem] order-1' 
+          ? 'lg:col-span-3 h-144 order-1' 
           : 'lg:col-span-1 h-72 order-2'"
-        class="bg-slate-800/40 rounded-[2rem] p-8 border border-white/5 backdrop-blur-xl transition-all duration-500 ease-out overflow-hidden relative group"
+        class="bg-slate-800/40 rounded-4xl p-8 border border-white/5 backdrop-blur-xl transition-all duration-500 ease-out overflow-hidden relative group"
       >
         <div class="flex justify-between items-start mb-6">
           <span class="text-[10px] uppercase font-bold tracking-[0.3em] text-slate-500">Time Domain (Waveform)</span>
@@ -598,14 +540,14 @@ onUnmounted( () => {
         <canvas
           ref="oscCanvas"
           class="w-full"
-          :class="activeFocus === 'waveform' ? 'h-[28rem]' : 'h-40'"
+          :class="activeFocus === 'waveform' ? 'h-112' : 'h-40'"
         ></canvas>
       </div>
 
     <!-- 3D Stage (Spectral Topology) -->
     <div
       :class="activeFocus === 'topology' 
-        ? 'lg:col-span-3 h-[42rem] order-1' 
+        ? 'lg:col-span-3 h-168 order-1' 
         : 'lg:col-span-1 h-72 order-2'"
       class="bg-black rounded-[2.5rem] p-4 border border-white/5 relative overflow-hidden group shadow-2xl transition-all duration-500 ease-out"
     >
@@ -629,7 +571,7 @@ onUnmounted( () => {
 
       <!-- Peak Note Detector HUD -->
       <div
-        class="bg-slate-800/40 rounded-[2rem] p-8 border border-white/5 backdrop-blur-xl h-72 flex flex-col items-center justify-center relative group order-last"
+        class="bg-slate-800/40 rounded-4xl p-8 border border-white/5 backdrop-blur-xl h-72 flex flex-col items-center justify-center relative group order-last"
 
       >
         <div class="absolute inset-0 bg-sky-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-4xl">
@@ -646,7 +588,7 @@ onUnmounted( () => {
       </div>
 
       <!-- EQ Suggestions (Pro Feature) -->
-      <div class="bg-slate-800/40 rounded-[2rem] p-8 border border-white/5 backdrop-blur-xl h-72 order-last">
+      <div class="bg-slate-800/40 rounded-4xl p-8 border border-white/5 backdrop-blur-xl h-72 order-last">
 
         <span class="text-[10px] uppercase font-bold tracking-[0.3em] text-amber-400 block mb-6">EQ Suggestions</span>
         <div
@@ -676,6 +618,23 @@ onUnmounted( () => {
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- Initialization Overlay -->
+    <div
+      v-if="!isInitialized"
+      class="fixed inset-0 z-50 flex flex-col items-center justify-center bg-slate-900/95 backdrop-blur-md"
+    >
+      <button
+        @click="init()"
+        class="px-10 py-5 bg-sky-500/20 border border-sky-500/30 rounded-3xl text-sky-400 font-black uppercase tracking-widest text-sm hover:bg-sky-500/30 hover:border-sky-500/50 transition-all shadow-[0_0_40px_rgba(14,165,233,0.2)] hover:shadow-[0_0_60px_rgba(14,165,233,0.4)] flex items-center gap-4"
+      >
+        <div class="w-3 h-3 rounded-full bg-white animate-pulse"></div>
+        Enable Microphone
+      </button>
+      <p class="text-slate-500 text-[10px] font-mono uppercase tracking-widest mt-6">
+        Frequency Flow requires live audio analysis
+      </p>
     </div>
 
   </div>

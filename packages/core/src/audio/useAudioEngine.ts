@@ -1,20 +1,19 @@
 import { ref } from 'vue';
+import { defineStore, storeToRefs } from 'pinia';
 import { AudioEngine } from './AudioEngine';
 import { PitchNodePool } from './PitchNodePool';
 
-// Single source of truth for reactivity across the app
-export const isInitialized = ref( AudioEngine.getInstance().initialized );
-const error = ref<string | null>( null );
-const inputGain = ref( 1.0 );
-const activeConsumers = ref( 0 );
-const availableDevices = ref<MediaDeviceInfo[]>( [] );
-const availableOutputDevices = ref<MediaDeviceInfo[]>( [] );
-const selectedDeviceId = ref<string>( '' );
-const selectedOutputId = ref<string>( '' );
-let suspendTimer: any = null;
-
-export function useAudioEngine () {
+export const useAudioEngineStore = defineStore('audioEngine', () => {
   const engine = AudioEngine.getInstance();
+  const isInitialized = ref( engine.initialized );
+  const error = ref<string | null>( null );
+  const inputGain = ref( 1.0 );
+  const activeConsumers = ref( 0 );
+  const availableDevices = ref<MediaDeviceInfo[]>( [] );
+  const availableOutputDevices = ref<MediaDeviceInfo[]>( [] );
+  const selectedDeviceId = ref<string>( '' );
+  const selectedOutputId = ref<string>( '' );
+  let suspendTimer: any = null;
 
   const updateDeviceList = async () => {
     const devices = await engine.getDevices();
@@ -51,7 +50,6 @@ export function useAudioEngine () {
       selectedOutputId.value = deviceId;
     } catch ( err: any ) {
       console.warn( 'Output selection error:', err );
-      // Don't set error.value globally as this is often non-fatal (just a warning)
     }
   };
 
@@ -87,7 +85,7 @@ export function useAudioEngine () {
         PitchNodePool.warmUp( ctx ).catch( e => console.warn( 'PitchNodePool warmUp failed:', e ) );
       }
     } catch ( err: any ) {
-      error.value = err.message;
+      error.value = err.message; // Propagate error properly to the store
     }
   };
 
@@ -102,16 +100,12 @@ export function useAudioEngine () {
    * NON-BLOCKING: Does not await the resume to prevent HMR freezes.
    */
   const activate = () => {
-    // Cancel any pending suspension immediately as we have a new consumer
     if ( suspendTimer ) {
       clearTimeout( suspendTimer );
       suspendTimer = null;
     }
-
     activeConsumers.value++;
-
     if ( isInitialized.value ) {
-      // Fire-and-forget resume to prevent blocking the main thread
       engine.resume().catch( e => console.warn( 'Resume failed:', e ) );
     }
   };
@@ -123,14 +117,9 @@ export function useAudioEngine () {
    */
   const deactivate = () => {
     activeConsumers.value = Math.max( 0, activeConsumers.value - 1 );
-
     if ( activeConsumers.value === 0 ) {
-      // Debounce the suspension to allow for navigation (switching tools)
-      // without continuously stopping/starting the AudioContext hardware.
       if ( suspendTimer ) clearTimeout( suspendTimer );
-
       suspendTimer = setTimeout( () => {
-        // Double check count is still 0 after delay
         if ( activeConsumers.value === 0 && isInitialized.value ) {
           engine.suspend().catch( e => console.warn( 'Suspend failed:', e ) );
         }
@@ -146,22 +135,46 @@ export function useAudioEngine () {
     isInitialized,
     error,
     inputGain,
-    init,
-    setGain,
-    getAnalyser,
-    getContext,
-    activate,
-    deactivate,
-    resume: () => engine.resume(),
-    suspend: () => engine.suspend(),
-    close: () => engine.close(),
+    activeConsumers,
     availableDevices,
-    selectedDeviceId,
     availableOutputDevices,
+    selectedDeviceId,
     selectedOutputId,
     updateDeviceList,
     selectDevice,
     selectOutputDevice,
-    playGlobalTestTone
+    playGlobalTestTone,
+    init,
+    setGain,
+    activate,
+    deactivate,
+    getAnalyser,
+    getContext,
+    resume: () => engine.resume(),
+    suspend: () => engine.suspend(),
+    close: () => engine.close()
+  };
+});
+
+// Legacy backward compatibility wrapper for existing UI modules
+export function useAudioEngine () {
+  const store = useAudioEngineStore();
+  const refs = storeToRefs( store );
+
+  return {
+    ...refs,
+    updateDeviceList: store.updateDeviceList,
+    selectDevice: store.selectDevice,
+    selectOutputDevice: store.selectOutputDevice,
+    playGlobalTestTone: store.playGlobalTestTone,
+    init: store.init,
+    setGain: store.setGain,
+    activate: store.activate,
+    deactivate: store.deactivate,
+    getAnalyser: store.getAnalyser,
+    getContext: store.getContext,
+    resume: store.resume,
+    suspend: store.suspend,
+    close: store.close
   };
 }

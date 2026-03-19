@@ -46,6 +46,10 @@ export default defineConfig( {
     dedupe: ['vue', 'pinia']
   },
   server: {
-    port: 5000
+    port: 5000,
+    headers: {
+      "Cross-Origin-Opener-Policy": "same-origin",
+      "Cross-Origin-Embedder-Policy": "require-corp",
+    }
   }
 } )

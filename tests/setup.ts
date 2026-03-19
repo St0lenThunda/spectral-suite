@@ -157,3 +157,40 @@ vi.stubGlobal( 'ResizeObserver', vi.fn( () => ( {
   unobserve: vi.fn(),
   disconnect: vi.fn(),
 } ) ) );
+
+// Mock SharedArrayBuffer for Node environments where it might be disabled
+if (typeof SharedArrayBuffer === 'undefined') {
+  vi.stubGlobal('SharedArrayBuffer', ArrayBuffer);
+}
+
+// Mock OffscreenCanvas
+if (typeof OffscreenCanvas === 'undefined') {
+  class MockOffscreenCanvas {
+    width: number;
+    height: number;
+    constructor(width: number, height: number) {
+      this.width = width;
+      this.height = height;
+    }
+    getContext() {
+      return HTMLCanvasElement.prototype.getContext.call(this, '2d');
+    }
+    transferToImageBitmap() { return {}; }
+  }
+  vi.stubGlobal('OffscreenCanvas', MockOffscreenCanvas);
+}
+
+// Mock Web Worker
+if (typeof Worker === 'undefined') {
+  class MockWorker {
+    onmessage: any = null;
+    postMessage = vi.fn();
+    terminate = vi.fn();
+  }
+  vi.stubGlobal('Worker', MockWorker);
+}
+
+// Mock transferControlToOffscreen on standard Canvas elements
+if (typeof HTMLCanvasElement !== 'undefined') {
+  HTMLCanvasElement.prototype.transferControlToOffscreen = vi.fn(() => new OffscreenCanvas(300, 150));
+}

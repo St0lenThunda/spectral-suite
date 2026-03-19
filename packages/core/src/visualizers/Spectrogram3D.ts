@@ -10,8 +10,7 @@
  * and narrowed (X-axis scale) to simulate depth (Z-axis).
  */
 export class Spectrogram3D {
-  private canvas: HTMLCanvasElement;
-  private analyser: AnalyserNode;
+  private canvas: HTMLCanvasElement | OffscreenCanvas;
 
   // History of frequency snapshots
   private history: Uint8Array[] = [];
@@ -20,9 +19,8 @@ export class Spectrogram3D {
   private maxHistory: number = 60;     // How many "moments" of history to show
   private depthStep: number = 4;       // Vertical distance between slices
 
-  constructor( canvas: HTMLCanvasElement, analyser: AnalyserNode ) {
+  constructor( canvas: HTMLCanvasElement | OffscreenCanvas ) {
     this.canvas = canvas;
-    this.analyser = analyser;
   }
 
   /**
@@ -34,21 +32,23 @@ export class Spectrogram3D {
    * @param hueShift - Base hue for the heatmap (not used in rainbow mode, but kept for API)
    */
   draw (
+    dataArray: Uint8Array,
+    nyquist: number,
     isFrozen: boolean = false,
     verticalScale: number = 1.5,
     perspective: number = 0.8,
     hueShift: number = 200
   ) {
-    const ctx = this.canvas.getContext( '2d' );
+    const ctx = this.canvas.getContext( '2d' ) as unknown as CanvasRenderingContext2D;
     if ( !ctx ) return;
 
     // 1. Update History
     if ( !isFrozen ) {
-      const data = new Uint8Array( this.analyser.frequencyBinCount );
-      this.analyser.getByteFrequencyData( data );
+      // Create a fresh clone so we don't hold references to a mutable buffer
+      const dataCopy = new Uint8Array( dataArray );
 
       // We unshift to put newest at index 0 (Front)
-      this.history.unshift( data );
+      this.history.unshift( dataCopy );
       if ( this.history.length > this.maxHistory ) {
         this.history.pop();
       }
@@ -62,7 +62,7 @@ export class Spectrogram3D {
     for ( let i = this.history.length - 1; i >= 0; i-- ) {
       const slice = this.history[i];
       if ( slice ) {
-        this.drawSlice( ctx, slice, i, verticalScale, perspective, hueShift );
+        this.drawSlice( ctx, slice, nyquist, i, verticalScale, perspective, hueShift );
       }
     }
   }
@@ -80,6 +80,7 @@ export class Spectrogram3D {
   private drawSlice (
     ctx: CanvasRenderingContext2D,
     data: Uint8Array,
+    nyquist: number,
     index: number,
     vScale: number,
     pScale: number,
@@ -107,7 +108,6 @@ export class Spectrogram3D {
     const samplePoints: number[] = [];
     const minFreq = 20;
     const maxFreq = 10000;
-    const nyquist = this.analyser.context.sampleRate / 2;
 
     for ( let j = 0; j < samples; j++ ) {
       const percent = j / ( samples - 1 );

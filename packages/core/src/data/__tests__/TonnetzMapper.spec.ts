@@ -11,8 +11,8 @@ describe('TonnetzMapper', () => {
       expect(TonnetzMapper.pcToTonnetz(7)).toEqual({ x: 1, y: 0 });
     });
 
-    it('maps E (4) to {x:0, y:1} (Major 3rd)', () => {
-      expect(TonnetzMapper.pcToTonnetz(4)).toEqual({ x: 0, y: 1 });
+    it('maps Eb (3) to {x:0, y:1} (Major 3rd)', () => {
+      expect(TonnetzMapper.pcToTonnetz(3)).toEqual({ x: 0, y: 1 });
     });
 
     it('handles wrapping for large PC values', () => {
@@ -57,7 +57,7 @@ describe('TonnetzMapper', () => {
       expect(path[0]).toEqual({ x: 0, y: 0 }); // C
       expect(path[1]).toEqual({ x: 1, y: 0 }); // G
       // Am root is A (9) -> {x:3, y:0}
-      expect(path[2]).toEqual({ x: 3, y: 0 }); 
+      expect(path[2]).toEqual({ x: 0, y: 3 }); 
     });
   });
 

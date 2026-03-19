@@ -78,10 +78,17 @@ const toggleFreeze = () => {
 const render = () => {
   if ( osc ) osc.draw();
   if ( spec ) spec.draw();
-  if ( mag ) mag.draw( frozenData.value, scaleMode.value, peakHoldData.value, showInstrumentLabels.value, INSTRUMENT_RANGES, showHarmonics.value, dominantFreq.value );
+  
+  const analyser = getAnalyser();
+  if ( analyser ) {
+    const data = new Uint8Array( analyser.frequencyBinCount );
+    analyser.getByteFrequencyData( data );
+    const nyquist = analyser.context.sampleRate / 2;
+    if ( mag ) mag.draw( data, nyquist, frozenData.value, scaleMode.value, peakHoldData.value, showInstrumentLabels.value, INSTRUMENT_RANGES, showHarmonics.value, dominantFreq.value );
+  }
+  
 
   // Detect dominant frequency
-  const analyser = getAnalyser();
   if ( analyser ) {
     const data = new Uint8Array( analyser.frequencyBinCount );
     analyser.getByteFrequencyData( data );

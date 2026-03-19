@@ -3,7 +3,7 @@ import { setActivePinia, createPinia } from 'pinia';
 import { useRhythmStore } from '../rhythm';
 import { ref, nextTick } from 'vue';
 
-import { isInitialized as mockIsEngineInitialized } from '../../audio/useAudioEngine';
+const mockIsEngineInitialized = ref( false );
 
 const mockContext = {
   currentTime: 0,
@@ -16,7 +16,7 @@ vi.mock( '../../audio/useAudioEngine', async ( importOriginal ) => {
   return {
     ...actual,
     useAudioEngine: vi.fn( () => ( {
-      isInitialized: actual.isInitialized,
+      isInitialized: mockIsEngineInitialized,
       getContext: vi.fn( () => ( {
         currentTime: 0,
         state: 'running',

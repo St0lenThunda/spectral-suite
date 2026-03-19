@@ -1,13 +1,13 @@
 export class MagnitudeSpectrum {
-  canvas: HTMLCanvasElement;
-  analyser: AnalyserNode;
+  canvas: HTMLCanvasElement | OffscreenCanvas;
 
-  constructor( canvas: HTMLCanvasElement, analyser: AnalyserNode ) {
+  constructor( canvas: HTMLCanvasElement | OffscreenCanvas ) {
     this.canvas = canvas;
-    this.analyser = analyser;
   }
 
   draw (
+    dataArray: Uint8Array,
+    nyquist: number,
     frozenData: Uint8Array | null,
     scaleMode: 'linear' | 'log',
     peakHoldData: Uint8Array | null = null,
@@ -16,15 +16,10 @@ export class MagnitudeSpectrum {
     showHarmonics: boolean = false,
     fundamentalFreq: number = 0
   ) {
-    const ctx = this.canvas.getContext( '2d' );
+    const ctx = this.canvas.getContext( '2d' ) as unknown as CanvasRenderingContext2D;
     if ( !ctx ) return;
     // Ensure subsequent getContext calls return the same mock (helps unit tests)
     ( this.canvas as any ).getContext = () => ctx;
-
-    const bufferLength = this.analyser.frequencyBinCount;
-    const dataArray = new Uint8Array( bufferLength );
-    this.analyser.getByteFrequencyData( dataArray );
-    const nyquist = this.analyser.context.sampleRate / 2;
 
     ctx.clearRect( 0, 0, this.canvas.width, this.canvas.height );
 

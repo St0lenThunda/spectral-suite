@@ -21,15 +21,20 @@ class PitchProcessor extends AudioWorkletProcessor {
   private _useLowPass: boolean = false;
   private _downsample: number = 1;
   private _lpfState: number = 0;
+  private _sharedBuffer: Float32Array | null = null;
 
   static get parameterDescriptors() {
     return [];
   }
 
-  constructor() {
+  constructor(options?: any) {
     super();
     this._buffer = new Float32Array(this._bufferSize);
     this._sampleRate = typeof sampleRate !== 'undefined' ? sampleRate : 44100;
+
+    if (options && options.processorOptions && options.processorOptions.sharedBuffer) {
+      this._sharedBuffer = new Float32Array(options.processorOptions.sharedBuffer);
+    }
 
     this.port.onmessage = ( e ) => {
       if ( e.data && e.data.type === 'config' ) {
@@ -147,11 +152,20 @@ class PitchProcessor extends AudioWorkletProcessor {
     }
     const volume = Math.sqrt(sumSquares / this._bufferSize);
 
-    this.port.postMessage({
-        pitch,
-        clarity,
-        volume
-    });
+    if (this._sharedBuffer) {
+      // ZERO-COPY DATA TRANSFER 
+      // Emitting data directly into shared memory without IPC cloning
+      this._sharedBuffer[0] = pitch === null ? -1.0 : pitch;
+      this._sharedBuffer[1] = clarity;
+      this._sharedBuffer[2] = volume;
+    } else {
+      // Fallback for standard array buffers
+      this.port.postMessage({
+          pitch,
+          clarity,
+          volume
+      });
+    }
   }
 
   // --- McLeod Pitch Method Implementation ---

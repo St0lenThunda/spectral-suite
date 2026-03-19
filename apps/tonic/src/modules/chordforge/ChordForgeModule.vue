@@ -8,7 +8,7 @@
  * @module modules/chordforge/ChordForgeModule.vue
  */
 
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
+import { ref, computed, onActivated, onDeactivated, watch } from 'vue';
 import { Chord } from 'tonal';
 import {
   SynthEngine,
@@ -42,8 +42,8 @@ const drawerCategories = computed( () => [
   }
 ] );
 
-onMounted( () => activate() );
-onUnmounted( () => deactivate() );
+onActivated( () => activate() );
+onDeactivated( () => deactivate() );
 
 // ============================================================================
 // INSTRUMENT & TUNING CONFIGURATIONS (mirror of Fretboard.vue)

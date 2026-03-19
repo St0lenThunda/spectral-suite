@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onActivated, onDeactivated, watch } from 'vue'
 import { useChordCapture, useAudioEngine, ChordEngine, SynthEngine, type ChordMatch, useGlobalEngine, Fretboard } from '@spectralsuite/core'
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import ContextDrawer from '../../components/ui/ContextDrawer.vue';
@@ -49,11 +49,11 @@ const {
 } = useChordCapture()
 const { init, isInitialized, error, activate, deactivate } = useAudioEngine()
 
-onMounted( () => {
+onActivated( () => {
  activate();
 });
 
-onUnmounted( () => {
+onDeactivated( () => {
  deactivate();
 });
 

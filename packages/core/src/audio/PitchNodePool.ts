@@ -28,12 +28,19 @@ export const poolPitch = ref<number | null>(null);
 export const poolClarity = ref<number | null>(null);
 export const poolVolume = ref<number>(0);
 
+export const sharedAudioData = new Float32Array(
+  typeof SharedArrayBuffer !== 'undefined' 
+    ? new SharedArrayBuffer(3 * Float32Array.BYTES_PER_ELEMENT)
+    : new ArrayBuffer(3 * Float32Array.BYTES_PER_ELEMENT)
+);
+
 class PitchNodePoolClass {
   private node: AudioWorkletNode | null = null;
   private refCount: number = 0;
   private cleanupTimer: any = null;
   private isModuleLoaded: boolean = false;
   private analyserConnection: AnalyserNode | null = null;
+  private tickId: number | null = null;
 
   /**
    * Pre-registers the worklet module without creating a node.
@@ -78,16 +85,40 @@ class PitchNodePoolClass {
       return;
     }
 
-    // Create new node
+    // Create new node with Shared Memory Access
     await this.warmUp(context);
     
-    this.node = new AudioWorkletNode(context, 'pitch-processor');
+    this.node = new AudioWorkletNode(context, 'pitch-processor', {
+      processorOptions: {
+        sharedBuffer: sharedAudioData.buffer
+      }
+    });
+
+    // Sub-optimal Fallback for environments lacking Cross-Origin headers
     this.node.port.onmessage = (event) => {
-      const { pitch, clarity, volume } = event.data;
-      poolPitch.value = pitch;
-      poolClarity.value = clarity;
-      poolVolume.value = volume;
+      if (event.data && event.data.pitch !== undefined) {
+        const { pitch, clarity, volume } = event.data;
+        poolPitch.value = pitch;
+        poolClarity.value = clarity;
+        poolVolume.value = volume;
+      }
     };
+
+    // Zero-Copy Fast Lane: Reads memory securely synchronized via Animation frames
+    if (typeof SharedArrayBuffer !== 'undefined') {
+        const loop = () => {
+          if (!this.node) return;
+          const p = sharedAudioData[0]!;
+          // We encoded `null` as -1.0 in the worklet
+          poolPitch.value = p === -1.0 ? null : p;
+          poolClarity.value = sharedAudioData[1]!;
+          poolVolume.value = sharedAudioData[2]!;
+          
+          this.tickId = requestAnimationFrame(loop);
+        };
+        // Boot the main thread data pipeline
+        if (!this.tickId) loop();
+    }
 
     // Connect to audio graph
     this.reconnect(context, analyser);
@@ -107,6 +138,12 @@ class PitchNodePoolClass {
       this.cleanupTimer = setTimeout(() => {
         if (this.refCount === 0 && this.node) {
           console.log('[PitchNodePool] Cleaning up idle node');
+          
+          if (this.tickId) {
+            cancelAnimationFrame(this.tickId);
+            this.tickId = null;
+          }
+
           this.node.disconnect();
           this.node = null;
           this.analyserConnection = null;

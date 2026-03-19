@@ -8,7 +8,7 @@
  * @module modules/harmonicorbit/HarmonicOrbitModule.vue
  */
 
-import { ref, computed, onMounted, onUnmounted, provide } from 'vue';
+import { ref, computed, onActivated, onDeactivated, provide } from 'vue';
 import {
   SynthEngine,
   Note,
@@ -284,8 +284,8 @@ provide( HARMONIC_NAVIGATE_KEY, {
   navigateToTonnetz: () => emit( 'navigate-tonnetz' )
 } );
 
-onMounted( () => activate() );
-onUnmounted( () => deactivate() );
+onActivated( () => activate() );
+onDeactivated( () => deactivate() );
 
 </script>
 

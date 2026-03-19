@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePitch, useAudioEngine, Note, useGlobalEngine } from '@spectralsuite/core'
-import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
+import { onActivated, onDeactivated, ref, computed, watch } from 'vue'
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
@@ -19,11 +19,11 @@ const {
 const { init, isInitialized, error: engineError, activate, deactivate } = useAudioEngine()
 
 // Ensure engine is active when we mount this tool
-onMounted( () => {
+onActivated( () => {
  activate();
 });
 
-onUnmounted( () => {
+onDeactivated( () => {
  deactivate();
 });
 
@@ -83,7 +83,7 @@ const SPRING_TENSION = 0.08;
 // Friction: Resistance to movement (Higher = Less overshoot/More heavy feel)
 const SPRING_FRICTION = 0.82; 
 
-onMounted( () => {
+onActivated( () => {
   const animate = () => {
       // 1. Strobe Logic (Keep existing)
     if ( strobeCanvas.value && cents.value !== null && ( clarity.value ?? 0 ) > 0.8 ) {

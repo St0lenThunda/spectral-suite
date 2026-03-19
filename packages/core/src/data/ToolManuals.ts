@@ -263,13 +263,13 @@ export const TOOL_MANUALS: Record<string, ToolManual> = {
   },
   bendtrainer: {
     id: "bendtrainer",
-    title: "Bend",
-    subtitle: "Trainer",
+    title: "Pitch",
+    subtitle: "Stairway",
     accentColor: "amber-400",
     steps: [
       {
         step: 1,
-        title: "Set Your Starting Note",
+        title: "Set Your Anchor",
         task: "Tap a fret on the fretboard to pick the note you'll bend from.",
         physics: "We lock onto the exact frequency of the selected fret. This becomes the 'anchor' — all bend distances are measured relative to this fixed reference pitch."
       },
@@ -277,13 +277,19 @@ export const TOOL_MANUALS: Record<string, ToolManual> = {
         step: 2,
         title: "Choose Your Target",
         task: "Select ½, Full, 1½, or 2 step bend targets from the sidebar.",
-        physics: "A 'Full' bend = 100 cents = 1 semitone. Each semitone doubles the frequency ratio by 2^(1/12). The staircase shows these intervals as labeled steps."
+        physics: "A 'Full' step bend = 200 cents = 2 semitones. Each semitone represents the frequency distance of one physical guitar fret."
       },
       {
         step: 3,
         title: "Climb the Staircase",
-        task: "Bend your string and watch the cursor climb. Green = on target. Hold it steady!",
-        physics: "We calculate 1200 × log₂(current_pitch / start_pitch) to get the bend distance in cents. The cursor moves continuously — it doesn't snap to steps — revealing your micro-pitch accuracy."
+        task: "Bend your string and watch the cursor climb. Amber = on target. Hold it steady!",
+        physics: "We calculate 1200 × log₂(current_pitch / start_pitch) to get the bend distance in cents. The cursor moves continuously without snapping, revealing your raw micro-pitch accuracy."
+      },
+      {
+        step: 4,
+        title: "The Blues Zone",
+        task: "Try bending slightly flat to hit the cyan ¼-bend markers.",
+        physics: "Blues bends (microtones) land exactly halfway between standard semitones (e.g. 50, 150 cents). This adds immense vocal-like expression that traditional piano keys physically cannot recreate."
       }
     ]
   }

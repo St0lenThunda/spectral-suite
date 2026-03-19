@@ -95,7 +95,9 @@ describe( 'useMelodyMirror', () => {
     // But playNote is buried in playMelody. 
     // Let's trust the logic if the function runs without error for now as we mocked SynthEngine globally
 
-    await store.replayTargetMelody();
+    const replay = store.replayTargetMelody();
+    await vi.runAllTimersAsync();
+    await replay;
     // In a real test we'd check the mock call count of the injected engine.
     // Since we mocked it as { playNote: vi.fn() } in the `beforeEach`, let's verify that.
 

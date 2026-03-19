@@ -1,5 +1,6 @@
 import { defineConfig } from 'vitest/config';
 import vue from '@vitejs/plugin-vue';
+import path from 'path';
 
 export default defineConfig( {
   plugins: [vue()],
@@ -13,8 +14,8 @@ export default defineConfig( {
     exclude: ['**/node_modules/**', '**/dist/**'],
     globals: true,
     alias: {
-      '@spectralsuite/core': '/home/thunda/Dev/543_Tools/spectral-suite/packages/core/src/index.ts',
-      '/favicon.webp': '/home/thunda/Dev/543_Tools/spectral-suite/apps/tonic/public/favicon.webp'
+      '@spectralsuite/core': path.resolve(__dirname, './packages/core/src/index.ts'),
+      '/favicon.webp': path.resolve(__dirname, './apps/tonic/public/favicon.webp')
     },
     setupFiles: ['./tests/setup.ts']
   }

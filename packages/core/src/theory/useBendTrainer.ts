@@ -1,4 +1,4 @@
-import { ref, computed, watch, onUnmounted } from 'vue';
+import { ref, shallowRef, computed, watch, onUnmounted } from 'vue';
 import { Note, Interval } from 'tonal';
 import { usePitch } from '../audio/usePitch';
 
@@ -107,7 +107,7 @@ export function useBendTrainer () {
 
   // ── User State ──────────────────────────────────────────────────────
   const startingNote = ref<string | null>( null );
-  const targetSemitones = ref( 1 );   // Default: full bend (1 semitone = 100 cents)
+  const targetSemitones = ref( 2 );   // Default: Full Step bend (2 semitones = 200 cents)
   const tolerance = ref( DEFAULT_TOLERANCE );
 
   // ── Derived: Starting Frequency ─────────────────────────────────────
@@ -141,8 +141,11 @@ export function useBendTrainer () {
    */
   const bendCents = computed( () => {
     if ( !pitch.value || !startingFreq.value ) return 0;
-    // Only track if the signal has enough clarity to be meaningful
-    if ( ( clarity.value ?? 0 ) < 0.5 ) return 0;
+    
+    // Only track if the signal has enough clarity to be meaningful.
+    // Lowered from 0.5 down to 0.15 to support rapid decay profiles 
+    // (especially acoustic guitars recorded through laptop mics).
+    if ( ( clarity.value ?? 0 ) < 0.15 ) return 0;
 
     const cents = 1200 * Math.log2( pitch.value / startingFreq.value );
     // Round to 1 decimal for display stability
@@ -260,7 +263,7 @@ export function useBendTrainer () {
   let holdInterval: ReturnType<typeof setInterval> | null = null;
   let holdStartTime: number | null = null;
 
-  // Watch isOnTarget to start/stop the hold timer
+  // Watch isOnTarget strictly to start/stop the visible UI hold timer
   watch( isOnTarget, ( onTarget ) => {
     if ( onTarget ) {
       // Start counting
@@ -270,14 +273,14 @@ export function useBendTrainer () {
           holdSeconds.value = Math.round(
             ( performance.now() - holdStartTime ) / 100
           ) / 10; // Update every 100ms, display to 1 decimal
+          
+          if ( holdSeconds.value > maxHoldForGesture ) {
+            maxHoldForGesture = holdSeconds.value;
+          }
         }
       }, 100 ); // Tick every 100ms for smooth display
     } else {
-      // Stopped being on target — record attempt if we were tracking
-      if ( holdStartTime !== null ) {
-        recordAttempt( holdSeconds.value >= 1.0 );
-      }
-      // Reset
+      // Reset timer UI when falling out of the target zone
       holdStartTime = null;
       if ( holdInterval ) clearInterval( holdInterval );
       holdInterval = null;
@@ -285,26 +288,66 @@ export function useBendTrainer () {
     }
   } );
 
-  // ── Attempt History ─────────────────────────────────────────────────
+  // ── Attempt History & Gesture Tracking ──────────────────────────────
   /**
    * Stores the last MAX_HISTORY bend results.
    * Each entry records: what the target was, what the user actually hit,
    * and whether they held it for >1 second.
    */
-  const attemptHistory = ref<BendAttempt[]>( [] );
+  const attemptHistory = shallowRef<BendAttempt[]>( [] );
 
-  const recordAttempt = ( held: boolean ) => {
-    attemptHistory.value.push( {
+  const recordAttempt = ( actualPeakCents: number, held: boolean ) => {
+    const newHistory = [ ...attemptHistory.value, {
       targetCents: targetCents.value,
-      actualCents: bendCents.value,
+      actualCents: actualPeakCents,
       held
-    } );
+    } ];
 
     // Keep only the most recent attempts
-    if ( attemptHistory.value.length > MAX_HISTORY ) {
-      attemptHistory.value.shift();
+    if ( newHistory.length > MAX_HISTORY ) {
+      newHistory.shift();
     }
+    attemptHistory.value = newHistory;
   };
+
+  // State for tracking a continuous physical bend motion
+  let isBending = false;
+  let maxCentsForGesture = 0;
+  let maxHoldForGesture = 0;
+
+  // Watch bendCents to accurately detect the start and end of a physical bend motion.
+  // This solves the issue where missed target zones never generated a history record!
+  watch( bendCents, ( cents ) => {
+    // A bend motion starts when the pitch crosses 30 cents (a deliberate pull)
+    if ( cents > 30 && !isBending ) {
+      isBending = true;
+      maxCentsForGesture = cents;
+      maxHoldForGesture = holdSeconds.value;
+    }
+    
+    if ( isBending ) {
+      // Track the absolute highest pitch reached during this single bend motion
+      if ( cents > maxCentsForGesture ) {
+        maxCentsForGesture = cents;
+      }
+      
+      // When the pitch drops below 20 cents, or signal is completely lost (0 cents),
+      // the string has been released or muted. The bend physical gesture is fully over.
+      if ( cents < 20 ) {
+        // Only record an attempt if they made a meaningful push (say, over 40 cents)
+        if ( maxCentsForGesture > 40 ) {
+          // Acoustic guitars decay fast, so 0.5s is a much more realistic 
+          // required hold time compared to electric guitars with sustain.
+          recordAttempt( maxCentsForGesture, maxHoldForGesture >= 0.5 );
+        }
+        
+        // Reset gesture trackers
+        isBending = false;
+        maxCentsForGesture = 0;
+        maxHoldForGesture = 0;
+      }
+    }
+  } );
 
   // ── Starting Note Setter ────────────────────────────────────────────
   /**

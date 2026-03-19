@@ -17,7 +17,7 @@
  * @module modules/tonnetz/TonnetzModule
  */
 
-import { ref, computed, provide, onMounted, onUnmounted } from 'vue';
+import { ref, computed, provide, onActivated, onDeactivated } from 'vue';
 import {
   useAudioEngine,
   useGlobalEngine
@@ -67,12 +67,12 @@ const activeComparisonPath = ref<any[]>( [] );
 
 // ─── AUDIO ENGINE LIFECYCLE ─────────────────────────────────────────
 // Register when mounted, unregister when unmounted
-onMounted( () => {
+onActivated( () => {
   activate();
   initDatabase();
   console.log( 'TonnetzModule: Database status:', { isDatabaseReady: isDatabaseReady.value, isImporting: isImporting.value } );
 } );
-onUnmounted( () => deactivate() );
+onDeactivated( () => deactivate() );
 
 // ─── EMITS ──────────────────────────────────────────────────────────
 

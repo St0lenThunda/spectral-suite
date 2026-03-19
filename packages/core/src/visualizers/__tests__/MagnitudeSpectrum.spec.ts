@@ -42,10 +42,12 @@ describe( 'MagnitudeSpectrum', () => {
     const mockCtx = createMockCtx();
     const mockCanvas = { width: 200, height: 100, getContext: () => mockCtx } as any;
     const mockAnalyser = createMockAnalyser();
-    const visualizer = new MagnitudeSpectrum( mockCanvas, mockAnalyser );
+    const visualizer = new MagnitudeSpectrum(mockCanvas);
 
     const instrumentRanges = [{ name: 'Bass', start: 20, end: 200, color: 'rgba(255,0,0,0.2)' }];
     visualizer.draw(
+      new Uint8Array(1024),
+      22050,
       null,
       'linear',
       null,
@@ -64,9 +66,11 @@ describe( 'MagnitudeSpectrum', () => {
   it( 'draws harmonic markers when showHarmonics is true and fundamentalFreq is set', () => {
     const mockCanvas = { width: 200, height: 100, getContext: () => createMockCtx() } as any;
     const mockAnalyser = createMockAnalyser();
-    const visualizer = new MagnitudeSpectrum( mockCanvas, mockAnalyser );
+    const visualizer = new MagnitudeSpectrum(mockCanvas);
 
     visualizer.draw(
+      new Uint8Array(1024),
+      22050,
       null,
       'linear',
       null,
@@ -84,7 +88,7 @@ describe( 'MagnitudeSpectrum', () => {
   it( 'returns 0 for frequency below or at minimum in log mode', () => {
     const mockCanvas = { width: 200, height: 100, getContext: () => createMockCtx() } as any;
     const mockAnalyser = createMockAnalyser();
-    const visualizer = new MagnitudeSpectrum( mockCanvas, mockAnalyser );
+    const visualizer = new MagnitudeSpectrum(mockCanvas);
 
     // Test below min
     expect( visualizer.freqToX( 5, 'log', 22050 ) ).toBe( 0 );
@@ -96,9 +100,11 @@ describe( 'MagnitudeSpectrum', () => {
     const mockCtx = createMockCtx();
     const mockCanvas = { width: 200, height: 100, getContext: () => mockCtx } as any;
     const mockAnalyser = createMockAnalyser();
-    const visualizer = new MagnitudeSpectrum( mockCanvas, mockAnalyser );
+    const visualizer = new MagnitudeSpectrum(mockCanvas);
 
     visualizer.draw(
+      new Uint8Array(1024),
+      22050,
       null,
       'log',
       null,
@@ -115,10 +121,12 @@ describe( 'MagnitudeSpectrum', () => {
     const mockCtx = createMockCtx();
     const mockCanvas = { width: 200, height: 100, getContext: () => mockCtx } as any;
     const mockAnalyser = createMockAnalyser();
-    const visualizer = new MagnitudeSpectrum( mockCanvas, mockAnalyser );
+    const visualizer = new MagnitudeSpectrum(mockCanvas);
     const frozenData = new Uint8Array( 1024 ).fill( 128 );
 
     visualizer.draw(
+      new Uint8Array(1024),
+      22050,
       frozenData,
       'linear',
       null,
@@ -136,10 +144,12 @@ describe( 'MagnitudeSpectrum', () => {
     const mockCtx = createMockCtx();
     const mockCanvas = { width: 200, height: 100, getContext: () => mockCtx } as any;
     const mockAnalyser = createMockAnalyser();
-    const visualizer = new MagnitudeSpectrum( mockCanvas, mockAnalyser );
+    const visualizer = new MagnitudeSpectrum(mockCanvas);
     const peakData = new Uint8Array( 1024 ).fill( 200 );
 
     visualizer.draw(
+      new Uint8Array(1024),
+      22050,
       null,
       'linear',
       peakData,
@@ -163,9 +173,12 @@ describe( 'MagnitudeSpectrum', () => {
     mockAnalyser.getByteFrequencyData.mockImplementation( ( arr: Uint8Array ) => {
       arr.fill( 100 );
     } );
-    const visualizer = new MagnitudeSpectrum( mockCanvas, mockAnalyser );
+    const visualizer = new MagnitudeSpectrum(mockCanvas);
 
-    visualizer.draw( null, 'log' );
+    visualizer.draw(
+      new Uint8Array(1024),
+      22050,
+      null, 'log' );
     expect( mockCtx.lineTo ).toHaveBeenCalled();
   } );
 
@@ -173,9 +186,12 @@ describe( 'MagnitudeSpectrum', () => {
     const mockCtx = createMockCtx();
     const mockCanvas = { width: 200, height: 100, getContext: () => mockCtx } as any;
     const mockAnalyser = createMockAnalyser();
-    const visualizer = new MagnitudeSpectrum( mockCanvas, mockAnalyser );
+    const visualizer = new MagnitudeSpectrum(mockCanvas);
 
-    visualizer.draw( null, 'linear' );
+    visualizer.draw(
+      new Uint8Array(1024),
+      22050,
+      null, 'linear' );
     expect( mockCtx.fillText ).toHaveBeenCalledWith( '0dB', 4, expect.any( Number ) );
     expect( mockCtx.fillText ).toHaveBeenCalledWith( '-60dB', 4, expect.any( Number ) );
   } );
@@ -183,7 +199,7 @@ describe( 'MagnitudeSpectrum', () => {
   it( 'returns 0 for frequency below minimum in log mode', () => {
     const mockCanvas = { width: 200, height: 100, getContext: () => createMockCtx() } as any;
     const mockAnalyser = createMockAnalyser();
-    const visualizer = new MagnitudeSpectrum( mockCanvas, mockAnalyser );
+    const visualizer = new MagnitudeSpectrum(mockCanvas);
 
     // freqToX is public for testing or we can trigger it via drawPath
     const x = visualizer.freqToX( 5, 'log', 22050 );
@@ -193,9 +209,12 @@ describe( 'MagnitudeSpectrum', () => {
   it( 'bails if context is not available', () => {
     const mockCanvas = { width: 200, height: 100, getContext: () => null } as any;
     const mockAnalyser = createMockAnalyser();
-    const visualizer = new MagnitudeSpectrum( mockCanvas, mockAnalyser );
+    const visualizer = new MagnitudeSpectrum(mockCanvas);
 
     // Should not throw
-    visualizer.draw( null, 'linear' );
+    visualizer.draw(
+      new Uint8Array(1024),
+      22050,
+      null, 'linear' );
   } );
 } );

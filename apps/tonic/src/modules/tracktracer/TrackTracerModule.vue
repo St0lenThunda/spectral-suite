@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onUnmounted } from 'vue';
+import { ref, onDeactivated } from 'vue';
 import { TrackAnalyzer, type AnalysisResult, useAudioRecorder, useAudioEngine } from '@spectralsuite/core';
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
@@ -113,7 +113,7 @@ const startListening = async () => {
   }
 }
 
-onUnmounted( () => {
+onDeactivated( () => {
   deactivate();
   stopPlayback( true );
   stopWaveform();

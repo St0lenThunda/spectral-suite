@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onUnmounted, watch } from 'vue'
+import { ref, computed, onDeactivated, watch } from 'vue'
 import { useRhythmStore, PlayButton } from '@spectralsuite/core'
 import { storeToRefs } from 'pinia';
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
@@ -239,7 +239,7 @@ const { activate, deactivate } = useAudioEngine();
 // Register as an active audio consumer
 activate();
 
-onUnmounted( () => {
+onDeactivated( () => {
   deactivate();
   stop() // Stop the loop
 } )

@@ -10,10 +10,12 @@ import HarmonicOrbitModule from './modules/harmonicorbit/HarmonicOrbitModule.vue
 import TonnetzModule from './modules/tonnetz/TonnetzModule.vue';
 import ChordForgeModule from './modules/chordforge/ChordForgeModule.vue';
 import MelodyMirrorModule from './modules/melodymirror/MelodyMirrorModule.vue';
+import ResonanceLabModule from './modules/resonancelab/ResonanceLabModule.vue';
 import AcademyModule from './modules/academy/AcademyModule.vue';
 import LessonRunner from './modules/academy/LessonRunner.vue';
 import { type Lesson } from './modules/academy/lessons';
-import ToolInfoModal from './components/ToolInfoModal.vue';
+import ToolManualOverlay from './components/ToolManualOverlay.vue';
+import IntelligenceButton from './components/IntelligenceButton.vue';
 import SettingsModal from './components/settings/SettingsModal.vue';
 import ToastContainer from './components/ToastContainer.vue';
 import { useAudioEngine, StorageService } from '@spectralsuite/core'
@@ -97,6 +99,13 @@ const ALL_TOOLS = [
     color: 'from-emerald-500 to-teal-600'
   },
   {
+    id: 'resonancelab',
+    name: 'Resonance Lab',
+    description: 'Forensic frequency analysis. Discover and mirror the physical resonance of objects.',
+    icon: '💎',
+    color: 'from-emerald-400 to-cyan-500'
+  },
+  {
     id: 'academy',
     name: 'Spectral Academy',
     description: 'Interactive music theory lessons. Learn via active performance.',
@@ -116,6 +125,7 @@ const enabledTools = ref<Record<string, boolean>>( {
   tonnetz: true,
   chordforge: true,
   melodymirror: true,
+  resonancelab: true,
   academy: false
 } )
 
@@ -225,7 +235,7 @@ const handleGainChange = ( event: Event ) => {
         <header class="mb-12">
           <div class="flex items-baseline gap-4 mb-3">
             <h2 class="text-4xl font-black tracking-tighter text-white uppercase italic">Tonic</h2>
-            <div class="h-px flex-1 bg-gradient-to-r from-indigo-500/50 to-transparent"></div>
+            <div class="h-px flex-1 bg-linear-to-r from-indigo-500/50 to-transparent"></div>
           </div>
           <div class="flex flex-col md:flex-row md:items-end justify-between gap-6">
             <p class="text-slate-400 text-sm max-w-xl leading-relaxed italic">
@@ -244,14 +254,25 @@ const handleGainChange = ( event: Event ) => {
           <div
             v-for=" tool in activeTools "
             :key="tool.id"
-            class="group relative p-8 rounded-[2.5rem] bg-white/5 border border-white/5 backdrop-blur-xl transition-all duration-500 hover:bg-white/[0.08] hover:border-white/10 hover:-translate-y-2 cursor-pointer overflow-hidden"
+            class="group relative p-8 rounded-[2.5rem] bg-white/5 border border-white/5 backdrop-blur-xl transition-all duration-500 hover:bg-white/8 hover:border-white/10 hover:-translate-y-2 cursor-pointer overflow-hidden"
             @click="currentModule = tool.id"
           >
             <!-- Decorative Glow -->
             <div
-              class="absolute -top-24 -right-24 w-48 h-48 bg-gradient-to-br opacity-10 blur-3xl group-hover:opacity-30 transition-opacity"
+              class="absolute -top-24 -right-24 w-48 h-48 bg-linear-to-br opacity-10 blur-3xl group-hover:opacity-30 transition-opacity"
               :class="tool.color"
             ></div>
+
+            <!-- Dashboard Intelligence Link -->
+            <div class="absolute top-6 right-6 z-20">
+              <IntelligenceButton
+                :toolId="tool.id"
+                colorClass="text-white/40 group-hover:text-white/90"
+                bgClass="bg-white/5 group-hover:bg-white/10"
+                borderClass="border-white/5 group-hover:border-white/20"
+                @click.stop
+              />
+            </div>
 
             <div class="relative z-10">
               <div class="text-4xl mb-6 transform group-hover:scale-110 transition-transform duration-500">
@@ -328,6 +349,10 @@ const handleGainChange = ( event: Event ) => {
         v-else-if=" currentModule === 'melodymirror' && enabledTools.melodymirror "
         @back="currentModule = 'dashboard'"
       />
+      <ResonanceLabModule
+        v-else-if=" currentModule === 'resonancelab' && enabledTools.resonancelab "
+        @back="currentModule = 'dashboard'"
+      />
       <AcademyModule
         v-else-if=" currentModule === 'academy' "
         @start-lesson="( l ) => activeLesson = l"
@@ -346,7 +371,7 @@ const handleGainChange = ( event: Event ) => {
         >Return to Base</button>
       </div>
 
-      <ToolInfoModal />
+      <ToolManualOverlay />
 
       <!-- Global Settings Modal -->
       <SettingsModal
@@ -376,7 +401,7 @@ const handleGainChange = ( event: Event ) => {
     >
       <div
         v-if=" activeLesson "
-        class="fixed inset-0 pointer-events-none z-[60]"
+        class="fixed inset-0 pointer-events-none z-60"
       >
         <LessonRunner
           class="pointer-events-auto"
@@ -394,7 +419,7 @@ const handleGainChange = ( event: Event ) => {
       class="fixed bottom-0 left-0 right-0 h-16 bg-spectral-950 border-t border-white/5 backdrop-blur-xl flex items-center px-8 z-50"
     >
       <div class="flex items-center gap-8 overflow-x-auto no-scrollbar scroll-smooth w-full md:w-auto">
-        <div class="flex flex-col flex-shrink-0 group relative">
+        <div class="flex flex-col shrink-0 group relative">
           <div class="flex items-center justify-between mb-1.5">
             <span class="text-[8px] uppercase tracking-[0.3em] text-slate-400 font-black">Input Gain</span>
             <span
@@ -404,7 +429,7 @@ const handleGainChange = ( event: Event ) => {
           <div class="relative w-32 h-1.5 bg-slate-900 rounded-full overflow-hidden border border-white/5">
             <!-- Background Meter (Volume) -->
             <div
-              class="absolute inset-y-0 left-0 bg-gradient-to-r from-emerald-500/40 to-cyan-500/40 transition-all duration-75"
+              class="absolute inset-y-0 left-0 bg-linear-to-r from-emerald-500/40 to-cyan-500/40 transition-all duration-75"
               :style="{ width: volumeLevel + '%' }"
             ></div>
 
@@ -430,7 +455,7 @@ const handleGainChange = ( event: Event ) => {
 
         <div class="h-6 w-px bg-white/5 hidden md:block"></div>
 
-        <div class="flex flex-col flex-shrink-0 hidden sm:flex">
+        <div class="flex-col shrink-0 hidden sm:flex">
           <span class="text-[8px] uppercase tracking-[0.3em] text-slate-400 font-black">Global Engine</span>
           <span
             class="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">{{ isInitialized ? 'Synced' : 'Standby' }}</span>

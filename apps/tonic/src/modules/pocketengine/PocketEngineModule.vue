@@ -2,11 +2,9 @@
 import { ref, computed, onUnmounted, watch } from 'vue'
 import { useRhythmStore, PlayButton } from '@spectralsuite/core'
 import { storeToRefs } from 'pinia';
-import { useToolInfo } from '../../composables/useToolInfo';
+import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
-
-const { openInfo } = useToolInfo();
 
 const store = useRhythmStore();
 const {
@@ -255,13 +253,13 @@ onUnmounted( () => {
       class="flex flex-col items-center justify-center py-20"
     >
       <div class="glass-container p-12 text-center rounded-[3rem] max-w-lg relative">
-        <button
-          @click="openInfo( 'pocketengine' )"
-          class="absolute top-8 right-8 w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-rose-400 hover:text-white hover:bg-rose-500/20 transition-all active:scale-95"
-          title="Tool Intelligence"
-        >
-          i
-        </button>
+        <IntelligenceButton
+          toolId="pocketengine"
+          colorClass="text-rose-400"
+          bgClass="bg-white/5"
+          borderClass="border-white/10"
+          class="absolute top-8 right-8"
+        />
         <div v-if=" !error ">
           <div
             class="w-20 h-20 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center mx-auto mb-8"
@@ -319,22 +317,13 @@ onUnmounted( () => {
             :is-open="isSettingsOpen"
             @click="isSettingsOpen = !isSettingsOpen"
           />
-
-
-
-
-
-          <button
-
- 
-          @click="openInfo( 'pocketengine' )"
-            class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-black text-lg flex items-center justify-center hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
- 
-        >
-            ?
-
-
-          </button>
+          <IntelligenceButton
+          toolId="pocketengine"
+          label="Learn & How-To"
+          colorClass="text-emerald-400"
+          bgClass="bg-emerald-500/10"
+          borderClass="border-emerald-500/20"
+        />
         </div>
       </header>
 
@@ -516,7 +505,7 @@ onUnmounted( () => {
             <div class="flex items-center gap-6">
               <div class="flex-1 relative flex items-center">
                 <div
-                  class="absolute h-1 bg-gradient-to-r from-emerald-500 to-rose-500 rounded-full opacity-20"
+                  class="absolute h-1 bg-linear-to-r from-emerald-500 to-rose-500 rounded-full opacity-20"
                   :style="{ width: '100%' }"
                 ></div>
                 <input

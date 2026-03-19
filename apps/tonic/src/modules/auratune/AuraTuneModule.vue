@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { usePitch, useAudioEngine, Note, useGlobalEngine } from '@spectralsuite/core'
 import { onMounted, onUnmounted, ref, computed, watch } from 'vue'
-import { useToolInfo } from '../../composables/useToolInfo';
+import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
@@ -17,7 +17,6 @@ const {
 } = usePitch( { averagingWindowMs: 2500 } )
 
 const { init, isInitialized, error: engineError, activate, deactivate } = useAudioEngine()
-const { openInfo } = useToolInfo();
 
 // Ensure engine is active when we mount this tool
 onMounted( () => {
@@ -232,12 +231,13 @@ const gaugeRotation = computed(() => {
           :is-open="isSettingsOpen"
           @click="isSettingsOpen = !isSettingsOpen"
         />
-        <button
-          @click="openInfo( 'auratune' )"
-          class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-black text-lg flex items-center justify-center hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
-        >
-          ?
-        </button>
+        <IntelligenceButton
+          toolId="auratune"
+          label="Learn & How-To"
+          colorClass="text-sky-400"
+          bgClass="bg-sky-500/10"
+          borderClass="border-sky-500/20"
+        />
       </div>
     </header>
 
@@ -464,6 +464,7 @@ const gaugeRotation = computed(() => {
             
             <!-- REMOVED OLD INDICATOR AS REQUESTED -->
         </div>
+
       </div>
 
       <!-- Stats Card -->
@@ -472,7 +473,7 @@ const gaugeRotation = computed(() => {
           v-if=" showDiagnostics "
           class="bg-slate-800/50 rounded-3xl p-6 border border-slate-700 backdrop-blur-xl"
         >
-          <h3 class="text-sm font-bold uppercase tracking-widest text-slate-500 mb-6 font-black italic">Diagnostic Data
+          <h3 class="text-sm font-black uppercase tracking-widest text-slate-500 mb-6 italic">Diagnostic Data
           </h3>
           <div class="space-y-4">
             <div

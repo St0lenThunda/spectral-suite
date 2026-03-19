@@ -17,13 +17,12 @@ import {
   Fretboard,
   Note
 } from '@spectralsuite/core';
-import { useToolInfo } from '../../composables/useToolInfo';
+import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 
 const emit = defineEmits<{ ( e: 'back' ): void }>();
-const { openInfo } = useToolInfo();
 const { activate, deactivate } = useAudioEngine();
 
 const showConfig = ref( true );
@@ -566,13 +565,13 @@ const fretboardHighlights = computed( () => {
 
         <div class="flex items-center gap-4">
           <SettingsToggle :isOpen="isSettingsOpen" @click="isSettingsOpen = !isSettingsOpen" />
-          <button
-            @click="openInfo( 'chordforge' )"
-            class="w-8 h-8 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 hover:bg-blue-500/20 transition-all"
-            title="Tool Intelligence"
-          >
-            ?
-          </button>
+          <IntelligenceButton
+            toolId="chordforge"
+            label="Learn & How-To"
+            colorClass="text-fuchsia-400"
+            bgClass="bg-fuchsia-500/10"
+            borderClass="border-fuchsia-500/20"
+          />
         </div>
       </div>
     </header>
@@ -870,6 +869,6 @@ const fretboardHighlights = computed( () => {
 @reference "tailwindcss";
 
 .glass-container {
-  @apply bg-white/[0.02] backdrop-blur-xl border border-white/10 rounded-3xl;
+  @apply bg-white/2 backdrop-blur-xl border border-white/10 rounded-3xl;
 }
 </style>

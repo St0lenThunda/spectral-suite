@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue';
 import { TrackAnalyzer, type AnalysisResult, useAudioRecorder, useAudioEngine } from '@spectralsuite/core';
-import { useToolInfo } from '../../composables/useToolInfo';
+import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsTrigger from '../../components/settings/SettingsTrigger.vue';
 
-const { openInfo } = useToolInfo();
 const { activate, deactivate } = useAudioEngine();
 
 // Ensure audio engine is awake for playback/recording
@@ -500,13 +499,13 @@ const exportAnalysis = () => {
         </p>
       </div>
       <div class="flex items-center gap-3">
-        <button
-          @click="openInfo( 'tracktracer' )"
-          class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center hover:bg-indigo-500/20 transition-all active:scale-95"
-          title="Intelligence"
-        >
-          <span class="text-lg font-bold">?</span>
-        </button>
+        <IntelligenceButton
+          toolId="tracktracer"
+          label="Learn & How-To"
+          colorClass="text-cyan-400"
+          bgClass="bg-cyan-500/10"
+          borderClass="border-cyan-500/20"
+        />
 
         <SettingsTrigger @click="isSettingsOpen = true" />
 
@@ -829,7 +828,7 @@ const exportAnalysis = () => {
 
         <div class="lg:col-span-8 flex flex-col gap-6">
           <div
-            class="p-10 rounded-[2.5rem] bg-white/5 border border-white/5 backdrop-blur-xl h-auto min-h-[16rem] relative overflow-hidden flex flex-col"
+            class="p-10 rounded-[2.5rem] bg-white/5 border border-white/5 backdrop-blur-xl h-auto min-h-64 relative overflow-hidden flex flex-col"
           >
             <!-- Song Sections Labels -->
             <div class="flex h-6 mb-2 border-b border-white/5 items-center">
@@ -853,7 +852,7 @@ const exportAnalysis = () => {
               <div
                 v-for=" ( point, idx ) in result!.energyMap "
                 :key="idx"
-                class="flex-1 bg-gradient-to-t from-blue-600/50 to-cyan-400 rounded-t-sm transition-all duration-1000 z-10"
+                class="flex-1 bg-linear-to-t from-blue-600/50 to-cyan-400 rounded-t-sm transition-all duration-1000 z-10"
                 :style="{ height: ( point * 95 ) + '%', opacity: 0.3 + ( point * 0.7 ) }"
               ></div>
 

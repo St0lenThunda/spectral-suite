@@ -24,7 +24,7 @@ import {
 } from '@spectralsuite/core';
 import { Chord, Note } from 'tonal';
 import { useHarmonicTheory } from '../../composables/useHarmonicTheory';
-import { useToolInfo } from '../../composables/useToolInfo';
+import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import { useSongDatabase } from '../../composables/useSongDatabase';
 import {
   HARMONIC_SELECTION_KEY,
@@ -40,7 +40,6 @@ import type { ScoredSuggestion, SongEntry } from '@spectralsuite/core';
 
 // ─── COMPOSABLES ────────────────────────────────────────────────────
 
-const { openInfo } = useToolInfo();
 const { activate, deactivate } = useAudioEngine();
 const {
   playTriad,
@@ -457,13 +456,14 @@ const resetLattice = () => {
         >
           <span class="text-lg">↻</span>
         </button>
-        <button
-          @click="openInfo( 'tonnetz' )"
-          class="w-10 h-10 rounded-xl bg-violet-500/10 border border-violet-500/20 text-violet-400 flex items-center justify-center hover:bg-violet-500/20 transition-all active:scale-95"
-          title="Intelligence"
-        >
-          <span class="text-lg font-bold">?</span>
-        </button>
+<IntelligenceButton
+          toolId="tonnetz"
+          label="Learn & How-To"
+          colorClass="text-indigo-400"
+          bgClass="bg-indigo-500/10"
+          borderClass="border-indigo-500/20"
+        />
+
 
         <SettingsTrigger @click="isSettingsOpen = true" />
       </div>

@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue';
 import { useAudioEngine, MagnitudeSpectrum, Spectrogram3D, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion, useGlobalEngine } from '@spectralsuite/core';
-import { useToolInfo } from '../../composables/useToolInfo';
+import IntelligenceButton from '../../components/IntelligenceButton.vue';
+
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 
-const { openInfo } = useToolInfo();
 const isSettingsOpen = ref( false );
 
 const drawerCategories = [
@@ -332,12 +332,13 @@ onUnmounted( () => {
           :is-open="isSettingsOpen"
           @click="isSettingsOpen = !isSettingsOpen"
         />
-        <button
-          @click="openInfo( 'frequencyflow' )"
-          class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-black text-lg flex items-center justify-center hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
-        >
-          ?
-        </button>
+        <IntelligenceButton
+          toolId="frequencyflow"
+          label="Learn & How-To"
+          colorClass="text-sky-400"
+          bgClass="bg-sky-500/10"
+          borderClass="border-sky-500/20"
+        />
       </div>
     </header>
 
@@ -435,6 +436,7 @@ onUnmounted( () => {
           ? 'lg:col-span-3 h-[36rem] order-1' 
           : 'lg:col-span-1 h-72 order-2'"
         class="bg-slate-800/40 rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-xl relative transition-all duration-500 ease-out overflow-hidden"
+
       >
         <div class="flex justify-between items-center mb-6">
           <div>
@@ -486,7 +488,7 @@ onUnmounted( () => {
 
           <!-- Frequency Labels -->
           <div
-            class="absolute bottom-[-2rem] left-0 w-full flex justify-between px-2 text-[8px] font-mono text-slate-600 uppercase tracking-widest"
+            class="absolute -bottom-8 left-0 w-full flex justify-between px-2 text-[8px] font-mono text-slate-600 uppercase tracking-widest"
           >
             <span>20Hz</span>
             <span v-if=" scaleMode === 'log' ">100Hz</span>
@@ -502,6 +504,7 @@ onUnmounted( () => {
       <!-- Precision Control Panel -->
       <div
         class="bg-slate-800/40 rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-xl flex flex-col gap-8 h-auto lg:h-[28rem] order-4"
+
       >
         <div>
           <h4 class="text-[11px] font-black uppercase tracking-[0.4em] text-sky-400 mb-2">Forensic Controls</h4>
@@ -591,6 +594,7 @@ onUnmounted( () => {
             <span>⛶</span> Full
           </button>
         </div>
+
         <canvas
           ref="oscCanvas"
           class="w-full"
@@ -611,6 +615,7 @@ onUnmounted( () => {
         @click="activeFocus = 'topology'"
         class="absolute top-8 right-8 z-50 px-3 py-1 bg-indigo-500/20 text-indigo-400 hover:bg-indigo-500/40 text-[10px] font-black uppercase tracking-widest rounded-md transition-all flex items-center gap-2 opacity-0 group-hover:opacity-100"
         title="Maximize Topology"
+
       >
         <span>⛶</span> Full
       </button>
@@ -625,14 +630,15 @@ onUnmounted( () => {
       <!-- Peak Note Detector HUD -->
       <div
         class="bg-slate-800/40 rounded-[2rem] p-8 border border-white/5 backdrop-blur-xl h-72 flex flex-col items-center justify-center relative group order-last"
+
       >
-        <div class="absolute inset-0 bg-sky-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-[2rem]">
+        <div class="absolute inset-0 bg-sky-500/5 opacity-0 group-hover:opacity-100 transition-opacity rounded-4xl">
         </div>
         <span class="text-[10px] uppercase font-bold tracking-[0.3em] text-slate-500 block mb-8 z-10">Peak Note
           Detector</span>
         <div class="text-center z-10">
           <div
-            class="text-6xl font-black italic text-transparent bg-clip-text bg-gradient-to-br from-white to-sky-400 mb-3 tracking-tighter"
+            class="text-6xl font-black italic text-transparent bg-clip-text bg-linear-to-br from-white to-sky-400 mb-3 tracking-tighter"
           >{{ dominantNote }}</div>
           <p class="text-[11px] font-mono text-sky-500/80 uppercase tracking-[0.5em] font-black">{{ dominantFreq }} HZ
           </p>
@@ -641,6 +647,7 @@ onUnmounted( () => {
 
       <!-- EQ Suggestions (Pro Feature) -->
       <div class="bg-slate-800/40 rounded-[2rem] p-8 border border-white/5 backdrop-blur-xl h-72 order-last">
+
         <span class="text-[10px] uppercase font-bold tracking-[0.3em] text-amber-400 block mb-6">EQ Suggestions</span>
         <div
           v-if=" eqSuggestions.length === 0 "
@@ -656,7 +663,7 @@ onUnmounted( () => {
           <div
             v-for=" ( suggestion, i ) in eqSuggestions "
             :key="i"
-            class="p-4 rounded-2xl border border-white/5 bg-white/[0.02]"
+            class="p-4 rounded-2xl border border-white/5 bg-white/2"
           >
             <div class="flex justify-between items-center mb-2">
               <span class="text-amber-400 font-black text-sm">{{ suggestion.freq }}</span>

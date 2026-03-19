@@ -16,7 +16,7 @@ import {
   useGlobalEngine,
   useHarmonicOrbit // Import the store
 } from '@spectralsuite/core';
-import { useToolInfo } from '../../composables/useToolInfo';
+import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import {
   HARMONIC_SELECTION_KEY,
   HARMONIC_NAVIGATE_KEY
@@ -27,7 +27,6 @@ import SettingsTrigger from '../../components/settings/SettingsTrigger.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import InstrumentBrowser from '../../components/settings/InstrumentBrowser.vue';
 
-const { openInfo } = useToolInfo();
 const { activate, deactivate } = useAudioEngine();
 
 // --- STATE MANAGEMENT ---
@@ -310,13 +309,13 @@ onUnmounted( () => deactivate() );
         </p>
       </div>
       <div class="flex items-center gap-3">
-        <button
-          @click="openInfo( 'harmonicorbit' )"
-          class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center hover:bg-indigo-500/20 transition-all active:scale-95"
-          title="Intelligence"
-        >
-          <span class="text-lg font-bold">?</span>
-        </button>
+        <IntelligenceButton
+          toolId="harmonicorbit"
+          label="Learn & How-To"
+          colorClass="text-sky-500"
+          bgClass="bg-indigo-500/10"
+          borderClass="border-indigo-500/20"
+        />
 
         <SettingsTrigger @click="isSettingsOpen = true" />
       </div>

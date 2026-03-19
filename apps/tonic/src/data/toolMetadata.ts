@@ -85,4 +85,20 @@ export const TOOL_METADATA: Record<string, ToolMetadata> = {
     practicalApplication: 'Experiment with voicings without picking up a guitar. Discover new chord shapes, test inversions, and learn how moving one note changes the chord quality. Perfect for songwriters and theory students.',
     howItWorks: 'Uses Tonal.js Chord.detect() to identify chords from selected pitch classes. Each fret tap calculates the note using semitone transposition from the open string. Audio playback uses SynthEngine with staggered note starts for a strum effect.'
   },
+  resonancelab: {
+    id: 'resonancelab',
+    name: 'Resonance Lab',
+    whatAmISeeing: 'A forensic frequency analysis suite. You are looking at a Discovery HUD for identifying natural resonance peaks, a Magnitude Meter for monitoring mic levels, and a "Harmonic Mirror" for projecting frequencies back at physical objects.',
+    instructions: '1. Enable "Listening" and tap an object (like a wine glass) repeatedly near your mic.\n2. Observe the "Target Frequency" consolidate as the lab averages the peaks.\n3. Enable "Start Mirror" to project that exact frequency back at the object.\n4. Use the "Fine Tune" slider to create architectural "beats" (amplitude modulation).\n5. Use the Strobe pulse to visually "freeze" physical vibrations.',
+    practicalApplication: 'Master the physics of sympathetic resonance. Identify the weak points in structural materials, explore the "singing" properties of glass and ceramics, and use stroboscopic effects to analyze fast-moving oscillations in slow motion.',
+    howItWorks: 'Resonance Lab uses high-resolution FFT analysis to isolate rapid transients (taps). It averages high-confidence peaks over a rolling 2-second window to find the most likely resonant node. The mirror uses a sample-accurate sine oscillator with sub-millisecond phase locking.'
+  },
+  melodymirror: {
+    id: 'melodymirror',
+    name: 'Melody Mirror',
+    whatAmISeeing: 'An interactive ear-training environment. You see a "Call and Response" interface where the computer plays a melody and you must play it back using your instrument or the virtual keyboard. The "Note History" tracks your accuracy.',
+    instructions: '1. Listen to the phrase played by the computer.\n2. Play the notes back exactly as you heard them.\n3. Watch the visual feedback for pitch accuracy.\n4. Increase difficulty to expand the scale range and rhythmic complexity.',
+    practicalApplication: 'Bridge the gap between hearing music and playing it. Develop a "perfect ear" for intervals and melodies, and improve your muscle memory for rapid melodic transcription.',
+    howItWorks: 'Uses an interactive state-machine to compare real-time pitch detection against a pre-generated sequence of note events. It calculates timing and pitch deltas to provide a detailed performance score.'
+  }
 };

@@ -8,7 +8,7 @@
  */
 import { ref, computed, Transition, onMounted, onUnmounted, watch } from 'vue';
 import { useScaleSleuth, useAudioEngine, SynthEngine, Fretboard, Note, useGlobalEngine } from '@spectralsuite/core';
-import { useToolInfo } from '../../composables/useToolInfo';
+import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
@@ -318,12 +318,13 @@ watch( isInitialized, ( newVal ) => {
       </div>
       <div class="flex flex-col items-end gap-2">
         <div class="flex items-center gap-4">
-          <button
-            @click="openInfo( 'scalesleuth' )"
-            class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-black text-lg flex items-center justify-center hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
-          >
-            ?
-          </button>
+          <IntelligenceButton
+            toolId="scalesleuth"
+            label="Learn & How-To"
+            colorClass="text-indigo-400"
+            bgClass="bg-indigo-500/10"
+            borderClass="border-indigo-500/20"
+          />
           <button
             @click="clearNotes"
             class="bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold uppercase tracking-widest px-4 py-2 rounded-lg border border-slate-700 transition-all"
@@ -644,7 +645,7 @@ class="flex gap-2 mt-4"
     <Transition name="toast">
       <div
         v-if=" toastVisible "
-        class="fixed bottom-10 left-1/2 -translate-x-1/2 z-[100] bg-indigo-600 border border-indigo-400 px-8 py-4 rounded-2xl shadow-2xl text-white font-black uppercase tracking-widest text-xs flex items-center gap-4 backdrop-blur-3xl"
+        class="fixed bottom-10 left-1/2 -translate-x-1/2 z-100 bg-indigo-600 border border-indigo-400 px-8 py-4 rounded-2xl shadow-2xl text-white font-black uppercase tracking-widest text-xs flex items-center gap-4 backdrop-blur-3xl"
       >
         <span class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center text-sm">🔒</span>
         {{ toastMessage }}

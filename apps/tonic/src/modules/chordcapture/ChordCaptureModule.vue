@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useChordCapture, useAudioEngine, ChordEngine, SynthEngine, type ChordMatch, useGlobalEngine, Fretboard } from '@spectralsuite/core'
-import { useToolInfo } from '../../composables/useToolInfo';
+import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import ContextDrawer from '../../components/ui/ContextDrawer.vue';
 import ChordForgePanel from '../chordforge/ChordForgePanel.vue';
 import ScaleSleuthPanel from '../scalesleuth/ScaleSleuthPanel.vue';
@@ -10,8 +10,6 @@ import LiveMonitor from './LiveMonitor.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
-
-const { openInfo } = useToolInfo();
 
 // --- UI / Interaction State ---
 const isSettingsOpen = ref( false );
@@ -291,15 +289,16 @@ const emit = defineEmits<{
       class="w-full flex flex-col items-center animate-fade-in"
     >
       <div
-        class="glass-container w-full max-w-2xl p-12 text-center rounded-[2rem] border border-white/10 bg-white/5 backdrop-blur-3xl shadow-2xl relative"
+        class="glass-container w-full max-w-2xl p-12 text-center rounded-4xl border border-white/10 bg-white/5 backdrop-blur-3xl shadow-2xl relative"
       >
-        <button
-          @click="openInfo( 'chordcapture' )"
-          class="absolute top-8 right-8 w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-indigo-400 hover:text-white hover:bg-indigo-500/20 transition-all active:scale-95"
-          title="Tool Intelligence"
-        >
-          i
-        </button>
+        <IntelligenceButton
+          toolId="chordcapture"
+          label="Learn & How-To"
+          colorClass="text-indigo-400"
+          bgClass="bg-white/5"
+          borderClass="border-white/10"
+          class="absolute top-8 right-8"
+        />
         <div v-if=" !error ">
           <div
             class="w-20 h-20 rounded-2xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center mx-auto mb-8 transform -rotate-6"
@@ -382,12 +381,13 @@ const emit = defineEmits<{
             :is-open="isSettingsOpen"
             @click="isSettingsOpen = !isSettingsOpen"
           />
-          <button
-            @click="openInfo( 'chordcapture' )"
-            class="w-10 h-10 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 font-black text-lg flex items-center justify-center hover:bg-indigo-500/20 transition-all active:scale-95 mb-1"
-          >
-            ?
-          </button>
+          <IntelligenceButton
+            toolId="chordcapture"
+            label="Learn & How-To"
+            colorClass="text-violet-400"
+            bgClass="bg-violet-500/10"
+            borderClass="border-violet-500/20"
+          />
         </div>
       </header>
 
@@ -468,7 +468,7 @@ const emit = defineEmits<{
       <!-- Main Interactive Split: Monitor (Left) & Workspace (Right) -->
       <!-- Lowered breakpoint to md: for better responsiveness -->
       <div
-        class="w-full max-w-[100rem] grid grid-cols-1 md:grid-cols-[40%_60%] lg:grid-cols-[35%_65%] gap-8 items-start animate-fade-in relative"
+        class="w-full max-w-400 grid grid-cols-1 md:grid-cols-[40%_60%] lg:grid-cols-[35%_65%] gap-8 items-start animate-fade-in relative"
       >
 
         <!-- 1. Live Monitor (Top-Left) -->
@@ -643,7 +643,7 @@ const emit = defineEmits<{
       <!-- 5. Fretboard / Voicing Atlas (Full-Width Bottom) -->
       <div
         v-if=" showFretboard "
-        class="w-full max-w-[100rem] mx-auto pb-24 lg:pb-0 bg-slate-900/40 rounded-[3rem] p-8 border border-white/5 backdrop-blur-xl"
+        class="w-full max-w-400 mx-auto pb-24 lg:pb-0 bg-slate-900/40 rounded-[3rem] p-8 border border-white/5 backdrop-blur-xl"
       >
         <Fretboard
           :active-notes="effectiveCapturedNotes"
@@ -725,7 +725,7 @@ const emit = defineEmits<{
 }
 
 .glass-card:hover {
-  @apply border-white/10 bg-white/[0.04];
+  @apply border-white/10 bg-white/4;
 }
 
 /* Animations */

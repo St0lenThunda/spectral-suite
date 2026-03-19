@@ -11,6 +11,7 @@ import TonnetzModule from './modules/tonnetz/TonnetzModule.vue';
 import ChordForgeModule from './modules/chordforge/ChordForgeModule.vue';
 import MelodyMirrorModule from './modules/melodymirror/MelodyMirrorModule.vue';
 import ResonanceLabModule from './modules/resonancelab/ResonanceLabModule.vue';
+import BendTrainerModule from './modules/bendtrainer/BendTrainerModule.vue';
 import AcademyModule from './modules/academy/AcademyModule.vue';
 import LessonRunner from './modules/academy/LessonRunner.vue';
 import { type Lesson } from './modules/academy/lessons';
@@ -106,6 +107,13 @@ const ALL_TOOLS = [
     color: 'from-emerald-400 to-cyan-500'
   },
   {
+    id: 'bendtrainer',
+    name: 'Bend Trainer',
+    description: 'Pitch staircase bend practice. Master half, full, and blues bends.',
+    icon: '🎯',
+    color: 'from-amber-500 to-orange-600'
+  },
+  {
     id: 'academy',
     name: 'Spectral Academy',
     description: 'Interactive music theory lessons. Learn via active performance.',
@@ -126,6 +134,7 @@ const enabledTools = ref<Record<string, boolean>>( {
   chordforge: true,
   melodymirror: true,
   resonancelab: true,
+  bendtrainer: true,
   academy: false
 } )
 
@@ -351,6 +360,10 @@ const handleGainChange = ( event: Event ) => {
       />
       <ResonanceLabModule
         v-else-if=" currentModule === 'resonancelab' && enabledTools.resonancelab "
+        @back="currentModule = 'dashboard'"
+      />
+      <BendTrainerModule
+        v-else-if=" currentModule === 'bendtrainer' && enabledTools.bendtrainer "
         @back="currentModule = 'dashboard'"
       />
       <AcademyModule

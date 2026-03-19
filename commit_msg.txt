@@ -1,16 +1,9 @@
-feat(ui): unify module settings and improve audio input quality
+feat(bendtrainer): implement pitch staircase UI and core physics
 
-- **UI Refactor**:
-  - Implement `LocalSettingsDrawer` for consistent settings access across all modules.
-  - Create `EngineSettings`, `SettingsModal`, `SettingsToggle`, and `SettingsTrigger` components in `apps/tonic/src/components/settings/`.
-  - Add `PillNav` component for UI navigation.
-  - Update `ChordCaptureModule`, `FrequencyFlowModule`, and other modules to use the new settings drawer pattern.
-  - Refactor module headers to align with `AuraTuneModule` design.
-
-- **Audio Engine**:
-  - Configure `getUserMedia` to request raw audio (disable echo cancellation, noise suppression, AGC) in `AudioEngine.ts`.
-  - This ensures full spectral content is available for analysis, preventing OS-level filtering artifacts.
-
-- **Build & Chore**:
-  - Update `tsconfig.json` and `env.d.ts` to resolve TypeScript build errors.
-  - Apply JSDoc and comments per `code-style-guide.md`.
+- Create `useBendTrainer` composable for precise pitch bend tracking (cents distance, hold timer)
+- Implement responsive SVG "Pitch Staircase" visualization in `BendTrainerModule.vue`
+- Add "Blues Zones" (cyan quarter-tone markers) for expressive practicing
+- Update `App.vue` to integrate Bend Trainer into the main application routing and tools list
+- Add detailed tool manual entry explaining bend physics in `ToolManuals.ts`
+- Write comprehensive test suite (`useBendTrainer.spec.ts`) for bend calculations, targeting, and tracker functionality
+- Update package-lock.json dependency structures

@@ -587,7 +587,6 @@ function unwrapPath ( path: TonnetzPoint[] ) {
   if ( path.length < 2 ) return [];
 
   const visualPoints: { x: number; y: number }[] = [];
-  const start = path[path.length - 1]!;
 
   // Starting visual position (Center of lattice)
   const cx = props.width / 2;

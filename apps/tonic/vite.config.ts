@@ -9,7 +9,7 @@ import fs from 'fs'
 export default defineConfig( {
   plugins: [
     vue(),
-    VueDevTools(),
+    VueDevTools() as any,
     {
       name: 'serve-docs',
       configureServer ( server ) {

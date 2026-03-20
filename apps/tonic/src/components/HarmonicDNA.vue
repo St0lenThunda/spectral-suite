@@ -48,6 +48,7 @@ const svgPath = computed( () => {
 const firstPoint = computed( () => {
   if ( !svgPath.value ) return { x: 0, y: 0 };
   const parts = svgPath.value.split( ' ' );
+  if ( !parts[0] ) return { x: 0, y: 0 };
   const coords = parts[0].split( ',' );
   return { x: parseFloat( coords[0] || '0' ), y: parseFloat( coords[1] || '0' ) };
 } );

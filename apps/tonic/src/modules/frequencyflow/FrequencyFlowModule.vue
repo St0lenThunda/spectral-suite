@@ -118,8 +118,8 @@ const tick = () => {
   const analyser = getAnalyser();
   if ( analyser ) {
     // 1. Pipestream Data to SharedMemory Lock-Free
-    analyser.getFloatTimeDomainData(timeView as unknown as Float32Array);
-    analyser.getByteFrequencyData(freqView as unknown as Uint8Array);
+    analyser.getFloatTimeDomainData(timeView as any);
+    analyser.getByteFrequencyData(freqView as any);
 
     // 2. Throttle heavy UI String formatting
     if ( Math.random() > 0.95 ) {

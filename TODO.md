@@ -107,6 +107,8 @@
 
 ---
 
+---
+
 ## 📋 Priority Order
 
 1. **Tauri (Desktop)** - Lower friction, faster to ship
@@ -117,6 +119,5 @@
 ## 🎧 Audio Engine Enhancements
 
 ### Input Processor (DSP)
-- [ ] **Noise Gate**: Mute signal below variable threshold (Clean up silence)
-- [ ] **Input Gain**: Digital gain boost for quiet microphones
+- [ ] **Noise Gate**: Fine-tune threshold logic for varied environments
 - [ ] **Compressor**: Dynamic range cleaner (Even out volume)

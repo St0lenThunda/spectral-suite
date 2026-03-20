@@ -13,7 +13,6 @@ import {
   SynthEngine,
   Note,
   useAudioEngine,
-  useGlobalEngine,
   useHarmonicOrbit // Import the store
 } from '@spectralsuite/core';
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
@@ -27,7 +26,7 @@ import SettingsTrigger from '../../components/settings/SettingsTrigger.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import InstrumentBrowser from '../../components/settings/InstrumentBrowser.vue';
 
-const { activate, deactivate } = useAudioEngine();
+const { activate, deactivate, isInitialized } = useAudioEngine();
 
 // --- STATE MANAGEMENT ---
 // Refactored to use global store for Lesson integration
@@ -101,7 +100,7 @@ const drawerCategories = computed( () => [
     id: 'engine',
     label: 'Engine',
     description: 'Global Audio Processing',
-    showIndicator: useGlobalEngine().isGlobalEngineActive.value
+    showIndicator: isInitialized.value
   }
 ] );
 

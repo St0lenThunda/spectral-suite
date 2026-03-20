@@ -1,6 +1,5 @@
 import { openDB, type IDBPDatabase } from 'idb';
 import type { SongEntry, ChordTransition } from './types';
-import { BinaryLoader } from './BinaryLoader';
 
 /**
  * SongDatabase — IndexedDB Persistence Layer

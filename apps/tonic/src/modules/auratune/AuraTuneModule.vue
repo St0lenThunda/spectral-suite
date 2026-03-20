@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { usePitch, useAudioEngine, Note, useGlobalEngine } from '@spectralsuite/core'
+import { usePitch, useAudioEngine, Note } from '@spectralsuite/core'
 import { onActivated, onDeactivated, ref, computed, watch } from 'vue'
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
@@ -57,7 +57,7 @@ const drawerCategories = computed( () => [
     id: 'Engine',
     label: 'Engine',
     description: 'Global Audio Processing',
-    showIndicator: useGlobalEngine().isGlobalEngineActive.value
+    showIndicator: isInitialized.value
   }
 ] );
 

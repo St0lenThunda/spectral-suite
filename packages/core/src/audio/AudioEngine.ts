@@ -1,4 +1,3 @@
-import { isRawAudioMode } from '../config/sensitivity';
 
 export class AudioEngine {
   private static instance: AudioEngine;
@@ -50,7 +49,7 @@ export class AudioEngine {
        * 3. autoGainControl: false - Prevents the volume from "pumping" up and down.
        */
       // Simplified constraints for debugging
-      const rawMode = isRawAudioMode.value;
+      // const rawMode = isRawAudioMode.value;
 
       // OPTIMIZATION: Default to Processed Audio for Tuner Stability
       // 1. echoCancellation: true - Removes speaker feedback

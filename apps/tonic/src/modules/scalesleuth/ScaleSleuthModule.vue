@@ -7,7 +7,7 @@
  * potential scales based on the notes a user plays.
  */
 import { ref, computed, Transition, onActivated, onDeactivated, watch } from 'vue';
-import { useScaleSleuth, useAudioEngine, SynthEngine, Fretboard, Note, useGlobalEngine } from '@spectralsuite/core';
+import { useScaleSleuth, useAudioEngine, SynthEngine, Fretboard, Note } from '@spectralsuite/core';
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
@@ -38,7 +38,7 @@ const {
 
 // initialization helpers for audio and info panels
 const { init, isInitialized, activate, deactivate } = useAudioEngine();
-const { openInfo } = useToolInfo();
+useToolInfo();
 
 // --- UI / Interaction State ---
 
@@ -55,7 +55,7 @@ const drawerCategories = computed( () => [
     id: 'Engine',
     label: 'Engine',
     description: 'Global Audio Processing',
-    showIndicator: useGlobalEngine().isGlobalEngineActive.value
+    showIndicator: isInitialized.value
   }
 ] );
 

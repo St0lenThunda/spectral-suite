@@ -19,10 +19,9 @@
 
 import { ref, computed, provide, onActivated, onDeactivated } from 'vue';
 import {
-  useAudioEngine,
-  useGlobalEngine
+  useAudioEngine
 } from '@spectralsuite/core';
-import { Chord, Note } from 'tonal';
+// Chord import removed — usage was commented out during refactor
 import { useHarmonicTheory } from '../../composables/useHarmonicTheory';
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import { useSongDatabase } from '../../composables/useSongDatabase';
@@ -40,7 +39,7 @@ import type { ScoredSuggestion, SongEntry } from '@spectralsuite/core';
 
 // ─── COMPOSABLES ────────────────────────────────────────────────────
 
-const { activate, deactivate } = useAudioEngine();
+const { activate, deactivate, isInitialized } = useAudioEngine();
 const {
   playTriad,
   pitchClassName,
@@ -182,7 +181,7 @@ const drawerCategories = computed( () => [
     id: 'engine',
     label: 'Engine',
     description: 'Global Audio Processing',
-    showIndicator: useGlobalEngine().isGlobalEngineActive.value
+    showIndicator: isInitialized.value
   }
 ] );
 
@@ -373,13 +372,13 @@ const handleTriadSelect = ( notes: string[], type: 'major' | 'minor' ) => {
   if ( notes.length < 3 ) return;
 
   // Use Tonal to get canonical name (e.g. "Am", "C")
-  const detected = Chord.detect( notes );
-  const chordName = detected[0] || ( notes[0] + ( type === 'minor' ? 'm' : '' ) );
+  // const detected = Chord.detect( notes );
+  // const chordName = detected[0] || ( notes[0] + ( type === 'minor' ? 'm' : '' ) );
 
   // Re-center on the first note
-  centerNote.value = notes[0];
+  centerNote.value = notes[0] as string;
 
-  selectTriad( notes[0], notes[1], notes[2], type );
+  selectTriad( notes[0] as string, notes[1] as string, notes[2] as string, type );
 };
 
 /**
@@ -880,9 +879,9 @@ const resetLattice = () => {
                 <div
                   v-for=" item in similarSongs "
                   :key="item.song.id"
-                  @click="activeComparisonPath = ( activeComparisonPath === item.matchedPath ? [] : item.matchedPath )"
+                  @click="activeComparisonPath = ( activeComparisonPath === (item as any).matchedPath ? [] : (item as any).matchedPath )"
                   class="p-3 rounded-xl bg-spectral-900/50 border flex gap-4 items-center group transition-all hover:bg-white/5 cursor-pointer"
-                  :class="activeComparisonPath === item.matchedPath ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/5'"
+                  :class="activeComparisonPath === (item as any).matchedPath ? 'border-emerald-500/50 bg-emerald-500/5' : 'border-white/5'"
                 >
                   <!-- Album Art -->
                   <div
@@ -915,16 +914,16 @@ const resetLattice = () => {
                     <!-- Harmonic DNA Sparkline -->
                     <div class="mt-2 flex items-center gap-2">
                       <HarmonicDNA
-                        :path="item.matchedPath"
+                        :path="(item as any).matchedPath"
                         :width="60"
                         :height="15"
-                        :color="activeComparisonPath === item.matchedPath ? '#10b981' : '#64748b'"
-                        :glow="activeComparisonPath === item.matchedPath"
+                        :color="activeComparisonPath === (item as any).matchedPath ? '#10b981' : '#64748b'"
+                        :glow="activeComparisonPath === (item as any).matchedPath"
                       />
                       <span
                         class="text-[8px] font-black uppercase tracking-tighter text-slate-500 group-hover:text-emerald-400 transition-colors"
                       >
-                        {{ activeComparisonPath === item.matchedPath ? 'Plotted' : 'Plot DNA' }}
+                        {{ activeComparisonPath === (item as any).matchedPath ? 'Plotted' : 'Plot DNA' }}
                       </span>
                     </div>
 

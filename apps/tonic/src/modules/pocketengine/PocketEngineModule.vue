@@ -50,9 +50,7 @@ const stealthBarsOff = ref( 2 )
 const isStealthEnabled = ref( false )
 
 import EngineSettings from '../../components/settings/EngineSettings.vue';
-import { useGlobalEngine } from '@spectralsuite/core';
 
-// ... existing imports ...
 
 const drawerCategories = computed( () => [
   {
@@ -65,7 +63,7 @@ const drawerCategories = computed( () => [
     id: 'Engine',
     label: 'Engine',
     description: 'Mic Sensitivity & Gate',
-    showIndicator: useGlobalEngine().isGlobalEngineActive.value
+    showIndicator: isInitialized.value
   },
   {
     id: 'Stability',

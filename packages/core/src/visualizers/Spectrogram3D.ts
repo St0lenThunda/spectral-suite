@@ -17,7 +17,7 @@ export class Spectrogram3D {
 
   // Configurable parameters for the "Feel" of the 3D terrain
   private maxHistory: number = 60;     // How many "moments" of history to show
-  private depthStep: number = 4;       // Vertical distance between slices
+  // private depthStep: number = 4;       // Vertical distance between slices
 
   constructor( canvas: HTMLCanvasElement | OffscreenCanvas ) {
     this.canvas = canvas;

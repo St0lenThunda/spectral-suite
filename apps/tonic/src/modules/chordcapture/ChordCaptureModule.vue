@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onActivated, onDeactivated, watch } from 'vue'
-import { useChordCapture, useAudioEngine, ChordEngine, SynthEngine, type ChordMatch, useGlobalEngine, Fretboard } from '@spectralsuite/core'
+import { useChordCapture, useAudioEngine, ChordEngine, SynthEngine, type ChordMatch, Fretboard } from '@spectralsuite/core'
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import ContextDrawer from '../../components/ui/ContextDrawer.vue';
 import ChordForgePanel from '../chordforge/ChordForgePanel.vue';
@@ -30,7 +30,7 @@ const drawerCategories = computed( () => [
     id: 'Engine',
     label: 'Engine',
     description: 'Global Audio Processing',
-    showIndicator: useGlobalEngine().isGlobalEngineActive.value
+    showIndicator: isInitialized.value
   }
 ] );
 

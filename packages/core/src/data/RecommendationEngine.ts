@@ -1,4 +1,3 @@
-import { Chord, Note } from 'tonal';
 import { TonnetzMapper } from './TonnetzMapper';
 import { SongDatabase } from './SongDatabase';
 import { ChordEngine } from '../theory/ChordEngine';

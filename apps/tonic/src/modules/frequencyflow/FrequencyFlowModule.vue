@@ -1,22 +1,21 @@
 <script setup lang="ts">
 import { ref, onActivated, onDeactivated, watch, nextTick } from 'vue';
-import { useAudioEngine, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion, useGlobalEngine } from '@spectralsuite/core';
+import { useAudioEngine, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion } from '@spectralsuite/core';
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
-import SpectrogramWorker from '../../../../../packages/core/src/visualizers/spectrogram.worker.ts?worker';
+
+const { init, isInitialized, getAnalyser, activate, deactivate } = useAudioEngine();
 
 const isSettingsOpen = ref( false );
 
 const drawerCategories = [
-  { id: 'Engine', label: 'Engine', description: 'Global Audio Settings', showIndicator: useGlobalEngine().isGlobalEngineActive.value },
+  { id: 'Engine', label: 'Engine', description: 'Global Audio Settings', showIndicator: isInitialized.value },
   { id: 'Visuals', label: '3D Config', description: 'Visualizer Perspective', showIndicator: false },
   { id: 'Exports', label: 'Exports', description: 'Save Analysis Data', showIndicator: false }
 ];
-
-const { init, isInitialized, getAnalyser, activate, deactivate } = useAudioEngine();
 const oscCanvas = ref<HTMLCanvasElement | null>( null );
 const specCanvas = ref<HTMLCanvasElement | null>( null );
 const magCanvas = ref<HTMLCanvasElement | null>( null );
@@ -186,8 +185,8 @@ const exportSpectrum = ( format: 'png' | 'json' ) => {
     // JSON Export of current frequency data
     const analyser = getAnalyser();
     if ( analyser ) {
-      analyser.getByteFrequencyData( freqView );
-      const json = JSON.stringify( Array.from( freqView.slice(0, analyser.frequencyBinCount) as unknown as Uint8Array ) );
+      analyser.getByteFrequencyData( freqView as any );
+      const json = JSON.stringify( Array.from( (freqView as any).slice(0, analyser.frequencyBinCount) ) );
       const blob = new Blob( [json], { type: 'application/json' } );
       const url = URL.createObjectURL( blob );
 
@@ -204,7 +203,10 @@ const setupVis = () => {
   if (!analyser) return;
 
   if (!worker) {
-    worker = new SpectrogramWorker();
+    worker = new Worker(
+      new URL('../../../../../packages/core/src/visualizers/spectrogram.worker.ts', import.meta.url),
+      { type: 'module' }
+    );
   }
 
   if (oscCanvas.value && !oscCanvas.value.dataset.transferred) {
@@ -375,7 +377,7 @@ onDeactivated( () => {
       <!-- Interactive Spectrum Analyzer (Magnitude) -->
       <div
         :class="activeFocus === 'magnitude' 
-          ? 'lg:col-span-3 h-144 order-1' 
+          ? 'lg:col-span-3 h-[36rem] order-1' 
           : 'lg:col-span-1 h-72 order-2'"
         class="bg-slate-800/40 rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-xl relative transition-all duration-500 ease-out overflow-hidden"
 
@@ -422,7 +424,7 @@ onDeactivated( () => {
           </div>
         </div>
 
-        <div class="relative flex-1" :class="activeFocus === 'magnitude' ? 'h-112' : 'h-40'">
+        <div class="relative flex-1" :class="activeFocus === 'magnitude' ? 'h-[28rem]' : 'h-40'">
           <canvas
             ref="magCanvas"
             class="w-full h-full"
@@ -445,7 +447,7 @@ onDeactivated( () => {
 
       <!-- Precision Control Panel -->
       <div
-        class="bg-slate-800/40 rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-xl flex flex-col gap-8 h-auto lg:h-112 order-4"
+        class="bg-slate-800/40 rounded-[2.5rem] p-8 border border-white/5 backdrop-blur-xl flex flex-col gap-8 h-auto lg:h-[28rem] order-4"
 
       >
         <div>
@@ -521,7 +523,7 @@ onDeactivated( () => {
       <!-- Waveform (Time Domain) -->
       <div 
         :class="activeFocus === 'waveform' 
-          ? 'lg:col-span-3 h-144 order-1' 
+          ? 'lg:col-span-3 h-[36rem] order-1' 
           : 'lg:col-span-1 h-72 order-2'"
         class="bg-slate-800/40 rounded-4xl p-8 border border-white/5 backdrop-blur-xl transition-all duration-500 ease-out overflow-hidden relative group"
       >
@@ -540,14 +542,14 @@ onDeactivated( () => {
         <canvas
           ref="oscCanvas"
           class="w-full"
-          :class="activeFocus === 'waveform' ? 'h-112' : 'h-40'"
+          :class="activeFocus === 'waveform' ? 'h-[28rem]' : 'h-40'"
         ></canvas>
       </div>
 
     <!-- 3D Stage (Spectral Topology) -->
     <div
       :class="activeFocus === 'topology' 
-        ? 'lg:col-span-3 h-168 order-1' 
+        ? 'lg:col-span-3 h-[42rem] order-1' 
         : 'lg:col-span-1 h-72 order-2'"
       class="bg-black rounded-[2.5rem] p-4 border border-white/5 relative overflow-hidden group shadow-2xl transition-all duration-500 ease-out"
     >

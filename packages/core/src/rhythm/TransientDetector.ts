@@ -26,8 +26,8 @@ export class TransientDetector {
       if ( !engine.getContext() ) {
         await engine.init();
         // Sync the global reactive state
-        const { isInitialized: globalInit } = await import( '../audio/useAudioEngine' );
-        globalInit.value = true;
+        const { useAudioEngine } = await import( '../audio/useAudioEngine' );
+        useAudioEngine().isInitialized.value = true;
       }
 
       const context = engine.getContext();

@@ -112,13 +112,13 @@ export function useInputDiagnostics() {
       });
     }
 
-    // 2. Mic permission denied (if we checked and it failed)
+    // 2. Mic permission required (not granted yet, or actively denied)
     if (isMicGranted.value === false) {
       issues.push({
         id: 'mic-denied',
-        message: 'Microphone access was denied.',
-        severity: 'error',
-        action: 'Grant microphone permission in browser settings.',
+        message: 'Mic access required',
+        severity: 'warning',
+        action: 'Enable microphone to start analyzing audio.',
       });
     }
 

@@ -13,7 +13,6 @@ import { Chord } from 'tonal';
 import {
   SynthEngine,
   useAudioEngine,
-  useGlobalEngine,
   Fretboard,
   Note
 } from '@spectralsuite/core';
@@ -23,7 +22,7 @@ import SettingsToggle from '../../components/settings/SettingsToggle.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 
 const emit = defineEmits<{ ( e: 'back' ): void }>();
-const { activate, deactivate } = useAudioEngine();
+const { activate, deactivate, isInitialized } = useAudioEngine();
 
 const showConfig = ref( true );
 
@@ -38,7 +37,7 @@ const drawerCategories = computed( () => [
     id: 'Engine',
     label: 'Engine',
     description: 'Global Audio Processing',
-    showIndicator: useGlobalEngine().isGlobalEngineActive.value
+    showIndicator: isInitialized.value
   }
 ] );
 

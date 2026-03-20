@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onActivated, onDeactivated, watch } from 'vue';
-import { useAudioEngine, useResonance, getNoteFromFreq, useGlobalEngine, LAB_MANUAL } from '@spectralsuite/core';
+import { useAudioEngine, useResonance, getNoteFromFreq } from '@spectralsuite/core';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
@@ -24,7 +24,7 @@ const isSettingsOpen = ref( false );
 const drawerCategories = [
     {
         id: 'Engine', label: 'Engine', description: 'Audio Input & Device Selection', showIndicator:
-            useGlobalEngine().isGlobalEngineActive.value
+            isInitialized.value
     }
 ];
 

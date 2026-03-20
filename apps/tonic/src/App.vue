@@ -1,20 +1,51 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch, onUnmounted, defineAsyncComponent } from 'vue'
+import { ref, onMounted, computed, watch, onUnmounted, defineAsyncComponent, h } from 'vue'
 
-const AuraTuneModule = defineAsyncComponent(() => import('./modules/auratune/AuraTuneModule.vue'));
-const ScaleSleuthModule = defineAsyncComponent(() => import('./modules/scalesleuth/ScaleSleuthModule.vue'));
-const ChordCaptureModule = defineAsyncComponent(() => import('./modules/chordcapture/ChordCaptureModule.vue'));
-const PocketEngineModule = defineAsyncComponent(() => import('./modules/pocketengine/PocketEngineModule.vue'));
-const FrequencyFlowModule = defineAsyncComponent(() => import('./modules/frequencyflow/FrequencyFlowModule.vue'));
-const TrackTracerModule = defineAsyncComponent(() => import('./modules/tracktracer/TrackTracerModule.vue'));
-const HarmonicOrbitModule = defineAsyncComponent(() => import('./modules/harmonicorbit/HarmonicOrbitModule.vue'));
-const TonnetzModule = defineAsyncComponent(() => import('./modules/tonnetz/TonnetzModule.vue'));
-const ChordForgeModule = defineAsyncComponent(() => import('./modules/chordforge/ChordForgeModule.vue'));
-const MelodyMirrorModule = defineAsyncComponent(() => import('./modules/melodymirror/MelodyMirrorModule.vue'));
-const ResonanceLabModule = defineAsyncComponent(() => import('./modules/resonancelab/ResonanceLabModule.vue'));
-const BendTrainerModule = defineAsyncComponent(() => import('./modules/bendtrainer/BendTrainerModule.vue'));
-const AcademyModule = defineAsyncComponent(() => import('./modules/academy/AcademyModule.vue'));
-const LessonRunner = defineAsyncComponent(() => import('./modules/academy/LessonRunner.vue'));
+/**
+ * LoadingSpinner — Rendered while any async module chunk is being fetched.
+ * Defined as a render function so we don't need a separate .vue file.
+ * 
+ * Now safe to use because we removed <KeepAlive> — the conflict was
+ * specifically between loadingComponent's async wrapper + KeepAlive's
+ * activate/deactivate lifecycle.
+ */
+const LoadingSpinner = {
+  render() {
+    return h('div', {
+      class: 'flex flex-col items-center justify-center py-32 space-y-6 w-full min-h-[50vh]'
+    }, [
+      h('div', { class: 'relative w-24 h-24' }, [
+        h('div', { class: 'absolute inset-0 border-4 border-indigo-500/20 rounded-full' }),
+        h('div', { class: 'absolute inset-0 border-4 border-indigo-400 rounded-full border-t-transparent animate-spin' })
+      ]),
+      h('p', {
+        class: 'font-black tracking-[0.5em] text-[10px] uppercase text-indigo-400 animate-pulse'
+      }, 'Initializing Module...')
+    ])
+  }
+}
+
+/** Wraps every module import with a shared loading spinner */
+const asyncModule = (loader: () => Promise<any>) => defineAsyncComponent({
+  loader,
+  loadingComponent: LoadingSpinner,
+  delay: 200  // Only show spinner if chunk takes > 200ms
+})
+
+const AuraTuneModule = asyncModule(() => import('./modules/auratune/AuraTuneModule.vue'));
+const ScaleSleuthModule = asyncModule(() => import('./modules/scalesleuth/ScaleSleuthModule.vue'));
+const ChordCaptureModule = asyncModule(() => import('./modules/chordcapture/ChordCaptureModule.vue'));
+const PocketEngineModule = asyncModule(() => import('./modules/pocketengine/PocketEngineModule.vue'));
+const FrequencyFlowModule = asyncModule(() => import('./modules/frequencyflow/FrequencyFlowModule.vue'));
+const TrackTracerModule = asyncModule(() => import('./modules/tracktracer/TrackTracerModule.vue'));
+const HarmonicOrbitModule = asyncModule(() => import('./modules/harmonicorbit/HarmonicOrbitModule.vue'));
+const TonnetzModule = asyncModule(() => import('./modules/tonnetz/TonnetzModule.vue'));
+const ChordForgeModule = asyncModule(() => import('./modules/chordforge/ChordForgeModule.vue'));
+const MelodyMirrorModule = asyncModule(() => import('./modules/melodymirror/MelodyMirrorModule.vue'));
+const ResonanceLabModule = asyncModule(() => import('./modules/resonancelab/ResonanceLabModule.vue'));
+const BendTrainerModule = asyncModule(() => import('./modules/bendtrainer/BendTrainerModule.vue'));
+const AcademyModule = asyncModule(() => import('./modules/academy/AcademyModule.vue'));
+const LessonRunner = asyncModule(() => import('./modules/academy/LessonRunner.vue'));
 import { type Lesson } from './modules/academy/lessons';
 import ToolManualOverlay from './components/ToolManualOverlay.vue';
 import IntelligenceButton from './components/IntelligenceButton.vue';
@@ -315,8 +346,7 @@ const handleGainChange = ( event: Event ) => {
       </div>
 
       <!-- MODULE VIEWS -->
-      <KeepAlive>
-        <AuraTuneModule
+      <AuraTuneModule
           v-if=" currentModule === 'auratune' && enabledTools.auratune "
           @back="currentModule = 'dashboard'"
         @open-settings="openSettings( 'engine' )"
@@ -370,10 +400,9 @@ const handleGainChange = ( event: Event ) => {
       />
       <AcademyModule
         v-else-if=" currentModule === 'academy' "
-        @start-lesson="( l ) => activeLesson = l"
+        @start-lesson="( l: Lesson ) => activeLesson = l"
         @back="currentModule = 'dashboard'"
       />
-      </KeepAlive>
 
       <div
         v-if=" currentModule !== 'dashboard' && currentModule !== 'academy' && !enabledTools[currentModule] "
@@ -425,7 +454,7 @@ const handleGainChange = ( event: Event ) => {
           :current-module="currentModule"
           @complete="activeLesson = null; currentModule = 'academy'"
           @quit="activeLesson = null; currentModule = 'academy'"
-          @tool-change="( toolId ) => currentModule = toolId"
+          @tool-change="( toolId: string ) => currentModule = toolId"
         />
       </div>
     </transition>

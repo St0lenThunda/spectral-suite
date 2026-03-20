@@ -121,3 +121,59 @@
 ### Input Processor (DSP)
 - [ ] **Noise Gate**: Fine-tune threshold logic for varied environments
 - [ ] **Compressor**: Dynamic range cleaner (Even out volume)
+
+---
+
+## 🌟 Module Wishlist
+
+### 🎓 Academy
+- **Bug**: 
+- **Improvements**: 
+
+### 🌈 AuraTune
+- **Bug**: 
+- **Improvements**: 
+
+### 🎯 Bend Trainer
+- **Bug**: 
+- **Improvements**: 
+
+### 📥 Chord Capture
+- **Bug**: 
+- **Improvements**: 
+
+### 🔨 Chord Forge
+- **Bug**: 
+- **Improvements**: 
+
+### 🌊 Frequency Flow
+- **Bug**: 
+- **Improvements**: 
+
+### 🪐 Harmonic Orbit
+- **Bug**: 
+- **Improvements**: 
+
+### 🪞 Melody Mirror
+- **Bug**: 
+- **Improvements**: 
+
+### 🕹️ Pocket Engine
+- **Bug**: 
+- **Improvements**: 
+
+### 🔬 Resonance Lab
+- **Bug**: 
+- **Improvements**: 
+
+### 🔍 Scale Sleuth
+- **Bug**: 
+- **Improvements**: 
+
+### 🕸️ Tonnetz
+- **Bug**: 
+- **Improvements**: 
+
+### 🕵️ Track Tracer
+- **Bug**: 
+- **Improvements**: 

@@ -16,7 +16,7 @@ export interface OrbitChord {
   hexColor: string;
 }
 
-const props = defineProps<{
+defineProps<{
   // Controls visibility
   isOpen: boolean;
   // Diatonic family chords for toggling
@@ -33,7 +33,7 @@ const { displayMode, activeCagedZone, toggledChords, multiVoicing, toggleMode, t
 // Header Title Display
 const displayTitle = computed(() => {
   if (toggledChords.value.length === 0) return 'No Chords Selected';
-  if (toggledChords.value.length === 1) return toggledChords.value[0].name;
+  if (toggledChords.value.length === 1) return toggledChords.value[0]?.name ?? 'Chord';
   return `${toggledChords.value.length} Chords Active`;
 });
 

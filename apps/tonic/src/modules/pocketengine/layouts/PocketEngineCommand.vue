@@ -12,7 +12,7 @@
  */
 import { PlayButton } from '@spectralsuite/core'
 
-const props = defineProps<{
+defineProps<{
   // State
   isPlaying: boolean
   tempo: number

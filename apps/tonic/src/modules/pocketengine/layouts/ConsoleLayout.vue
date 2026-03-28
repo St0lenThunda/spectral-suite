@@ -15,7 +15,7 @@ import StudioHUD from '../components/StudioHUD.vue';
 import LeftInteractionZone from '../components/LeftInteractionZone.vue';
 import RightInteractionZone from '../components/RightInteractionZone.vue';
 
-const props = defineProps<{
+defineProps<{
   isPlaying: boolean
   tempo: number
   timingOffset: number

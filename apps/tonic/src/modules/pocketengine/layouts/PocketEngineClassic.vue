@@ -13,7 +13,7 @@
  */
 import { PlayButton } from '@spectralsuite/core'
 
-const props = defineProps<{
+defineProps<{
   // State
   isInitialized: boolean
   isPlaying: boolean

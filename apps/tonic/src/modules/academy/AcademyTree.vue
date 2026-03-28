@@ -15,13 +15,13 @@ const academyStore = useAcademyStore();
 // For now, let's just render them as a sequential connected path based on the array order,
 // but styled like a vertical timeline.
 const timelineNodes = computed(() => {
-  return lessons.map((lesson, index) => {
+  return lessons.map((lesson, _index) => {
     return {
       ...lesson,
       isUnlocked: academyStore.isUnlocked(lesson.prerequisites),
       isCompleted: academyStore.isCompleted(lesson.id),
       // Alternate left/right alignment for a winding path look
-      alignment: index % 2 === 0 ? 'left' : 'right'
+      alignment: _index % 2 === 0 ? 'left' : 'right'
     };
   });
 });
@@ -57,7 +57,7 @@ const getToolIcon = (lesson: Lesson): string => {
     <div class="absolute left-8 md:left-1/2 top-0 bottom-0 w-1 bg-slate-800 md:-translate-x-1/2 rounded-full opacity-50 z-0"></div>
 
     <div class="max-w-2xl mx-auto flex flex-col gap-8 md:gap-12 relative z-10 w-full pl-12 md:pl-0">
-      <div v-for="(node, index) in timelineNodes" :key="node.id" 
+      <div v-for="node in timelineNodes" :key="node.id" 
            class="flex items-center w-full relative"
            :class="node.alignment === 'left' ? 'md:justify-start justify-end' : 'justify-end'">
         

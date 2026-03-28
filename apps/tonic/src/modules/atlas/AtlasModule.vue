@@ -6,7 +6,7 @@
  * learn how TypeScript, Vue 3, and Pinia are used, and see the
  * dependencies between different modules.
  */
-import { ref, computed, onMounted, watch, nextTick } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useAudioEngine } from '@spectralsuite/core';
 
 // --- STATE ---
@@ -68,7 +68,7 @@ const analyzeModule = async ( name: string ) => {
         name,
         why: importDictionary[name as keyof typeof importDictionary] || 'A utility used by this module for its specific logic.'
       }) )
-      .sort( ( a, b ) => a.why.includes( 'utility' ) ? 1 : -1 ); // Prioritize known imports
+      .sort( ( a, _b ) => a.why.includes( 'utility' ) ? 1 : -1 ); // Prioritize known imports
   }
 };
 
@@ -238,7 +238,7 @@ const tutorials = {
             <button
               v-for="mod in moduleList"
               :key="mod"
-              @click="activeSection = 'modules'; selectedModule = mod"
+              @click="activeSection = 'modules'; selectedModule = mod ?? null"
               class="w-full px-4 py-2 rounded-lg text-left text-[10px] font-bold uppercase tracking-wider transition-all"
               :class="selectedModule === mod ? 'text-emerald-400 bg-emerald-500/10' : 'text-slate-500 hover:text-slate-300 hover:bg-white/5'"
             >
@@ -359,7 +359,7 @@ const tutorials = {
                     <div class="bg-black/40 rounded-2xl border border-white/5 overflow-hidden flex max-h-[600px]">
                       <!-- Line Numbers gutter -->
                       <div class="w-10 bg-black/20 text-slate-600 font-mono text-[10px] py-6 text-right pr-3 select-none flex flex-col">
-                        <span v-for="(line, idx) in sourceLines" :key="idx" class="leading-relaxed h-4">{{ idx + 1 }}</span>
+                        <span v-for="(_line, idx) in sourceLines" :key="idx" class="leading-relaxed h-4">{{ idx + 1 }}</span>
                       </div>
                       <!-- Code area -->
                       <pre class="flex-1 text-[11px] font-mono text-slate-400/80 p-6 pt-[22px] overflow-auto custom-scrollbar selection:bg-indigo-500/20 leading-relaxed"><code class="block whitespace-pre">{{ currentSource }}</code></pre>

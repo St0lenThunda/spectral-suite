@@ -51,25 +51,16 @@ const currentTriadNotes = ref<string[]>( [] );
 const isGuitarPopoverOpen = ref( false );
 const popoverChordName = ref<string | null>( null );
 const popoverChordType = ref<string | null>( null );
-const popoverChordColor = ref<string | null>( null );
 
-const { toggleChord, isChordToggled, clearToggledChords } = useHarmonicOrbitGuitar();
+const { toggleChord, clearToggledChords } = useHarmonicOrbitGuitar();
 
 // Trigger the popover with a specific chord
-const openGuitarPopover = ( chordName: string, chordType: string ) => {
+const openGuitarPopover = ( chordName: string, _chordType: string ) => {
   popoverChordName.value = null; // No single name anymore! It's a collection.
   popoverChordType.value = null;
   clearToggledChords();
   toggleChord(chordName, getSegmentStyle( chordName ).color);
   isGuitarPopoverOpen.value = true;
-};
-
-// Toggle individual chords from the anatomy panel
-const toggleFretboardChord = ( chordName: string ) => {
-  toggleChord(chordName, getSegmentStyle( chordName ).color);
-  if (!isGuitarPopoverOpen.value) {
-    isGuitarPopoverOpen.value = true;
-  }
 };
 
 // Calculation to get all 7 diatonic chords for a selected key

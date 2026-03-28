@@ -151,7 +151,7 @@ onFlash( () => {
 const grooveHistory = ref<Array<{ offset: number, time: number }>>( [] )
 watch( () => stats.total, () => {
   if ( timingHistory.value.length === 0 ) return;
-  grooveHistory.value.push( { offset: timingHistory.value[timingHistory.value.length - 1], time: performance.now() } );
+  grooveHistory.value.push( { offset: timingHistory.value[timingHistory.value.length - 1] ?? 0, time: performance.now() } );
   if ( grooveHistory.value.length > 32 ) grooveHistory.value.shift();
 } );
 
@@ -170,7 +170,7 @@ const reset = () => { resetStats(); grooveHistory.value = [] }
 watch( isPlaying, ( newData ) => newData && metronome.setAccentPattern( accentPattern.value ) )
 
 import { useAudioEngine } from '@spectralsuite/core';
-const { init: initAudio, activate, deactivate, getAnalyser } = useAudioEngine();
+const { init: initAudio, activate, deactivate } = useAudioEngine();
 
 /**
  * INITIALIZATION HANDLER
@@ -188,9 +188,7 @@ const handleInit = async () => {
     activate();
 
     // 3. Initialize the rhythm store (sequencer, workers, detection)
-    // We pass the global analyser to the store so it can perform
-    // real-time transient detection from the microphone input.
-    await initStore( getAnalyser() );
+    await initStore();
   } catch (err) {
     console.error("Pocket Engine Init Failed:", err);
   }

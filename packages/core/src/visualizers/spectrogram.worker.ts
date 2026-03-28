@@ -7,16 +7,19 @@ class MiniOsc {
   constructor(canvas: OffscreenCanvas) {
     this.canvas = canvas;
   }
-  draw(data: Float32Array) {
+  draw(data: Float32Array, fftSize: number) {
     const ctx = this.canvas.getContext('2d') as unknown as CanvasRenderingContext2D;
     if (!ctx) return;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.strokeStyle = '#00f3ff';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    const sliceWidth = this.canvas.width / data.length;
+    
+    const bufferLength = fftSize;
+    const sliceWidth = this.canvas.width / bufferLength;
     let x = 0;
-    for (let i = 0; i < data.length; i++) {
+    
+    for (let i = 0; i < bufferLength; i++) {
         const v = data[i] ?? 0;
         const y = (v + 1) * this.canvas.height / 2;
         if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
@@ -44,6 +47,8 @@ let showHarmonics = false;
 let fundamentalFreq = 0;
 let instrumentRanges: any[] = [];
 let nyquist = 22050; // Assume 44.1/2 default, updated sequentially
+let binCount = 1024; // Corresponds to default fftSize 2048
+let fftSize = 2048; // Global scope for tracking active FFT width
 let frozenData: Uint8Array | null = null;
 
 let animId: number | null = null;
@@ -51,17 +56,18 @@ let animId: number | null = null;
 // Lock-free rendering loop perfectly synchronized to the target display rate
 const tick = () => {
     if (osc && timeView && !isFrozen) {
-        osc.draw(timeView);
+        osc.draw(timeView, fftSize);
     }
     
     if (spec3d && freqView) {
-        spec3d.draw(freqView, nyquist, isFrozen, verticalScale, perspective, hueShift);
+        spec3d.draw(freqView, nyquist, binCount, isFrozen, verticalScale, perspective, hueShift);
     }
     
     if (mag && freqView) {
         mag.draw(
             freqView,
             nyquist,
+            binCount,
             frozenData,
             scaleMode,
             null, // peakHoldData
@@ -94,6 +100,9 @@ self.onmessage = (e) => {
         nyquist = msg.nyquist || 22050;
 
         if (!animId) tick();
+    } else if (msg.type === 'SYNC_BUFFERS') {
+        freqView = msg.freqArray;
+        timeView = msg.timeArray;
     } else if (msg.type === 'UPDATE_CONFIG') {
         if (msg.isFrozen !== undefined) isFrozen = msg.isFrozen;
         if (msg.verticalScale !== undefined) verticalScale = msg.verticalScale;
@@ -105,6 +114,8 @@ self.onmessage = (e) => {
         if (msg.fundamentalFreq !== undefined) fundamentalFreq = msg.fundamentalFreq;
         if (msg.instrumentRanges !== undefined) instrumentRanges = msg.instrumentRanges;
         if (msg.nyquist !== undefined) nyquist = msg.nyquist;
+        if (msg.binCount !== undefined) binCount = msg.binCount;
+        if (msg.fftSize !== undefined) fftSize = msg.fftSize;
     } else if (msg.type === 'RESIZE') {
         if (msg.target === 'osc' && osc) {
             osc.canvas.width = msg.width; osc.canvas.height = msg.height;

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { usePitch, useAudioEngine, Note } from '@spectralsuite/core'
-import { onActivated, onDeactivated, ref, computed, watch } from 'vue'
+import { onMounted, onUnmounted, onActivated, onDeactivated, ref, computed, watch } from 'vue'
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
@@ -14,11 +14,22 @@ const {
   concertA,
   transposition,
   pitchHistory,
-} = usePitch( { averagingWindowMs: 2500 } )
+} = usePitch( { 
+  averagingWindowMs: 2500,
+  dynamicsResetThreshold: 0.15 // Higher threshold to ignore volume "beating" during acoustic decay
+} )
 
 const { init, isInitialized, error: engineError, activate, deactivate } = useAudioEngine()
 
 // Ensure engine is active when we mount this tool
+onMounted( () => {
+ activate();
+});
+
+onUnmounted( () => {
+ deactivate();
+});
+
 onActivated( () => {
  activate();
 });
@@ -77,13 +88,18 @@ const strobeAngle = ref( 0 )
 // Needle Physics State
 const needlePosition = ref( 0 ); // The visual position (in cents)
 let needleVelocity = 0;
+const animTime = ref( performance.now() ); // Track time for smooth graph scrolling
 // PHYSICS CONSTANTS
 // Tension: How hard the spring pulls to the target (Higher = Faster/Snappier)
 const SPRING_TENSION = 0.08; 
 // Friction: Resistance to movement (Higher = Less overshoot/More heavy feel)
 const SPRING_FRICTION = 0.82; 
 
-onActivated( () => {
+let animationId: number;
+
+const startAnimation = () => {
+  if (animationId) cancelAnimationFrame(animationId);
+  
   const animate = () => {
       // 1. Strobe Logic (Keep existing)
     if ( strobeCanvas.value && cents.value !== null && ( clarity.value ?? 0 ) > 0.8 ) {
@@ -117,18 +133,37 @@ onActivated( () => {
     
     // 2. Needle Physics Logic
     // Goal: Move 'needlePosition' towards 'cents.value' with spring physics
-    const target = cents.value || 0;
-    const displacement = target - needlePosition.value;
-    const force = displacement * SPRING_TENSION;
+    const target = (typeof cents.value === 'number' && isFinite(cents.value)) ? cents.value : 0;
     
-    needleVelocity += force;
-    needleVelocity *= SPRING_FRICTION; // Apply damping
-    needlePosition.value += needleVelocity;
+    // HMR / State Recovery: If the state was poisoned prior to hot-reload, heal it!
+    if (!isFinite(needlePosition.value) || !isFinite(needleVelocity)) {
+      needlePosition.value = 0;
+      needleVelocity = 0;
+    }
+    
+    const displacement = target - needlePosition.value;
+    
+    // Prevent NaN poisoning of the physics state
+    if (isFinite(displacement)) {
+      const force = displacement * SPRING_TENSION;
+      needleVelocity += force;
+      needleVelocity *= SPRING_FRICTION; // Apply damping
+      needlePosition.value += needleVelocity;
+    }
+    
+    animTime.value = performance.now();
 
-    requestAnimationFrame( animate )
+    animationId = requestAnimationFrame( animate )
   }
   animate()
-} )
+}
+
+// Support both KeepAlive component switching and direct Vue Router mounting
+onMounted( startAnimation )
+onActivated( startAnimation )
+
+onUnmounted( () => cancelAnimationFrame(animationId) )
+onDeactivated( () => cancelAnimationFrame(animationId) )
 
 // Drone Logic (Simple Oscillator)
 let droneOsc: OscillatorNode | null = null
@@ -202,13 +237,63 @@ const neighborNotes = computed(() => {
     }
 });
 
-// Map -50..+50 cents to -45..+45 degrees
+// Map -100..+100 cents to -45..+45 degrees
 const gaugeRotation = computed(() => {
     // Clamp needle visual range
-    const clamped = Math.max(-50, Math.min(50, needlePosition.value));
-    // Linear map: -50 -> -45deg, +50 -> +45deg
-    return clamped * (45 / 50);
+    const clamped = Math.max(-100, Math.min(100, needlePosition.value));
+    // Linear map: -100 -> -45deg, +100 -> +45deg
+    return clamped * (45 / 100);
 });
+
+// Target Pitch in Hz for Needle Center
+const targetHz = computed(() => {
+  if (!currentNote.value) return '';
+  const freq = Note.get(currentNote.value).freq;
+  // Account for custom tuning (e.g. A=432Hz)
+  if (freq) {
+     return (freq * (concertA.value / 440)).toFixed(1);
+  }
+  return '';
+});
+
+// --- Reference Tones ---
+const referenceStrings = [
+  { name: 'E', octave: 2 }, // Low E
+  { name: 'A', octave: 2 },
+  { name: 'D', octave: 3 },
+  { name: 'G', octave: 3 },
+  { name: 'B', octave: 3 },
+  { name: 'E', octave: 4 }  // High E
+];
+
+const playReferenceNote = (noteName: string, octave: number) => {
+  const context = useAudioEngine().getContext();
+  if (!context) return;
+  
+  if (context.state === 'suspended') {
+    context.resume();
+  }
+
+  const osc = context.createOscillator();
+  const gain = context.createGain();
+  
+  osc.type = 'triangle'; 
+  osc.connect(gain);
+  gain.connect(context.destination);
+  
+  const freq = Note.get(`${noteName}${octave}`).freq;
+  if (freq) {
+    osc.frequency.value = freq;
+    
+    // Smooth envelope for a guitar-like pluck
+    gain.gain.setValueAtTime(0, context.currentTime);
+    gain.gain.linearRampToValueAtTime(0.3, context.currentTime + 0.05); // Attack
+    gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 3.0); // Decay
+    
+    osc.start();
+    osc.stop(context.currentTime + 3.0);
+  }
+}
 </script>
 
 <template>
@@ -391,12 +476,14 @@ const gaugeRotation = computed(() => {
                 {{ engineError }}
             </div>
 
-            <div v-for="note in ['E','A','D','G','B','E']" :key="note" 
-                class="w-12 h-12 rounded-full flex items-center justify-center font-black text-xl bg-[#2a2a2a] text-stone-600 border-2 border-stone-800 transition-all duration-300"
-                :class="{ 'text-white border-white bg-sky-500 shadow-[0_0_20px_rgba(255,255,255,0.5)] scale-110': isInitialized && currentNote && currentNote.startsWith(note) }"
+            <button v-for="(string, index) in referenceStrings" :key="index" 
+                @click="playReferenceNote(string.name, string.octave)"
+                :title="`Play ${string.name}${string.octave}`"
+                class="w-12 h-12 rounded-full flex items-center justify-center font-black text-xl bg-[#2a2a2a] text-stone-600 border-2 border-stone-800 transition-all duration-300 cursor-pointer hover:bg-slate-700 hover:text-white"
+                :class="{ 'text-white border-white bg-sky-500 shadow-[0_0_20px_rgba(255,255,255,0.5)] scale-110': isInitialized && currentNote && currentNote.startsWith(string.name) }"
             >
-                {{ note }}
-            </div>
+                {{ string.name }}
+            </button>
         </div>
 
         <!-- Note Ruler -->
@@ -404,47 +491,58 @@ const gaugeRotation = computed(() => {
             <div class="text-4xl font-bold text-stone-700 opacity-50">{{ neighborNotes.prev || '--'  }}</div>
             <!-- Current Note: Turns Green when in tune -->
             <div class="text-9xl font-black tracking-tighter" 
-                 :class="Math.abs(needlePosition) < 5 && currentNote ? 'text-emerald-400 drop-shadow-[0_0_40px_rgba(52,211,153,0.6)]' : 'text-sky-500'"
+                 :class="Math.abs(needlePosition) < 5 && currentNote ? 'text-emerald-400 drop-shadow-[0_0_40px_rgba(52,211,153,0.6)]' : '#0ea5e9'"
+                 :style="{ color: Math.abs(needlePosition) < 5 && currentNote ? '' : '#0ea5e9' }"
             >
                 {{ currentNote || '--' }}
             </div>
             <div class="text-4xl font-bold text-stone-700 opacity-50">{{ neighborNotes.next || '--'  }}</div>
-        </div>
-        
-        <!-- Frequency Readout: Turns Green when in tune -->
-         <div class="text-4xl font-mono mb-4 z-10 relative"
-              :class="Math.abs(needlePosition) < 5 && currentNote ? 'text-emerald-400' : 'text-sky-500'"
-         >
-            {{ pitch ? pitch.toFixed( 1 ) : '---.-' }}<span class="text-lg text-stone-500 ml-1">Hz</span>
         </div>
 
         <!-- Analog Gauge (SVG) -->
         <div class="w-full max-w-[500px] aspect-[2/1] relative">
             <svg viewBox="0 0 300 150" class="w-full h-full overflow-visible">
                 <!-- Arc Ticks -->
-                <path id="gauge-arc" d="M 30,140 A 120,120 0 0 1 270,140" fill="none" class="stroke-stone-700" stroke-width="2" />
+                <path id="gauge-arc" d="M 30,140 A 120,120 0 0 1 270,140" fill="none" stroke="#333" stroke-width="2" />
                 
-                <!-- Major Ticks (-50, -40 ... 0 ... +50) -->
-                <g v-for="tick in [-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50]" :key="tick">
+                <!-- Minor Ticks -->
+                <g v-for="mtick in 40" :key="'m'+mtick">
+                   <rect x="149.5" y="22" width="1" height="6" fill="#0284c7" :transform="`rotate(${(-100 + (mtick * 5)) * (45/100)}, 150, 140)`" />
+                </g>
+                
+                <!-- Major Ticks (-100, -80 ... 0 ... +100) -->
+                <g v-for="tick in [-100, -80, -60, -40, -20, 0, 20, 40, 60, 80, 100]" :key="tick">
                     <!-- Map tick value to angle (-45 to 45 deg) -->
-                    <rect x="149" y="20" width="2" height="15" 
-                        :fill="tick === 0 ? ( Math.abs(needlePosition) < 5 && currentNote ? '#34d399' : '#0ea5e9') : '#444'" 
-                        :transform="`rotate(${tick * (45/50)}, 150, 140)`" 
+                    <rect x="148.5" y="20" width="3" height="12" 
+                        :fill="tick === 0 ? '#34d399' : '#0ea5e9'" 
+                        :transform="`rotate(${tick * (45/100)}, 150, 140)`" 
                     />
                     <!-- Tick Labels -->
-                    <text v-if="tick % 50 === 0" 
+                    <text v-if="[ -100, -50, 50, 100 ].includes(tick)" 
                         x="150" y="10" 
                         text-anchor="middle" 
-                        :fill="tick === 0 ? ( Math.abs(needlePosition) < 5 && currentNote ? '#34d399' : '#0ea5e9') : '#666'"
-                        class="text-[8px] font-mono font-bold"
-                        :transform="`rotate(${tick * (45/50)}, 150, 140)`"
+                        fill="#0ea5e9"
+                        class="text-[9px] font-mono font-bold"
+                        :transform="`rotate(${tick * (45/100)}, 150, 140)`"
                     >
                         {{ tick > 0 ? '+' : ''}}{{ tick }}c
                     </text>
+                    
+                    <!-- TARGET HZ LABEL AT ZERO -->
+                    <text v-if="tick === 0" 
+                        x="150" y="10" 
+                        text-anchor="middle" 
+                        fill="#0ea5e9"
+                        class="text-[10px] font-mono font-bold tracking-tighter"
+                    >
+                        {{ targetHz }}
+                    </text>
                 </g>
 
-                <!-- Connection Line (Decor) -->
-                 <line x1="150" y1="140" x2="150" y2="100" stroke="#333" stroke-width="1" />
+                <!-- Absolute Pitch Output (Center of Gauge) -->
+                <text x="150" y="100" font-size="28" font-weight="900" font-family="monospace" text-anchor="middle" :fill="Math.abs(needlePosition) < 5 && currentNote ? '#34d399' : '#0ea5e9'">
+                   {{ pitch ? pitch.toFixed(1) : '---.-' }}<tspan font-size="14" fill="#0284c7" dx="2">Hz</tspan>
+                </text>
 
                 <!-- THE NEEDLE: Turns Green when in tune -->
                 <g :transform="`rotate(${gaugeRotation}, 150, 140)`" class="transition-transform duration-75 ease-linear will-change-transform">
@@ -456,9 +554,8 @@ const gaugeRotation = computed(() => {
                      <circle cx="150" cy="35" r="3" 
                              :fill="Math.abs(needlePosition) < 5 && currentNote ? '#34d399' : '#0ea5e9'" 
                              :class="Math.abs(needlePosition) < 5 && currentNote ? 'filter drop-shadow-[0_0_15px_rgba(52,211,153,0.9)]' : 'filter drop-shadow-[0_0_8px_rgba(14,165,233,0.8)]'" />
-                     <!-- Counterweight -->
-                    <circle cx="150" cy="140" r="12" fill="#1a1a1a" :stroke="Math.abs(needlePosition) < 5 && currentNote ? '#34d399' : '#0ea5e9'" stroke-width="3" />
-                    <circle cx="150" cy="140" r="4" :fill="Math.abs(needlePosition) < 5 && currentNote ? '#34d399' : '#0ea5e9'" />
+                     <!-- Counterweight Pivot -->
+                    <circle cx="150" cy="140" r="10" fill="none" :stroke="Math.abs(needlePosition) < 5 && currentNote ? '#34d399' : '#0ea5e9'" stroke-width="4" />
                 </g>
             </svg>
             
@@ -500,46 +597,46 @@ const gaugeRotation = computed(() => {
           </div>
         </div>
       </Transition>
-    </div>
 
-    <!-- Vibrato Diagnostic Graph (Full Width Footer) -->
-    <Transition name="fade-scale">
-      <div
-        v-if=" showVibrato "
-        class="mt-6 p-6 rounded-3xl bg-slate-900/50 border border-stone-800 w-full backdrop-blur-xl"
-      >
-        <label class="text-[9px] font-black uppercase tracking-widest text-sky-500 block mb-4 opacity-50">Pitch History (Vibrato)</label>
-        <div class="h-32 w-full relative group">
-          <svg
-            class="w-full h-full overflow-visible"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-          >
-            <!-- Center Line -->
-            <line
-              x1="0"
-              y1="50"
-              x2="100"
-              y2="50"
-              stroke="#333"
-              stroke-width="1"
-              stroke-dasharray="2 2"
-            />
-            <!-- Vibrato Line -->
-            <polyline
-              fill="none"
-              stroke="#0ea5e9"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              :points="pitchHistory.length > 1 ? pitchHistory.map( ( h, i ) => `${( i / ( pitchHistory.length - 1 ) ) * 100},${50 - ( h.cents / 2 )}` ).join( ' ' ) : ''"
-            />
-          </svg>
-          <!-- Fade Overlay -->
-          <div class="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent pointer-events-none"></div>
+      <!-- Vibrato Diagnostic Graph (Grid Footer) -->
+      <Transition name="fade-scale">
+        <div
+          v-if=" showVibrato "
+          class="lg:col-span-3 p-6 rounded-3xl bg-slate-900/50 border border-stone-800 w-full backdrop-blur-xl"
+        >
+          <label class="text-[9px] font-black uppercase tracking-widest text-sky-500 block mb-4 opacity-50">Pitch History (Vibrato)</label>
+          <div class="h-32 w-full relative group">
+            <svg
+              class="w-full h-full overflow-hidden rounded-xl"
+              viewBox="0 0 100 100"
+              preserveAspectRatio="none"
+            >
+              <!-- Center Line -->
+              <line
+                x1="0"
+                y1="50"
+                x2="100"
+                y2="50"
+                stroke="#333"
+                stroke-width="1"
+                stroke-dasharray="2 2"
+              />
+              <!-- Vibrato Line (Clamped to +/- 150c visually to prevent offscreen slicing) -->
+              <polyline
+                fill="none"
+                stroke="#0ea5e9"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                :points="pitchHistory.length > 1 ? pitchHistory.map( h => `${100 - ( ( ( animTime - h.time ) / 3000 ) * 100 )},${50 - ( Math.max(-150, Math.min(150, h.cents)) * 0.3 )}` ).join( ' ' ) : ''"
+              />
+            </svg>
+            <!-- Fade Overlay -->
+            <div class="absolute inset-0 bg-gradient-to-r from-slate-900 via-transparent to-transparent pointer-events-none"></div>
+          </div>
         </div>
-      </div>
-    </Transition>
+      </Transition>
+    </div>
 
   </div>
 </template>

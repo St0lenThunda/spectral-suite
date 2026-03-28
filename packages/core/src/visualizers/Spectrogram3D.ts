@@ -34,6 +34,7 @@ export class Spectrogram3D {
   draw (
     dataArray: Uint8Array,
     nyquist: number,
+    binCount: number,
     isFrozen: boolean = false,
     verticalScale: number = 1.5,
     perspective: number = 0.8,
@@ -62,7 +63,7 @@ export class Spectrogram3D {
     for ( let i = this.history.length - 1; i >= 0; i-- ) {
       const slice = this.history[i];
       if ( slice ) {
-        this.drawSlice( ctx, slice, nyquist, i, verticalScale, perspective, hueShift );
+        this.drawSlice( ctx, slice, nyquist, binCount, i, verticalScale, perspective, hueShift );
       }
     }
   }
@@ -81,6 +82,7 @@ export class Spectrogram3D {
     ctx: CanvasRenderingContext2D,
     data: Uint8Array,
     nyquist: number,
+    binCount: number,
     index: number,
     vScale: number,
     pScale: number,
@@ -113,7 +115,7 @@ export class Spectrogram3D {
       const percent = j / ( samples - 1 );
       // Logarithmic frequency distribution
       const freq = minFreq * Math.pow( maxFreq / minFreq, percent );
-      const bin = Math.round( freq / ( nyquist / data.length ) );
+      const bin = Math.round( freq / ( nyquist / binCount ) );
       samplePoints.push( bin );
     }
 

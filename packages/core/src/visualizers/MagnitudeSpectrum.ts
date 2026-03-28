@@ -8,6 +8,7 @@ export class MagnitudeSpectrum {
   draw (
     dataArray: Uint8Array,
     nyquist: number,
+    binCount: number,
     frozenData: Uint8Array | null,
     scaleMode: 'linear' | 'log',
     peakHoldData: Uint8Array | null = null,
@@ -63,7 +64,7 @@ export class MagnitudeSpectrum {
       ctx.beginPath();
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
       ctx.setLineDash( [5, 5] );
-      this.drawPath( ctx, frozenData, scaleMode );
+      this.drawPath( ctx, frozenData, binCount, scaleMode );
       ctx.stroke();
       ctx.setLineDash( [] );
     }
@@ -73,7 +74,7 @@ export class MagnitudeSpectrum {
       ctx.beginPath();
       ctx.strokeStyle = 'rgba(251, 113, 133, 0.5)'; // rose-400
       ctx.lineWidth = 1;
-      this.drawPath( ctx, peakHoldData, scaleMode );
+      this.drawPath( ctx, peakHoldData, binCount, scaleMode );
       ctx.stroke();
     }
 
@@ -81,7 +82,7 @@ export class MagnitudeSpectrum {
     ctx.beginPath();
     ctx.strokeStyle = '#38bdf8'; // sky-400
     ctx.lineWidth = 2;
-    this.drawPath( ctx, dataArray, scaleMode );
+    this.drawPath( ctx, dataArray, binCount, scaleMode );
     ctx.stroke();
 
     // Fill area
@@ -110,10 +111,11 @@ export class MagnitudeSpectrum {
     }
   }
 
-  drawPath ( ctx: CanvasRenderingContext2D, data: Uint8Array, scaleMode: 'linear' | 'log' ) {
+  drawPath ( ctx: CanvasRenderingContext2D, data: Uint8Array, binCount: number, scaleMode: 'linear' | 'log' ) {
     const width = this.canvas.width;
     const height = this.canvas.height;
-    const bufferLength = data.length;
+    // Discard zero-padding correctly using binCount instead of data.length
+    const bufferLength = binCount;
 
     for ( let i = 0; i < bufferLength; i++ ) {
       let x: number;

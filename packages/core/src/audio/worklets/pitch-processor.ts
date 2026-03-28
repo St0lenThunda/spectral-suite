@@ -16,7 +16,9 @@ class PitchProcessor extends AudioWorkletProcessor {
   private _bufferIndex: number = 0;
 
   // MPM Constants
-  private _cutoff: number = 0.5; // Relaxed to allow downstream filtering
+  // Lowered to 0.15 so that the Worklet forwards decaying pitches to the frontend, instead of discarding them.
+  // The frontend `usePitch` handles user-configured clarity hysteresis.
+  private _cutoff: number = 0.15; // Relaxed to allow downstream filtering
   private _sampleRate: number;
   private _useLowPass: boolean = false;
   private _downsample: number = 1;

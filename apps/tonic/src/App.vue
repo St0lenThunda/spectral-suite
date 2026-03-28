@@ -46,6 +46,7 @@ const ResonanceLabModule = asyncModule(() => import('./modules/resonancelab/Reso
 const BendTrainerModule = asyncModule(() => import('./modules/bendtrainer/BendTrainerModule.vue'));
 const AcademyModule = asyncModule(() => import('./modules/academy/AcademyModule.vue'));
 const LessonRunner = asyncModule(() => import('./modules/academy/LessonRunner.vue'));
+const AtlasModule = asyncModule(() => import('./modules/atlas/AtlasModule.vue'));
 import { type Lesson } from './modules/academy/lessons';
 import ToolManualOverlay from './components/ToolManualOverlay.vue';
 import IntelligenceButton from './components/IntelligenceButton.vue';
@@ -53,12 +54,17 @@ import SettingsModal from './components/settings/SettingsModal.vue';
 import ToastContainer from './components/ToastContainer.vue';
 import { useAudioEngine, StorageService } from '@spectralsuite/core'
 import { useDiagnosticToasts } from './composables/useDiagnosticToasts';
+import { useNavLayout } from './composables/useNavLayout';
+import { useAcademyStore } from './stores/useAcademyStore';
 
 // Enable global diagnostic toast notifications
 useDiagnosticToasts();
 
+const { showNavs } = useNavLayout();
+
 const currentModule = ref( 'dashboard' )
 const activeLesson = ref<Lesson | null>( null )
+const academyStore = useAcademyStore();
 const { isInitialized, inputGain, setGain, getAnalyser } = useAudioEngine()
 const volumeLevel = ref( 0 )
 let rafId: number | null = null
@@ -143,7 +149,14 @@ const ALL_TOOLS = [
     name: 'Pitch Stairway',
     description: 'Precision pitch practice. Master half, full, and blues bends to heaven.',
     icon: '🪜',
-    color: 'from-amber-500 to-orange-600'
+    color: 'from-amber-500 to-orange-700'
+  },
+  {
+    id: 'atlas',
+    name: 'Project Atlas',
+    description: 'Explore the source code, dependencies, and master the Spectral Suite architecture.',
+    icon: '📂',
+    color: 'from-indigo-600 to-blue-800'
   },
   {
     id: 'academy',
@@ -167,6 +180,7 @@ const enabledTools = ref<Record<string, boolean>>( {
   melodymirror: true,
   resonancelab: true,
   bendtrainer: true,
+  atlas: true,
   academy: false
 } )
 
@@ -230,7 +244,8 @@ const handleGainChange = ( event: Event ) => {
 
     <!-- Main Navigation Ribbon -->
     <nav
-      class="fixed top-0 left-0 right-0 h-16 bg-spectral-950/50 border-b border-white/5 backdrop-blur-md flex items-center px-8 z-50"
+      class="fixed top-0 left-0 right-0 h-16 bg-spectral-950/50 border-b border-white/5 backdrop-blur-md flex items-center px-8 z-50 transition-transform duration-500 ease-out will-change-transform"
+      :class="showNavs ? 'translate-y-0' : '-translate-y-full'"
     >
       <div
         class="flex items-center gap-3 cursor-pointer"
@@ -403,6 +418,7 @@ const handleGainChange = ( event: Event ) => {
         @start-lesson="( l: Lesson ) => activeLesson = l"
         @back="currentModule = 'dashboard'"
       />
+      <AtlasModule v-else-if="currentModule === 'atlas' && enabledTools.atlas" @back="currentModule = 'dashboard'" />
 
       <div
         v-if=" currentModule !== 'dashboard' && currentModule !== 'academy' && !enabledTools[currentModule] "
@@ -452,7 +468,7 @@ const handleGainChange = ( event: Event ) => {
           class="pointer-events-auto"
           :lesson="activeLesson"
           :current-module="currentModule"
-          @complete="activeLesson = null; currentModule = 'academy'"
+          @complete="academyStore.completeLesson(activeLesson.id); activeLesson = null; currentModule = 'academy'"
           @quit="activeLesson = null; currentModule = 'academy'"
           @tool-change="( toolId: string ) => currentModule = toolId"
         />
@@ -461,7 +477,8 @@ const handleGainChange = ( event: Event ) => {
 
     <!-- Persistent Global Status Bar -->
     <div
-      class="fixed bottom-0 left-0 right-0 h-16 bg-spectral-950 border-t border-white/5 backdrop-blur-xl flex items-center px-8 z-50"
+      class="fixed bottom-0 left-0 right-0 h-16 bg-spectral-950 border-t border-white/5 backdrop-blur-xl flex items-center px-8 z-50 transition-transform duration-500 ease-out will-change-transform"
+      :class="showNavs ? 'translate-y-0' : 'translate-y-full'"
     >
       <div class="flex items-center gap-8 overflow-x-auto no-scrollbar scroll-smooth w-full md:w-auto">
         <div class="flex flex-col shrink-0 group relative">

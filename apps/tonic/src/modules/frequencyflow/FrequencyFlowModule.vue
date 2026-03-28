@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { ref, onActivated, onDeactivated, watch, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, onActivated, onDeactivated, watch, nextTick } from 'vue';
 import { useAudioEngine, INSTRUMENT_RANGES, generateEqSuggestions, getNoteFromFreq, type EQSuggestion } from '@spectralsuite/core';
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
+
+import SpectrogramWorker from '../../../../../packages/core/src/visualizers/spectrogram.worker.ts?worker';
 
 const { init, isInitialized, getAnalyser, activate, deactivate } = useAudioEngine();
 
@@ -22,10 +24,16 @@ const magCanvas = ref<HTMLCanvasElement | null>( null );
 
 // Zero-Copy Web Worker State
 let worker: Worker | null = null;
-const sabFreq = typeof SharedArrayBuffer !== 'undefined' ? new SharedArrayBuffer(8192) : new ArrayBuffer(8192);
-const sabTime = typeof SharedArrayBuffer !== 'undefined' ? new SharedArrayBuffer(8192 * 4) : new ArrayBuffer(8192 * 4);
+
+const hasSAB = typeof SharedArrayBuffer !== 'undefined';
+const sabFreq = hasSAB ? new SharedArrayBuffer( 8192 ) : new ArrayBuffer( 8192 );
+const sabTime = hasSAB ? new SharedArrayBuffer( 8192 * 4 ) : new ArrayBuffer( 8192 * 4 );
 const freqView = new Uint8Array(sabFreq);
 const timeView = new Float32Array(sabTime);
+
+// Local buffers for Web Audio API (which explicitly rejects SharedArrayBuffers)
+const localFreqView = new Uint8Array( 8192 );
+const localTimeView = new Float32Array( 8192 );
 
 let animId: number | null = null;
 
@@ -44,6 +52,9 @@ const perspective = ref( 0.8 );
 // Focus State for Layout Reflow
 const activeFocus = ref<'magnitude' | 'waveform' | 'topology'>( 'topology' );
 
+const debugFps = ref( 0 );
+const debugInfo = ref( '' );
+
 const resizeCanvases = () => {
   [
     { ref: magCanvas, id: 'mag' },
@@ -55,16 +66,22 @@ const resizeCanvases = () => {
     const rect = canvas.getBoundingClientRect();
     const dpr = window.devicePixelRatio || 1;
     
+    // Fallback preventing 0x0 canvas bug
+    const w = Math.max( 100, Math.floor( rect.width * dpr ) );
+    const h = Math.max( 100, Math.floor( rect.height * dpr ) );
+
     if ( worker ) {
       worker.postMessage({
         type: 'RESIZE',
         target: canvasData.id,
-        width: Math.floor( rect.width * dpr ),
-        height: Math.floor( rect.height * dpr )
+        width: w,
+        height: h
       });
     }
   } );
 };
+
+let observer: ResizeObserver | null = null;
 
 // Watch for focus changes to trigger a layout-driven resize
 watch( activeFocus, async () => {
@@ -90,7 +107,9 @@ watch([isFrozen, verticalScale, perspective, hueShift, scaleMode, showInstrument
       showHarmonics: showHarmonics.value,
       fundamentalFreq: dominantFreq.value,
       instrumentRanges: INSTRUMENT_RANGES,
-      nyquist: getAnalyser()?.context.sampleRate ? getAnalyser()!.context.sampleRate / 2 : 22050
+      nyquist: getAnalyser()?.context.sampleRate ? getAnalyser()!.context.sampleRate / 2 : 22050,
+      fftSize: fftSize.value,
+      binCount: fftSize.value / 2
     });
   }
 }, { deep: true });
@@ -117,18 +136,39 @@ const tick = () => {
 
   const analyser = getAnalyser();
   if ( analyser ) {
-    // 1. Pipestream Data to SharedMemory Lock-Free
-    analyser.getFloatTimeDomainData(timeView as any);
-    analyser.getByteFrequencyData(freqView as any);
+    debugFps.value++; // Increment frames on tick
 
-    // 2. Throttle heavy UI String formatting
+    // 1. Pipestream Data to standard Memory (Web Audio API blocks SABs directly)
+    analyser.getFloatTimeDomainData( localTimeView as any );
+    analyser.getByteFrequencyData( localFreqView as any );
+
+    // 2. Distribute data to WebWorker
+    if ( hasSAB ) {
+      // Fastest: Memory block copy directly into lock-free shared memory
+      freqView.set( localFreqView );
+      timeView.set( localTimeView );
+    } else if ( worker ) {
+      // Fallback: Message passing copy
+      worker.postMessage( {
+        type: 'SYNC_BUFFERS',
+        freqArray: localFreqView.slice( 0 ),
+        timeArray: localTimeView.slice( 0 )
+      } );
+    }
+
+    // Update debug text
+    if ( debugFps.value % 30 === 0 ) {
+      debugInfo.value = `SAB:${hasSAB} | Wrk:${!!worker} | W[${magCanvas.value?.width}x${magCanvas.value?.height}] | BinCount: ${analyser.frequencyBinCount} | Tick: ${debugFps.value}`;
+    }
+
+    // 3. Throttle heavy UI String formatting
     if ( Math.random() > 0.95 ) {
       const bufferLength = analyser.frequencyBinCount;
       let maxVal = -1;
       let maxIndex = -1;
       
       for ( let i = 0; i < bufferLength; i++ ) {
-        const val = freqView[i] ?? 0;
+        const val = localFreqView[i] ?? 0;
         if ( val > maxVal ) {
           maxVal = val;
           maxIndex = i;
@@ -140,7 +180,7 @@ const tick = () => {
         const freq = maxIndex * ( nyquist / bufferLength );
         dominantFreq.value = Math.round( freq );
         dominantNote.value = getNoteFromFreq( freq );
-        eqSuggestions.value = generateEqSuggestions( freqView, nyquist );
+        eqSuggestions.value = generateEqSuggestions( localFreqView.subarray(0, bufferLength), nyquist );
       }
     }
   }
@@ -203,10 +243,7 @@ const setupVis = () => {
   if (!analyser) return;
 
   if (!worker) {
-    worker = new Worker(
-      new URL('../../../../../packages/core/src/visualizers/spectrogram.worker.ts', import.meta.url),
-      { type: 'module' }
-    );
+    worker = new SpectrogramWorker();
   }
 
   if (oscCanvas.value && !oscCanvas.value.dataset.transferred) {
@@ -226,30 +263,51 @@ const setupVis = () => {
       sabTime,
       nyquist: analyser.context.sampleRate / 2
     }, [offOsc, offSpec, offMag]);
+
+    // Attach robust layout observer
+    if ( !observer ) {
+      observer = new ResizeObserver( () => {
+        resizeCanvases();
+      } );
+      [oscCanvas.value, specCanvas.value, magCanvas.value].forEach( c => {
+        if ( c ) observer!.observe( c );
+      } );
+    }
   }
 
-  resizeCanvases();
+  // Force first frame computation, letting DOM settle
+  setTimeout( resizeCanvases, 50 );
 };
 
-watch( isInitialized, ( val ) => {
+watch( isInitialized, async ( val ) => {
   if ( val ) {
     activate();
+    await nextTick();
     setupVis();
   }
 } );
 
-onActivated( () => {
+const startLoop = () => {
   activate();
   if ( isInitialized.value ) setupVis();
-  
   if ( !animId ) tick();
-} );
+};
 
-onDeactivated( () => {
+const stopLoop = () => {
   if ( animId ) cancelAnimationFrame( animId );
   animId = null;
   deactivate();
-} );
+  if ( observer ) {
+    observer.disconnect();
+    observer = null;
+  }
+};
+
+onMounted( startLoop );
+onActivated( startLoop );
+
+onUnmounted( stopLoop );
+onDeactivated( stopLoop );
 </script>
 
 <template>
@@ -269,6 +327,9 @@ onDeactivated( () => {
           >Pro</span></h2>
         <p class="text-slate-500 text-[10px] font-mono uppercase tracking-[0.2em] mt-1">Real-time spectral analysis and
           waveform diagnostics.</p>
+        <!--<p class="text-rose-400 text-[9px] font-mono mt-2 bg-rose-500/10 px-2 py-1 inline-block rounded-md border border-rose-500/20">
+          DEBUG: {{ debugInfo || 'Waiting for Analyzer...' }}
+        </p>-->
       </div>
 
       <div class="flex items-center gap-4">
@@ -549,7 +610,7 @@ onDeactivated( () => {
     <!-- 3D Stage (Spectral Topology) -->
     <div
       :class="activeFocus === 'topology' 
-        ? 'lg:col-span-3 h-[42rem] order-1' 
+  ? 'lg:col-span-3 h-[21rem] order-1' 
         : 'lg:col-span-1 h-72 order-2'"
       class="bg-black rounded-[2.5rem] p-4 border border-white/5 relative overflow-hidden group shadow-2xl transition-all duration-500 ease-out"
     >

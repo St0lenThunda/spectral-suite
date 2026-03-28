@@ -16,6 +16,9 @@ export interface Lesson {
   description: string;
   category: 'theory' | 'audio' | 'rhythm';
   difficulty: 'beginner' | 'intermediate' | 'advanced';
+  x: number;
+  y: number;
+  prerequisites?: string[];
   steps: LessonStep[];
 }
 
@@ -26,6 +29,9 @@ export const lessons: Lesson[] = [
     description: 'Learn how sound waves work and visualize your voice.',
     category: 'audio',
     difficulty: 'beginner',
+    x: 0,
+    y: -150,
+    prerequisites: [],
     steps: [
       {
         id: 'step-1',
@@ -70,6 +76,9 @@ export const lessons: Lesson[] = [
     description: 'Construct Major and Minor triads note by note.',
     category: 'theory',
     difficulty: 'beginner',
+    x: 150,
+    y: 100,
+    prerequisites: [],
     steps: [
       {
         id: 'step-1',
@@ -109,6 +118,9 @@ export const lessons: Lesson[] = [
     description: 'Learn to keep perfect time with Pocket Engine.',
     category: 'rhythm',
     difficulty: 'beginner',
+    x: -150,
+    y: 100,
+    prerequisites: [],
     steps: [
       {
         id: 'step-1',
@@ -144,6 +156,9 @@ export const lessons: Lesson[] = [
     description: 'Identify Dorian and Phrygian modes with Scale Sleuth.',
     category: 'theory',
     difficulty: 'intermediate',
+    x: 300,
+    y: 50,
+    prerequisites: ['chord-101'],
     steps: [
       {
         id: 'step-1',
@@ -183,6 +198,9 @@ export const lessons: Lesson[] = [
     description: 'Visualize harmonics and waveforms with Frequency Flow.',
     category: 'audio',
     difficulty: 'intermediate',
+    x: 0,
+    y: -300,
+    prerequisites: ['pitch-101'],
     steps: [
       {
         id: 'step-1',
@@ -222,6 +240,9 @@ export const lessons: Lesson[] = [
     description: 'Master fine intonation control and interval sensing.',
     category: 'audio',
     difficulty: 'advanced',
+    x: -100,
+    y: -450,
+    prerequisites: ['freq-101'],
     steps: [
       {
         id: 'step-1',
@@ -257,6 +278,9 @@ export const lessons: Lesson[] = [
     description: 'Construct lush 7th chords for jazz voicings.',
     category: 'theory',
     difficulty: 'advanced',
+    x: 450,
+    y: 0,
+    prerequisites: ['scale-101'],
     steps: [
       {
         id: 'step-1',
@@ -296,6 +320,9 @@ export const lessons: Lesson[] = [
     description: 'Build endurance and consistency.',
     category: 'rhythm',
     difficulty: 'intermediate',
+    x: -300,
+    y: 200,
+    prerequisites: ['rhythm-101'],
     steps: [
       {
         id: 'step-1',
@@ -325,6 +352,9 @@ export const lessons: Lesson[] = [
     description: 'Explore non-western and advanced mode colors.',
     category: 'theory',
     difficulty: 'advanced',
+    x: 500,
+    y: 100,
+    prerequisites: ['scale-101'],
     steps: [
       {
         id: 'step-1',
@@ -354,6 +384,9 @@ export const lessons: Lesson[] = [
     description: 'Analyze complex sound identifiers.',
     category: 'audio',
     difficulty: 'advanced',
+    x: 100,
+    y: -450,
+    prerequisites: ['freq-101'],
     steps: [
       {
         id: 'step-1',
@@ -375,6 +408,9 @@ export const lessons: Lesson[] = [
     description: 'Navigate the map of musical keys.',
     category: 'theory',
     difficulty: 'beginner',
+    x: 250,
+    y: 200,
+    prerequisites: ['chord-101'],
     steps: [
       {
         id: 'step-1',
@@ -414,6 +450,9 @@ export const lessons: Lesson[] = [
     description: 'Discover the sad cousins of happy keys.',
     category: 'theory',
     difficulty: 'intermediate',
+    x: 350,
+    y: 280,
+    prerequisites: ['orbit-101'],
     steps: [
       {
         id: 'step-1',
@@ -453,6 +492,9 @@ export const lessons: Lesson[] = [
     description: 'Master the seven chord degrees and learn when, why, and how to use them.',
     category: 'theory',
     difficulty: 'advanced',
+    x: 450,
+    y: 350,
+    prerequisites: ['orbit-102'],
     steps: [
       {
         id: 'step-1',

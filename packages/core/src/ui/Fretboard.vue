@@ -128,8 +128,11 @@ interface Props {
   // --- Legacy Compatibility Props ---
   activeNotes?: string[];
   highlightNotes?: string[];
+  highlightColor?: string;
+  highlightColorMap?: Record<number, string>; // Chroma (0-11) -> Hex Color
   labels?: Record<string, string>;
   fretRange?: [number, number];
+  zoomToRange?: boolean;
   playbackNote?: string;
   numFrets?: number;
 }
@@ -234,6 +237,40 @@ const fretLabels = computed( () => {
 } );
 
 // ============================================================================
+// COMPUTED - SVG VIEWPORT (ZOOM CONTROL)
+// ============================================================================
+
+const dynamicViewBox = computed(() => {
+  if (props.zoomToRange && props.fretRange) {
+    const [min, max] = props.fretRange;
+    const fretWidth = (FRETBOARD_WIDTH - NUT_WIDTH) / fretCount.value;
+    
+    // User requested showing 1 extra fret on BOTH sides of the selection
+    const targetMin = min - 1;
+    const targetMax = max + 1;
+    
+    // Left edge: Show wire before targetMin. 
+    // If targetMin is 1 or lower, just start at 0 (the Nut)
+    let startX = 0;
+    if (targetMin <= 1) {
+      startX = 0;
+    } else {
+      startX = NUT_WIDTH + ((targetMin - 1) * fretWidth) - 10;
+    }
+    
+    // Right edge: Show wire after targetMax
+    let endX = NUT_WIDTH + (targetMax * fretWidth) + 10;
+    if (endX > FRETBOARD_WIDTH) endX = FRETBOARD_WIDTH;
+    
+    const vWidth = endX - startX;
+    return `${startX} 0 ${vWidth} ${FRETBOARD_HEIGHT.value}`;
+  }
+  
+  // Default fullscreen viewbox
+  return `0 0 ${FRETBOARD_WIDTH} ${FRETBOARD_HEIGHT.value}`;
+});
+
+// ============================================================================
 // METHODS - NOTE CALCULATION
 // ============================================================================
 
@@ -306,12 +343,22 @@ const getHighlightStyle = ( stringNum: number, fret: number ) => {
     };
   }
 
-  // 5. Highlight Note from compatibility prop (Emerald / Scale Suggestions)
+  // 5. Highlight Note from compatibility prop
   // These stay within the range (e.g. CAGED shapes)
   if ( highlightChromas.value.has( chroma ) && isInsideRange( fret ) ) {
+    
+    // Check if we have a specific color map for this chroma from Multi-Chord mode
+    if (props.highlightColorMap && props.highlightColorMap[chroma]) {
+      const specificColor = props.highlightColorMap[chroma];
+      return {
+        classes: '',
+        style: { fill: specificColor, stroke: specificColor }
+      };
+    }
+    
     return {
-      classes: 'fill-emerald-600 stroke-emerald-300',
-      style: {}
+      classes: props.highlightColor ? '' : 'fill-emerald-600 stroke-emerald-300',
+      style: props.highlightColor ? { fill: props.highlightColor, stroke: props.highlightColor } : {}
     };
   }
 
@@ -352,8 +399,8 @@ const handleNutAction = ( stringNum: number ) => {
 <template>
   <div class="fretboard-container overflow-x-auto p-4 bg-slate-950 rounded-2xl border border-slate-800">
     <svg
-      :viewBox="`0 0 ${FRETBOARD_WIDTH} ${FRETBOARD_HEIGHT}`"
-      class="w-full min-w-[600px] mx-auto"
+      :viewBox="dynamicViewBox"
+      class="w-full min-w-[600px] mx-auto transition-all duration-700 ease-[cubic-bezier(0.16,1,0.3,1)]"
       preserveAspectRatio="xMidYMid meet"
     >
       <!-- Wood Texture Background -->

@@ -111,23 +111,39 @@ export class MetronomeEngine {
 
   /**
    * Starts the metronome engine.
+   * This is where the "Heartbeat" actually begins.
    */
-  public start () {
+  public async start () {
+    // If we're already playing, don't start it again!
     if ( this.isPlaying ) return
+    
+    // If the AudioContext doesn't exist yet, create it now.
     if ( !this.context ) this.init()
 
+    /**
+     * CRITICAL: Browsers block audio until a user clicks something.
+     * Even if we have a context, it might be in a "suspended" (sleeping) state.
+     * We MUST call resume() to wake it up so we can hear the clicks.
+     * 
+     * The `await` keyword means "Wait for this to finish before moving to the next line".
+     */
+    if ( this.context && this.context.state === 'suspended' ) {
+      await this.context.resume()
+    }
+
+    // Set our state to playing so the UI knows to show "Stop"
     this.isPlaying = true
 
-    // Reset counters so we start on "One"
+    // Reset counters so we start on "One" (the beginning of the measure)
     this.currentPulse = 0
     this.currentPolyPulse = 0
 
-    // Sync start time to now.
-    // context!.currentTime tells TypeScript "I promise context is not null"
+    // Sync start time to 'now' according to the high-precision audio clock.
+    // context!.currentTime is the most accurate clock in the computer.
     this.nextNoteTime = this.context!.currentTime
     this.nextPolyNoteTime = this.context!.currentTime
 
-    // Kick off the scheduling loop
+    // Kick off the scheduling loop (the recursion that keeps time)
     this.schedule()
   }
 

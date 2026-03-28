@@ -9,7 +9,7 @@ import { AudioEngine } from '../audio/AudioEngine';
  */
 export class TransientDetector {
   private workletNode: AudioWorkletNode | null = null
-  private threshold: number = 0.1 // Lowered from 0.3 for better sensitivity
+  private threshold: number = 0.05 // Lowered from 0.1 for better sensitivity to claps
   private lastTransientTime: number = 0
   private cooldownMs: number = 50
   private transientCallbacks: Array<( time: number, energy: number ) => void> = []
@@ -80,7 +80,7 @@ export class TransientDetector {
   }
 
   public setThreshold ( threshold: number ) {
-    this.threshold = Math.max( 0.1, Math.min( 1.0, threshold ) )
+    this.threshold = Math.max( 0.01, Math.min( 1.0, threshold ) )
   }
 
   public onTransient ( callback: ( time: number, energy: number ) => void ) {

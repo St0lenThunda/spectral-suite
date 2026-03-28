@@ -18,7 +18,7 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
 
   // State (Engine Instances - scoped to Store Lifecycle)
   const metronome = new MetronomeEngine( 120 );
-  const detector = new TransientDetector( 0.1 ); // 0.1 is the sensitivity threshold for onset detection
+  const detector = new TransientDetector( 0.05 ); // 0.05 is the sensitivity threshold for onset detection
 
   // Reactive State
   const { isInitialized: isEngineInitialized } = useAudioEngine();
@@ -33,12 +33,32 @@ export const useRhythmStore = defineStore( 'rhythm', () => {
   /**
    * Resilience: If the global engine uninitializes (e.g. after a settings reset),
    * we must also reset our local initialization state so we re-bind to the new context.
+   * 
+   * EDUCATIONAL PATTERN:
+   * Instead of making the user click "Initialize" in every single module, 
+   * we "watch" the global engine. If the user enables the mic globally, 
+   * this code sees that change and automatically prepares the Pocket Engine logic.
    */
-  watch( () => useAudioEngine().isInitialized.value, ( isReady: boolean ) => {
-    if ( !isReady ) {
+  watch( () => useAudioEngine().isInitialized.value, async ( isReady: boolean ) => {
+    if ( isReady ) {
+      /**
+       * If the global engine is ready, we "piggyback" on that success.
+       * We automatically call our own init() so the Pocket Engine is
+       * ready for action without an extra click.
+       */
+      try {
+        await init();
+      } catch ( e ) {
+        console.warn( "[RhythmStore] Auto-init failed:", e );
+      }
+    } else {
+      /**
+       * If the global engine is turned off, we mark ourselves as not started.
+       * The `false` value here will make the "Initialize" screen reappear if needed.
+       */
       isRhythmStarted.value = false;
     }
-  } );
+  }, { immediate: true } ); // immediate: true means "check right now when the app starts"
 
   // Analysis State
   const lastBeatTime = ref( 0 );

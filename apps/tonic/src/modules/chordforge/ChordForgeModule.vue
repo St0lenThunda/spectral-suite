@@ -20,6 +20,9 @@ import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
+import { useNavLayout } from '../../composables/useNavLayout';
+
+const { showNavs } = useNavLayout();
 
 const emit = defineEmits<{ ( e: 'back' ): void }>();
 const { activate, deactivate, isInitialized } = useAudioEngine();
@@ -543,7 +546,8 @@ const fretboardHighlights = computed( () => {
 <template>
   <div class="min-h-screen bg-spectral-950 text-white">
     <!-- Header -->
-    <header class="sticky top-0 z-20 bg-spectral-950/80 backdrop-blur-xl border-b border-white/5">
+    <header class="sticky top-0 z-20 bg-spectral-950/80 backdrop-blur-xl border-b border-white/5 transition-transform duration-500 ease-out will-change-transform"
+            :class="showNavs ? 'translate-y-0' : '-translate-y-full'">
       <div class="container mx-auto px-6 py-4 flex justify-between items-center">
         <div class="flex items-center gap-4">
           <button

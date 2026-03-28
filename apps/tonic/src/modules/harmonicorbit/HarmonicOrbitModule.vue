@@ -15,6 +15,7 @@ import {
   useAudioEngine,
   useHarmonicOrbit // Import the store
 } from '@spectralsuite/core';
+import { useHarmonicOrbitGuitar } from './composables/useHarmonicOrbitGuitar';
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import {
   HARMONIC_SELECTION_KEY,
@@ -25,6 +26,7 @@ import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.v
 import SettingsTrigger from '../../components/settings/SettingsTrigger.vue';
 import EngineSettings from '../../components/settings/EngineSettings.vue';
 import InstrumentBrowser from '../../components/settings/InstrumentBrowser.vue';
+import GuitarChordPopover from './components/GuitarChordPopover.vue';
 
 const { activate, deactivate, isInitialized } = useAudioEngine();
 
@@ -44,6 +46,31 @@ const showDegrees = ref( true ); // Show I, IV, V labels - default ON
 const showGlow = ref( true );      // Visual aesthetic setting
 const hoveredKeyIdx = ref<number | null>( null );
 const currentTriadNotes = ref<string[]>( [] );
+
+// Fretboard Explorer State
+const isGuitarPopoverOpen = ref( false );
+const popoverChordName = ref<string | null>( null );
+const popoverChordType = ref<string | null>( null );
+const popoverChordColor = ref<string | null>( null );
+
+const { toggleChord, isChordToggled, clearToggledChords } = useHarmonicOrbitGuitar();
+
+// Trigger the popover with a specific chord
+const openGuitarPopover = ( chordName: string, chordType: string ) => {
+  popoverChordName.value = null; // No single name anymore! It's a collection.
+  popoverChordType.value = null;
+  clearToggledChords();
+  toggleChord(chordName, getSegmentStyle( chordName ).color);
+  isGuitarPopoverOpen.value = true;
+};
+
+// Toggle individual chords from the anatomy panel
+const toggleFretboardChord = ( chordName: string ) => {
+  toggleChord(chordName, getSegmentStyle( chordName ).color);
+  if (!isGuitarPopoverOpen.value) {
+    isGuitarPopoverOpen.value = true;
+  }
+};
 
 // Calculation to get all 7 diatonic chords for a selected key
 // Based on the Circle of Fifths positions
@@ -265,8 +292,25 @@ const selectChordByName = ( chordName: string ) => {
   }
 };
 
-// --- EMITS ---
 const emit = defineEmits( ['back', 'navigate-tonnetz'] );
+
+const currentFamilyParams = computed(() => {
+  if (selectedKeyIdx.value === null) return [];
+  // Return the chord objects mapping standard Hex colors for the popover
+  const chords = getFamilyChords( selectedKeyIdx.value, selectedType.value );
+  return chords.map(c => ({
+    ...c,
+    hexColor: getSegmentStyle(c.name).color
+  }));
+});
+
+// We don't want to auto-clear toggled chords every time the user just rotates the ring,
+// but we DO want to close the popover if it's no longer relevant, or let them organically build new triads.
+import { watch } from 'vue';
+watch([selectedKeyIdx, selectedType], () => {
+  // If we change the overall selected key, we probably want to clear the old active fretboard highlights.
+  clearToggledChords();
+});
 
 // ─── PROVIDE/INJECT STATE ─────────────────────────────────────────────
 // Provide selection state so TonnetzPreview can inject it.
@@ -772,9 +816,15 @@ onDeactivated( () => deactivate() );
                 </div>
                 <!-- Note Labels (F - A - C) -->
                 <p
-                  class="text-[15px] font-black tracking-[0.3em] text-indigo-400 uppercase bg-indigo-500/5 px-3 py-1 rounded-full border border-indigo-500/10">
+                  class="text-[15px] font-black tracking-[0.3em] text-indigo-400 uppercase bg-indigo-500/5 px-3 py-1 rounded-full border border-indigo-500/10 mb-2">
                   {{ currentTriadNotes.join( ' - ' ) || '???' }}
                 </p>
+                <button 
+                  @click="openGuitarPopover(activeKeys[selectedKeyIdx]!.major, 'Major')" 
+                  class="w-full mt-2 py-2 px-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400 text-[9px] font-black uppercase tracking-widest hover:bg-amber-500/20 hover:border-amber-500/50 transition-all flex items-center justify-center gap-2"
+                >
+                  <span class="text-[12px]">🎸</span> Fretboard Explorer
+                </button>
               </div>
             </div>
 
@@ -846,6 +896,12 @@ onDeactivated( () => deactivate() );
 
     </div>
 
+    <!-- Floating Fretboard Explorer -->
+    <GuitarChordPopover
+      :is-open="isGuitarPopoverOpen"
+      :family-chords="currentFamilyParams"
+      @close="isGuitarPopoverOpen = false"
+    />
   </div>
 </template>
 

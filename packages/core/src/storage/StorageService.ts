@@ -7,6 +7,7 @@ export const STORAGE_KEYS = {
   ENABLED_TOOLS: 'spectral-suite-enabled-tools',
   CALIBRATION_A4: 'spectral-suite-calibration-a4',
   THEME_PREFERENCE: 'spectral-suite-theme',
+  ACADEMY_COMPLETED: 'spectral-suite-academy-completed',
 } as const;
 
 export type StorageKey = keyof typeof STORAGE_KEYS;

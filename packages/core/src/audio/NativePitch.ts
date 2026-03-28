@@ -11,9 +11,9 @@ export class NativePitch {
   // private buffer: Float32Array; // Removed unused buffer
   private sampleRate: number;
   // Tweak for Bass:
-  // 1. Cutoff: 0.4 (Allow slightly noisier signals typical of low strings)
+  // 1. Cutoff: 0.15 (Lowered so frontend handles hysteresis logic for acoustic decay)
   // 2. Downsample: 4 (Focus analysis on 0-2000Hz range, ignores high harmonics)
-  private cutoff: number = 0.4;
+  private cutoff: number = 0.15;
   public useLowPass: boolean = true; // Enable by default for bass stability
   public downsample: number = 4;
   private lpfState: number = 0;

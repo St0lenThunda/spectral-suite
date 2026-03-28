@@ -292,5 +292,69 @@ export const TOOL_MANUALS: Record<string, ToolManual> = {
         physics: "Blues bends (microtones) land exactly halfway between standard semitones (e.g. 50, 150 cents). This adds immense vocal-like expression that traditional piano keys physically cannot recreate."
       }
     ]
+  },
+  melodymirror: {
+    id: "melodymirror",
+    title: "Melody",
+    subtitle: "Mirror",
+    accentColor: "emerald-400",
+    steps: [
+      {
+        step: 1,
+        title: "Target Pattern",
+        task: "Press 'Start Game' and listen to the synthesized reference note.",
+        physics: "The engine uses Web Audio oscillators to generate pure test tones. Listen closely to internalize the target pitch."
+      },
+      {
+        step: 2,
+        title: "Vocal Mirroring",
+        task: "Sing or play the target note back into the microphone.",
+        physics: "We extract your fundamental frequency and calculate its Chromatic value (0-11). Octaves are ignored, focusing purely on absolute pitch class."
+      },
+      {
+        step: 3,
+        title: "Micro-Tuning Guidance",
+        task: "Watch the 'Too High' / 'Too Low' indicator needle.",
+        physics: "The needle shows the exact semitone distance between you and the target. Green means Constructive Interference (Unison), Red means Dissonance."
+      },
+      {
+        step: 4,
+        title: "Memory Expansion",
+        task: "Match the sequence to reach higher levels.",
+        physics: "As the sequence grows, the game strains your short-term auditory memory alongside physical vocal cord precision."
+      }
+    ]
+  },
+  tonnetz: {
+    id: "tonnetz",
+    title: "Tonnetz",
+    subtitle: "Lattice",
+    accentColor: "violet-400",
+    steps: [
+      {
+        step: 1,
+        title: "Harmonic Geometry",
+        task: "Click any node on the grid to instantly build a triad.",
+        physics: "The Tonnetz maps pitches spatially. Perfect 5ths, Major 3rds, and Minor 3rds each have their own axis. Triangles represent complete cohesive chords."
+      },
+      {
+        step: 2,
+        title: "Parallel Transform (P)",
+        task: "Click the 'P' button to swap a Major chord to its minor twin.",
+        physics: "This moves only the middle note (the 3rd) by one semitone. C Major (C-E-G) physically morphs into C minor (C-Eb-G)."
+      },
+      {
+        step: 3,
+        title: "Leading-Tone (L)",
+        task: "Click the 'L' button to execute an L-transform.",
+        physics: "This swaps the Root (for Major) or Fifth (for Minor). C Major drops its root to B, arriving directly at E minor with minimal physical motion."
+      },
+      {
+        step: 4,
+        title: "Relative Transform (R)",
+        task: "Click the 'R' button to jump to the relative minor or Major.",
+        physics: "C Major morphs into A minor. In physics terminology, you are maintaining two common frequencies while shifting the third to create a new mood."
+      }
+    ]
   }
 };

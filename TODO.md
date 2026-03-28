@@ -129,10 +129,12 @@
 ### 🎓 Academy
 - **Bug**: 
 - **Improvements**: 
+  - [ ] ensure lessons for all modules (min 3-5 steps)
 
 ### 🌈 AuraTune
 - **Bug**: 
 - **Improvements**: 
+  - [ ] enable 432Hz
 
 ### 🎯 Bend Trainer
 - **Bug**: 

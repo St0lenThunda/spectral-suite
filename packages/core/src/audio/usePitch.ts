@@ -59,6 +59,11 @@ export function usePitch ( config: PitchConfig = {} ) {
   let nullFrameCount = 0;
   const NULL_GRACE_PERIOD = 20; // Increased to 20 to handle acoustic envelope dropouts
 
+  // Inertia Buffer State
+  let inertiaFrames = 0;
+  const INERTIA_THRESHOLD = 5; // ~85ms at 60fps. Keeps it snappy but filters instant glitches.
+  let candidateNote = '';
+
   // Averaging Buffer for long-term stability
   // default to 0 (disabled) unless configured
   const AVERAGING_WINDOW = config.averagingWindowMs ?? 0;
@@ -91,7 +96,7 @@ export function usePitch ( config: PitchConfig = {} ) {
 
   // Watch pool data and route through our updateState function
   watch( [poolPitch, poolClarity, poolVolume], ( [p, c, v] ) => {
-    console.log( 'DEBUG: usePitch watch', { isPoolAcquired, p, c, v } );
+    // console.log( 'DEBUG: usePitch watch', { isPoolAcquired, p, c, v } );
     if ( isPoolAcquired ) {
       updateState( p, c ?? 0, v );
     }
@@ -193,13 +198,18 @@ export function usePitch ( config: PitchConfig = {} ) {
       p = sorted[Math.floor( sorted.length / 2 )]!;
     }
 
+    // Dynamics Reset: If volume spikes (new note attack), we know it's a new string pluck.
+    let isNewAttack = false;
+    if ( v > lastVolume + DYNAMICS_THRESHOLD ) {
+      isNewAttack = true;
+    }
+
     // 4. Long-term Averaging & Dynamics Reset
     if ( p && AVERAGING_WINDOW > 0 ) {
       const now = performance.now();
 
-      // Dynamics Reset: If volume spikes (new note attack), clear old history to lock quickly
-      // We use a simple difference check. 
-      if ( v > lastVolume + DYNAMICS_THRESHOLD ) {
+      // Clear old history to lock quickly on new attacks
+      if ( isNewAttack ) {
         averagingBuffer.length = 0;
       }
 
@@ -267,18 +277,71 @@ export function usePitch ( config: PitchConfig = {} ) {
     // 2. Sustain Lock: Once locked, we follow it down slightly lower (decay phase).
     // PHYSICS: Real instruments decay. As volume drops, clarity might drop slightly.
     // Hysteresis (the difference between start/stop thresholds) prevents the note from checking out prematurely.
+    // Acoustic instruments lose perfect periodicity (clarity) quickly on decay, but pitch remains valid.
+    // Widening the sustain threshold prevents the note from dropping out and picking up overtones.
     const CLARITY_START = clarityThreshold.value;
-    const CLARITY_SUSTAIN = Math.max( 0, clarityThreshold.value - 0.1 ); // Sustain 10% lower than start
+    const CLARITY_SUSTAIN = Math.max( 0.2, clarityThreshold.value - 0.25 ); // Wider hysteresis for acoustic decay
     const isLocked = currentNote.value !== null;
     const effectiveClarityThreshold = isLocked ? CLARITY_SUSTAIN : CLARITY_START;
 
     if ( p && rawClarity > effectiveClarityThreshold ) {
       const calibratedFreq = p * ( 440 / concertA.value );
-      const rawNoteName = Note.fromFreq( calibratedFreq );
-      const displayNote = Note.transpose( rawNoteName, Interval.fromSemitones( transposition.value ) );
+      let targetNoteName = Note.fromFreq( calibratedFreq );
+
+      // --- ADVANCED STICKY PITCH LOGIC ---
+      if ( isLocked && currentNote.value && !isNewAttack ) {
+        const lockedRawNote = Note.transpose( currentNote.value, Interval.fromSemitones( -transposition.value ) );
+        const lockedFreq = Note.get( lockedRawNote ).freq;
+        
+        if ( lockedFreq ) {
+          const centsFromLocked = 1200 * Math.log2( calibratedFreq / lockedFreq );
+          const absCents = Math.abs(centsFromLocked);
+          
+          // 1. The Sticky Lock: Keep near notes avoiding jumpy displays
+          if ( absCents < 150 ) {
+            targetNoteName = lockedRawNote;
+          } else {
+            // 2. Harmonic Squelch: Reject exact Octaves and Perfect 5ths that pop up during acoustic decay
+            const isOctave = Math.abs(absCents - 1200) < 50 || Math.abs(absCents - 2400) < 50;
+            const isPerfectFifth = Math.abs(absCents - 702) < 50 || Math.abs(absCents - 1902) < 50;
+            
+            if (isOctave || isPerfectFifth) {
+               targetNoteName = lockedRawNote;
+            }
+          }
+        }
+      }
+
+      // 3. Inertia Buffer: Require a new differing note to hold stable for N frames
+      if ( isLocked && currentNote.value && !isNewAttack ) {
+         const lockedRawNote = Note.transpose( currentNote.value, Interval.fromSemitones( -transposition.value ) );
+         if ( targetNoteName !== lockedRawNote ) {
+            if ( targetNoteName === candidateNote ) {
+               inertiaFrames++;
+            } else {
+               candidateNote = targetNoteName;
+               inertiaFrames = 0;
+            }
+
+            // Reject the UI update if inertia hasn't peaked
+            if ( inertiaFrames < INERTIA_THRESHOLD ) {
+               targetNoteName = lockedRawNote;
+            }
+         } else {
+            // Landed natively back on locked note
+            inertiaFrames = 0;
+            candidateNote = targetNoteName;
+         }
+      } else {
+         // Instant lock on new string attacks to feel responsive
+         inertiaFrames = 0;
+         candidateNote = targetNoteName;
+      }
+
+      const displayNote = Note.transpose( targetNoteName, Interval.fromSemitones( transposition.value ) );
       currentNote.value = displayNote;
 
-      const refFreq = Note.get( rawNoteName ).freq;
+      const refFreq = Note.get( targetNoteName ).freq;
       if ( refFreq ) {
         // MATH: Calculate Cents difference.
         // Formula: 1200 * log2( f1 / f0 )

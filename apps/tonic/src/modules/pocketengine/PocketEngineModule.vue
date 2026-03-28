@@ -1,11 +1,35 @@
 <script setup lang="ts">
-import { ref, computed, onDeactivated, watch } from 'vue'
-import { useRhythmStore, PlayButton } from '@spectralsuite/core'
+/**
+ * PocketEngineModule.vue
+ * The main orchestrator for the Pocket Engine rhythm training suite.
+ * 
+ * ARCHITECTURE:
+ * - State Management: Uses `useRhythmStore` (Pinia) for the timing engine.
+ * - Modular Layouts: Dynamically switches between different interface "Skins" 
+ *   (Classic, Studio, Command, Grid, HUD) using the `activeLayout` component.
+ * - Global Settings: Centralizes all training parameters (Subdivision, Tempo, 
+ *   Gap Click, Ladder, Stealth) in a single `LocalSettingsDrawer`.
+ */
+import { ref, computed, onDeactivated, watch, markRaw } from 'vue'
+import { useRhythmStore } from '@spectralsuite/core'
 import { storeToRefs } from 'pinia';
 import IntelligenceButton from '../../components/IntelligenceButton.vue';
 import LocalSettingsDrawer from '../../components/settings/LocalSettingsDrawer.vue';
 import SettingsToggle from '../../components/settings/SettingsToggle.vue';
+import EngineSettings from '../../components/settings/EngineSettings.vue';
 
+// Layout Imports
+// We use markRaw to prevent Vue from making these large component objects reactive,
+// which improves performance during layout switching.
+import PocketEngineClassic from './layouts/PocketEngineClassic.vue';
+import ConsoleLayout from './layouts/ConsoleLayout.vue';
+import PocketEngineCommand from './layouts/PocketEngineCommand.vue';
+import PocketEngineGrid from './layouts/PocketEngineGrid.vue';
+
+/**
+ * CORE ENGINE STATE
+ * We destructure the store to get reactive references (storeToRefs) and direct methods.
+ */
 const store = useRhythmStore();
 const {
   isInitialized,
@@ -16,22 +40,12 @@ const {
   history: timingHistory
 } = storeToRefs( store );
 
-// Stats is a reactive object, so we can destructure it directly without storeToRefs 
-// (assuming the object reference never changes)
-const { stats } = store;
+const { init: initStore, stats, toggle: togglePlay, setTempo, setSubdivision, setPolySubdivision, setMuteProbability, onFlash, metronome, resetStats } = store;
 
-const {
-  init,
-  toggle: togglePlay,
-  setTempo,
-  setSubdivision,
-  setPolySubdivision,
-  setMuteProbability,
-  onFlash,
-  metronome,
-  resetStats
-} = store;
-
+/**
+ * TRAINING STATE
+ * Local variables that control specific training modes.
+ */
 const subdivision = ref( 1 )
 const polySubdivision = ref( 0 )
 const isFlashEnabled = ref( true )
@@ -39,108 +53,74 @@ const isFlashing = ref( false )
 const gapIntensity = ref( 0 )
 const isSettingsOpen = ref( false )
 
+// Ladder: Auto-bpm increase system
 const isLadderEnabled = ref( false )
 const ladderIncrement = ref( 5 )
 const ladderInterval = ref( 4 )
 const ladderGoal = ref( 200 )
 
-// Stealth Training (Pro Phase 3)
+// Stealth: Silence blocks to test internal clock
 const stealthBarsOn = ref( 4 )
 const stealthBarsOff = ref( 2 )
 const isStealthEnabled = ref( false )
 
-import EngineSettings from '../../components/settings/EngineSettings.vue';
-
-
-const drawerCategories = computed( () => [
-  {
-    id: 'General',
-    label: 'General',
-    description: 'Subdivision, Flash, Poly, Accents',
-    showIndicator: false
-  },
-  {
-    id: 'Engine',
-    label: 'Engine',
-    description: 'Mic Sensitivity & Gate',
-    showIndicator: isInitialized.value
-  },
-  {
-    id: 'Stability',
-    label: 'Stability',
-    description: 'Gap Click Training',
-    showIndicator: gapIntensity.value > 0
-  },
-  {
-    id: 'Ladder',
-    label: 'Ladder',
-    description: 'Auto-BPM Increase',
-    showIndicator: isLadderEnabled.value
-  },
-  {
-    id: 'Stealth',
-    label: 'Stealth',
-    description: 'Cognitive Silence',
-    showIndicator: isStealthEnabled.value
-  }
-] );
-
-// Accent Pattern State
-// 3 = Strong, 2 = Normal, 1 = Weak, 0 = Mute
-const accentPattern = ref<number[]>( [3, 2, 2, 2] )
-const currentPulse = computed( () => store.currentPulse ) // Assuming store exposes this, or we need to track it locally
+/**
+ * LAYOUT CONFIGURATION
+ * Defines the available visual modes for the engine.
+ */
+const layouts = [
+  { id: 'studio', name: 'Studio', description: 'Premium 10/80/10 Interactive Console', component: markRaw(ConsoleLayout) },
+  { id: 'command', name: 'Command', description: 'Centralized HUD with Instrument Cluster', component: markRaw(PocketEngineCommand) },
+  { id: 'classic', name: 'Original', description: 'The baseline Pocket Engine experience', component: markRaw(PocketEngineClassic) },
+  { id: 'grid', name: 'Grid', description: 'High-density multi-pulse visualization', component: markRaw(PocketEngineGrid) }
+]
+const activeLayoutId = ref('studio')
+const activeLayout = computed(() => layouts.find(l => l.id === activeLayoutId.value)?.component || ConsoleLayout)
 
 /**
- * Toggles the accent level for a specific pulse slot.
- * Cycles: Strong (3) -> Normal (2) -> Weak (1) -> Mute (0)
- * 
- * Math:
- * We use the modulo operator (%) to loop back to the start of the array.
- * (currentIndex + 1) % 4 ensures that 3 -> 0 automatically (4 % 4 = 0).
+ * SETTINGS DRAWER CATEGORIES
+ * We add a 'Layout' category here so the user can switch views within the settings.
  */
+const drawerCategories = computed( () => [
+  { id: 'Layout', label: 'Console Layout', description: 'Switch between Studio, Command, and Classic views', showIndicator: false },
+  { id: 'General', label: 'Rhythm Basics', description: 'Subdivision, Flash, Poly, Accents', showIndicator: false },
+  { id: 'Engine', label: 'Audio Engine', description: 'Mic Sensitivity & Gate', showIndicator: isInitialized.value },
+  { id: 'Stability', label: 'Stability (Gap)', description: 'Gap Click training intensity', showIndicator: gapIntensity.value > 0 },
+  { id: 'Ladder', label: 'Auto-Ladder', description: 'Automatic Tempo progression', showIndicator: isLadderEnabled.value },
+  { id: 'Stealth', label: 'Stealth Mode', description: 'Cognitive silence cycles', showIndicator: isStealthEnabled.value }
+] );
+
+// Accent Logic
+const accentPattern = ref<number[]>( [3, 2, 2, 2] )
+const currentPulse = computed( () => store.currentPulse )
+
 const cycleAccent = ( index: number ) => {
   const levels = [3, 2, 1, 0]
   const currentLevel = accentPattern.value[index] ?? 2
-
-  // Find where we are in the sequence and step forward 1
   const nextIdx = ( levels.indexOf( currentLevel ) + 1 ) % levels.length
   accentPattern.value[index] = levels[nextIdx]!
   metronome.setAccentPattern( [...accentPattern.value] )
 }
 
-/**
- * Presets: Professional Rhythmic Identities
- */
 const applyPattern = ( type: 'downbeat' | 'backbeat' | 'jazz' ) => {
   let pattern: number[] = []
   const len = subdivision.value * 4
-
   switch ( type ) {
     case 'backbeat':
-      // Emphasize 2 and 4 (standard in Rock/Pop)
-      pattern = Array( len ).fill( 0 ).map( ( _, i ) => {
-        const beatNum = Math.floor( i / subdivision.value ) + 1
-        return ( beatNum === 2 || beatNum === 4 ) ? 3 : 1
-      } )
+      pattern = Array( len ).fill( 0 ).map( ( _, i ) => (Math.floor( i / subdivision.value ) + 1 === 2 || Math.floor( i / subdivision.value ) + 1 === 4) ? 3 : 1 )
       break
     case 'jazz':
-      // Emphasize the "ands" (off-beats) for swing feel
       pattern = Array( len ).fill( 1 ).map( ( _, i ) => ( i % 2 !== 0 ? 3 : 1 ) )
       break
-    case 'downbeat':
     default:
-      // Strong on the "One", Normal elsewhere
-      pattern = Array( len ).fill( 2 )
-      pattern[0] = 3
+      pattern = Array( len ).fill( 2 ); pattern[0] = 3
   }
   accentPattern.value = pattern
   metronome.setAccentPattern( accentPattern.value )
 }
-// Local visual state
-const pocketPosition = computed( () => {
-  return Math.max( 0, Math.min( 100, ( ( timingOffset.value + 200 ) / 400 ) * 100 ) )
-} )
 
+// Precision Math
+const pocketPosition = computed( () => Math.max( 0, Math.min( 100, ( ( timingOffset.value + 200 ) / 400 ) * 100 ) ) )
 const pocketColor = computed( () => {
   const abs = Math.abs( timingOffset.value )
   if ( abs < 30 ) return 'bg-emerald-500'
@@ -150,8 +130,7 @@ const pocketColor = computed( () => {
 const tendency = computed( () => {
   if ( stats.rush > stats.drag * 1.5 ) return 'Rushing'
   if ( stats.drag > stats.rush * 1.5 ) return 'Dragging'
-  if ( stats.total > 0 ) return 'Balanced'
-  return 'No data yet'
+  return stats.total > 0 ? 'Balanced' : 'No data yet'
 } )
 
 const avgOffset = computed( () => {
@@ -160,7 +139,7 @@ const avgOffset = computed( () => {
   return Math.round( sum / timingHistory.value.length )
 } )
 
-// Flash handling
+// Flash Handler
 onFlash( () => {
   if ( isFlashEnabled.value ) {
     isFlashing.value = true
@@ -168,683 +147,225 @@ onFlash( () => {
   }
 } )
 
-// Radial Groove Map (Pro Phase 2)
+// Radial History for Studio/Command Map
 const grooveHistory = ref<Array<{ offset: number, time: number }>>( [] )
-const MAX_GROOVE_DOTS = 32
-
-// Watch for stats updates to populate Groove Map
 watch( () => stats.total, () => {
   if ( timingHistory.value.length === 0 ) return;
-  const latestOffset = timingHistory.value[timingHistory.value.length - 1] ?? 0;
-
-  grooveHistory.value.push( { offset: latestOffset, time: performance.now() } );
-  if ( grooveHistory.value.length > MAX_GROOVE_DOTS ) {
-    grooveHistory.value.shift();
-  }
+  grooveHistory.value.push( { offset: timingHistory.value[timingHistory.value.length - 1], time: performance.now() } );
+  if ( grooveHistory.value.length > 32 ) grooveHistory.value.shift();
 } );
 
-// Init/Toggle replaced by useRhythm
-
-// Init/Toggle replaced by useRhythm
-
-
+// Update Methods
 const updateTempo = ( value: number ) => { setTempo( value ) }
-
-const updateSubdivision = ( value: number ) => {
-  subdivision.value = value
-  setSubdivision( value )
-}
-
-const updatePolyrhythm = ( value: number ) => {
-  polySubdivision.value = value
-  setPolySubdivision( value )
-}
-
-const updateGapIntensity = ( value: number ) => {
-  gapIntensity.value = value
-  setMuteProbability( value / 100 )
-}
-
+const updateSubdivision = ( value: number ) => { subdivision.value = value; setSubdivision( value ) }
+const updatePolyrhythm = ( value: number ) => { polySubdivision.value = value; setPolySubdivision( value ) }
+const updateGapIntensity = ( value: number ) => { gapIntensity.value = value; setMuteProbability( value / 100 ) }
 const updateLadder = () => {
-  if ( isLadderEnabled.value ) {
-    metronome.setProgression( ladderIncrement.value, ladderInterval.value, ladderGoal.value )
-  } else {
-    metronome.setProgression( 0, 0 )
-  }
+  if ( isLadderEnabled.value ) metronome.setProgression( ladderIncrement.value, ladderInterval.value, ladderGoal.value )
+  else metronome.setProgression( 0, 0 )
 }
+const updateStealth = () => metronome.setStealthMode( stealthBarsOn.value, stealthBarsOff.value, isStealthEnabled.value )
+const reset = () => { resetStats(); grooveHistory.value = [] }
 
-// Watch for playback start to ensure accent pattern is set
-watch( isPlaying, ( newData ) => {
-  if ( newData ) {
-    metronome.setAccentPattern( accentPattern.value )
-  }
-} )
-
-const updateStealth = () => {
-  metronome.setStealthMode( stealthBarsOn.value, stealthBarsOff.value, isStealthEnabled.value )
-}
-
-const reset = () => {
-  resetStats()
-  grooveHistory.value = []
-}
-
-const emit = defineEmits( ['back'] )
+watch( isPlaying, ( newData ) => newData && metronome.setAccentPattern( accentPattern.value ) )
 
 import { useAudioEngine } from '@spectralsuite/core';
-const { activate, deactivate } = useAudioEngine();
+const { init: initAudio, activate, deactivate, getAnalyser } = useAudioEngine();
 
-// Register as an active audio consumer
-activate();
+/**
+ * INITIALIZATION HANDLER
+ * Browser security requires a user gesture (like a click) to start 
+ * the audio engine. We wrap the store's init and the audio activate
+ * into this single function called by the "Enable Sync" button.
+ */
+const handleInit = async () => {
+  try {
+    // 1. Initialize the global hardware engine first
+    // This requests mic permissions and sets up the input stream.
+    await initAudio();
 
-onDeactivated( () => {
-  deactivate();
-  stop() // Stop the loop
-} )
+    // 2. Activate the hardware audio context (resumes AudioContext)
+    activate();
+
+    // 3. Initialize the rhythm store (sequencer, workers, detection)
+    // We pass the global analyser to the store so it can perform
+    // real-time transient detection from the microphone input.
+    await initStore( getAnalyser() );
+  } catch (err) {
+    console.error("Pocket Engine Init Failed:", err);
+  }
+}
+
+onDeactivated( () => { deactivate(); } )
+const emit = defineEmits( ['back'] )
 </script>
 
 <template>
-  <div class="p-6">
-    <!-- Initialize Screen -->
-    <div
-      v-if=" !isInitialized "
-      class="flex flex-col items-center justify-center py-20"
-    >
-      <div class="glass-container p-12 text-center rounded-[3rem] max-w-lg relative">
-        <IntelligenceButton
-          toolId="pocketengine"
-          colorClass="text-rose-400"
-          bgClass="bg-white/5"
-          borderClass="border-white/10"
-          class="absolute top-8 right-8"
-        />
-        <div v-if=" !error ">
-          <div
-            class="w-20 h-20 rounded-2xl bg-rose-500/20 border border-rose-500/30 flex items-center justify-center mx-auto mb-8"
-          >
-            <div class="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
-          </div>
-          <h2 class="text-3xl font-black mb-4">System Ready</h2>
-          <p class="text-slate-400 mb-10 max-w-sm mx-auto text-sm">
-            Enable your microphone to start analyzing your rhythmic timing.
-          </p>
-          <button
-            @click="init"
-            class="btn-primary"
-          >
-            Initialize Pocket Engine
-          </button>
-        </div>
-        <div
-          v-else
-          class="text-center p-4"
-        >
-          <div class="text-5xl mb-6">🛡️</div>
-          <h3 class="text-2xl font-black text-red-400 mb-4">Mic Required</h3>
-          <p class="text-slate-500 text-xs mb-8">{{ error }}</p>
-          <button
-            @click="init"
-            class="text-rose-400 font-bold uppercase tracking-widest text-[10px] hover:text-white transition-all underline underline-offset-8"
-          >
-            Retry
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Main Interface -->
-    <div
-      v-else
-      class="space-y-8"
-    >
-      <header class="flex justify-between items-end">
-        <div>
-          <button
-            @click="emit( 'back' )"
-            class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 hover:text-white transition-colors mb-4 flex items-center gap-2"
-          >
-            <span>←</span> Back to Tonic
-          </button>
-          <h2 class="text-3xl font-black text-white italic uppercase tracking-tighter">Pocket <span
-              class="text-rose-500"
-            >Engine</span> <span class="text-indigo-400 text-lg">Pro</span></h2>
-          <p class="text-slate-500 text-xs font-mono uppercase tracking-widest mt-1">Rhythm & Timing Diagnostic</p>
-        </div>
-        <div class="flex items-center gap-4">
-          <SettingsToggle
-            :is-open="isSettingsOpen"
-            @click="isSettingsOpen = !isSettingsOpen"
-          />
-          <IntelligenceButton
-          toolId="pocketengine"
-          label="Learn & How-To"
-          colorClass="text-emerald-400"
-          bgClass="bg-emerald-500/10"
-          borderClass="border-emerald-500/20"
-        />
-        </div>
-      </header>
-
-
-
-      <LocalSettingsDrawer
-        :is-open="isSettingsOpen"
-        :categories="drawerCategories"
-        @close="isSettingsOpen = false"
-      >
-
-
-        <template #General>
-          <div class="space-y-8">
-
-
-
-            <!-- Subdivision Control -->
-            <div class="space-y-4">
-
-              <label class="text-xs font-black uppercase tracking-[0.3em] text-slate-500 block">
-                Subdivision
-              </label>
-              <div class="flex items-center gap-2">
-                <button
-
- 
-                 v-for=" ( label, s ) in { 1: '1/4', 2: '1/8', 3: '1/12', 4: '1/16' } "
-                  :key="s"
-
- 
-                 @click="updateSubdivision( Math.floor( Number( s ) ) )"
-                  class="px-3 h-10 rounded-lg font-black transition-all text-xs"
-                  :class="subdivision === Math.floor( Number( s ) ) ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'bg-slate-900 text-slate-500 hover:text-white border border-white/5'"
-                >
-                  {{ label }}
-                </button>
-              </div>
-            </div>
-
-
-
-            <!-- Polyrhythm Control (Pro Feature) -->
-            <div class="space-y-4">
-
-              <label class="text-xs font-black uppercase tracking-[0.3em] text-indigo-400 block">
-                Polyrhythm (X over 4)
-              </label>
-              <div class="flex items-center gap-2">
-                <button
-
- 
-                 v-for=" val in [0, 3, 5, 7] "
-                  :key="val"
-
- 
-                 @click="updatePolyrhythm( val )"
-                  class="px-3 h-10 rounded-lg font-black transition-all text-xs"
-                  :class="polySubdivision === val ? 'bg-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-900 text-slate-500 hover:text-white border border-white/5'"
-                >
-                  {{ val === 0 ? 'OFF' : `${val}:4` }}
-                </button>
-              </div>
-            </div>
-
-
-
-
-
-
-            <!-- Visual Flash Toggle -->
-            <div class="space-y-4">
-
-              <label class="text-xs font-black uppercase tracking-[0.3em] text-slate-500 block">
-                Visual Flash
-              </label>
-              <button
-                @click="isFlashEnabled = !isFlashEnabled"
-                class="h-10 px-6 rounded-lg font-black transition-all flex items-center gap-3 text-xs"
-                :class="isFlashEnabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-slate-900 text-slate-500 border border-white/5'"
-              >
-                <div
-                  class="w-2 h-2 rounded-full"
-                  :class="isFlashEnabled ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'"
-                ></div>
-                {{ isFlashEnabled ? 'ENABLED' : 'DISABLED' }}
-              </button>
-            </div>
-
-            <!-- Accent Programmer (moved from Accents tab) -->
-            <div class="mt-8 pt-8 border-t border-white/5">
-              <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-                <div class="space-y-1">
-                  <label class="text-xs font-black uppercase tracking-[0.4em] text-rose-400 block">
-                    Accent Programmer
-                  </label>
-                  <p class="text-[11px] text-slate-500 italic">Define your rhythmic DNA. Click slots to toggle dynamics.
-                  </p>
-                </div>
-                <div class="flex gap-2">
-                  <button
-                    @click="applyPattern( 'downbeat' )"
-                    class="px-3 py-1 bg-slate-900 border border-white/5 rounded text-[10px] font-black hover:bg-slate-800 transition-colors uppercase text-slate-400 hover:text-white"
-                  >Standard</button>
-                  <button
-                    @click="applyPattern( 'backbeat' )"
-                    class="px-3 py-1 bg-slate-900 border border-white/5 rounded text-[10px] font-black hover:bg-slate-800 transition-colors uppercase text-slate-400 hover:text-white"
-                  >Rock 2&4</button>
-                  <button
-                    @click="applyPattern( 'jazz' )"
-                    class="px-3 py-1 bg-slate-900 border border-white/5 rounded text-[10px] font-black hover:bg-slate-800 transition-colors uppercase text-slate-400 hover:text-white"
-                  >Swing</button>
-                </div>
-              </div>
-
-              <div class="flex flex-wrap gap-2 items-center justify-start pb-4">
-                <div
-                  v-for=" ( level, idx ) in accentPattern "
-                  :key="idx"
-                  class="relative"
-                >
-                  <div
-                    v-if=" isPlaying && ( currentPulse % accentPattern.length === idx ) "
-                    class="absolute -inset-1 rounded-xl bg-rose-500/20 animate-pulse border border-rose-500/30 z-0"
-                  ></div>
-                  <button
-                    @click="cycleAccent( idx )"
-                    class="relative z-10 w-9 h-12 rounded-xl flex flex-col items-center justify-between py-2 transition-all border-2"
-                    :class="[
-                      level === 3 ? 'bg-rose-500 border-rose-300 text-white shadow-lg shadow-rose-500/20' :
-                        level === 2 ? 'bg-slate-800 border-slate-600 text-slate-300' :
-      level === 1 ? 'bg-slate-900 border-slate-800 text-slate-500 opacity-60' :
-        'bg-transparent border-slate-800 text-slate-700 opacity-30 shadow-inner'
-]"
-                  >
-                    <span
-                      class="text-[9px] font-black opacity-50">{{ idx % subdivision === 0 ? Math.floor( idx / subdivision ) + 1 : '' }}</span>
-                    <div
-                      class="w-1 rounded-full transition-all"
-                      :class="[
-                        level === 3 ? 'h-5 bg-white' :
-                          level === 2 ? 'h-3 bg-slate-400' :
-                            level === 1 ? 'h-1.5 bg-slate-600' :
-                              'h-1 bg-slate-800'
-                      ]"
-                    ></div>
-                    <span class="text-[9px] font-black">{{ level === 0 ? '×' : '' }}</span>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-
-        </template>
-
-        <template #Engine>
-          <EngineSettings />
-        </template>
-
-
-
-        <template #Stability>
-          <div class="space-y-8">
-
-
-            <div class="flex items-center justify-between mb-4">
-
-              <label class="text-xs font-black uppercase tracking-[0.3em] text-slate-500">
-                Stability Training (Gap Click)
-              </label>
-              <span
-                class="text-xs font-black px-2 py-0.5 rounded border transition-colors"
-                :class="gapIntensity > 0 ? 'text-rose-500 border-rose-500/20 bg-rose-500/5' : 'text-slate-600 border-white/5'"
-              >
-                {{ gapIntensity > 0 ? `${gapIntensity}% GAP` : 'OFF' }}
-              </span>
-            </div>
-            <div class="flex items-center gap-6">
-              <div class="flex-1 relative flex items-center">
-                <div
-                  class="absolute h-1 bg-linear-to-r from-emerald-500 to-rose-500 rounded-full opacity-20"
-                  :style="{ width: '100%' }"
-                ></div>
-                <input
-                  type="range"
-                  min="0"
-                  max="90"
-                  step="5"
-                  :value="gapIntensity"
-
- 
-                 @input="updateGapIntensity( parseInt( ( $event.target as HTMLInputElement ).value ) )"
-                  class="relative w-full h-8 bg-transparent appearance-none cursor-pointer z-10"
-                />
-              </div>
-              <div class="w-12 text-right">
-                <span class="text-[10px] font-black font-mono text-slate-400">INTENSITY</span>
-              </div>
-            </div>
-          </div>
-
-
-        </template>
-
-
-
-        <template #Ladder>
-          <div class="space-y-8">
-            <div class="flex items-center justify-between mb-6">
-              <div class="space-y-1">
-
-                <label class="text-xs font-black uppercase tracking-[0.3em] text-slate-500">
-                  Speed Building (The Ladder)
-                </label>
-
-                <p class="text-[11px] text-slate-500 italic">Automatically increments BPM every few bars.</p>
-              </div>
-              <button
-                @click="isLadderEnabled = !isLadderEnabled; updateLadder()"
-                class="h-8 px-4 rounded-full font-black text-[10px] transition-all border"
-                :class="isLadderEnabled ? 'bg-indigo-500/20 text-indigo-400 border-indigo-500/30' : 'bg-slate-900 text-slate-500 border-white/5'"
-              >
-                {{ isLadderEnabled ? 'ACTIVE' : 'INACTIVE' }}
-              </button>
-            </div>
-
-
-
-            <div
-              class="space-y-6 transition-opacity"
-              :class="{ 'opacity-50 pointer-events-none': !isLadderEnabled }"
-            >
-              <div class="space-y-3">
-                <div class="flex justify-between">
-
-                  <span class="text-[10px] font-bold text-slate-600 uppercase tracking-widest">BPM Increment</span>
-                  <span class="text-xs font-black text-white">+{{ ladderIncrement }}</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="20"
-                  :value="ladderIncrement"
-
- 
-                 @input="ladderIncrement = parseInt( ( $event.target as HTMLInputElement ).value ); updateLadder()"
-                  class="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
-                />
-              </div>
-
-
-
-              <div class="space-y-3">
-                <div class="flex justify-between">
-
-                  <span class="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Bar Interval</span>
-                  <span class="text-xs font-black text-white">{{ ladderInterval }} BARS</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="16"
-                  :value="ladderInterval"
-
- 
-                 @input="ladderInterval = parseInt( ( $event.target as HTMLInputElement ).value ); updateLadder()"
-                  class="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
-                />
-              </div>
-
-
-
-              <div class="space-y-3">
-                <div class="flex justify-between">
-
-                  <span class="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Goal Tempo</span>
-                  <span class="text-xs font-black text-white">{{ ladderGoal }} BPM</span>
-                </div>
-                <input
-                  type="range"
-                  min="40"
-                  max="300"
-                  step="5"
-                  :value="ladderGoal"
-
- 
-                 @input="ladderGoal = parseInt( ( $event.target as HTMLInputElement ).value ); updateLadder()"
-                  class="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
-                />
-              </div>
-            </div>
-          </div>
-
-
-        </template>
-
-
-
-        <template #Stealth>
-          <div class="space-y-8">
-            <div class="flex items-center justify-between mb-6">
-              <div class="space-y-1">
-
-                <label class="text-xs font-black uppercase tracking-[0.3em] text-cyan-400">
-                  Stealth Training
-                </label>
-
-                <p class="text-[11px] text-slate-500 italic">Metronome disappears for X bars.</p>
-              </div>
-              <button
-                @click="isStealthEnabled = !isStealthEnabled; updateStealth()"
-                class="h-8 px-4 rounded-full font-black text-[10px] transition-all border"
-                :class="isStealthEnabled ? 'bg-cyan-500/20 text-cyan-400 border-cyan-500/30' : 'bg-slate-900 text-slate-500 border-white/5'"
-              >
-                {{ isStealthEnabled ? 'ACTIVE' : 'INACTIVE' }}
-              </button>
-            </div>
-
-
-            <div
-              class="space-y-6 transition-opacity"
-              :class="{ 'opacity-50 pointer-events-none': !isStealthEnabled }"
-            >
-              <div class="space-y-3">
-                <div class="flex justify-between">
-
-                  <span class="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Bars ON</span>
-                  <span class="text-xs font-black text-white">{{ stealthBarsOn }} BARS</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="8"
-                  :value="stealthBarsOn"
-
-                 @input="stealthBarsOn = parseInt( ( $event.target as HTMLInputElement ).value ); updateStealth()"
-                  class="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
-                />
-              </div>
-
-
-              <div class="space-y-3">
-                <div class="flex justify-between">
-
-                  <span class="text-[10px] font-bold text-slate-600 uppercase tracking-widest">Bars OFF (Silent)</span>
-                  <span class="text-xs font-black text-cyan-400">{{ stealthBarsOff }} BARS</span>
-                </div>
-                <input
-                  type="range"
-                  min="1"
-                  max="8"
-                  :value="stealthBarsOff"
-
-                 @input="stealthBarsOff = parseInt( ( $event.target as HTMLInputElement ).value ); updateStealth()"
-                  class="w-full h-1 bg-slate-700 rounded-full appearance-none cursor-pointer"
-                />
-              </div>
-            </div>
-          </div>
-
-
-        </template>
-      </LocalSettingsDrawer>
-
-      <!-- Control Panel -->
-      <div class="glass-card p-8 rounded-[3rem]">
-        <div class="flex flex-col md:flex-row items-center gap-12">
-          <!-- Tempo Control -->
-          <!-- Tempo Control (Main Panel) -->
-          <div class="flex-1 w-full space-y-8">
-            <div>
-              <div class="flex items-center justify-between mb-4">
-                <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 block">
-                  Tempo (BPM)
-                </label>
-                <label class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-500 block">
-                  Tempo (BPM)
-                </label>
-              </div>
-              <div class="flex items-center gap-6">
-                <input
-                  type="range"
-                  min="40"
-                  max="300"
-                  :value="tempo"
-                  @input="updateTempo( parseInt( ( $event.target as HTMLInputElement ).value ) )"
-                  class="flex-1 h-2 bg-slate-800 rounded-full appearance-none cursor-pointer"
-                />
-                <span class="text-4xl font-black font-mono text-white w-20 text-right">{{ tempo }}</span>
-              </div>
-            </div>
-
-            <!-- Play/Stop Button -->
-          </div>
-          <!-- Play/Stop Button -->
-          <PlayButton
-            :is-playing="isPlaying"
-            @click="togglePlay"
-          />
-        </div>
-      </div>
-
-      <!-- Pocket Visualizer -->
-      <div
-        class="glass-card p-12 rounded-[3rem] transition-colors duration-100"
-        :class="{ 'bg-white/10': isFlashing }"
-      >
-        <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500 mb-8 text-center">
-          The Pocket
-        </h3>
-
-        <div
-          class="relative w-full h-32 bg-slate-900/50 rounded-3xl overflow-hidden border border-white/5 transition-all"
-          :class="{ 'ring-4 ring-white/20': isFlashing }"
-        >
-          <div
-            class="absolute left-1/2 top-0 bottom-0 w-24 -translate-x-1/2 bg-emerald-500/20 border-x-2 border-emerald-500/40"
-          ></div>
-          <div class="absolute left-1/2 top-0 bottom-0 w-1 -translate-x-1/2 bg-white/20"></div>
-          <div
-            class="absolute top-4 bottom-4 w-4 rounded-full transition-all duration-200 shadow-lg"
-            :class="pocketColor"
-            :style="{ left: pocketPosition + '%', transform: 'translateX(-50%)' }"
-          ></div>
-          <div class="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-mono text-rose-400">RUSH</div>
-          <div class="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] font-mono text-orange-400">DRAG</div>
-        </div>
-
-        <div class="mt-6 text-center">
-          <div class="text-6xl font-black font-mono">
-            {{ timingOffset > 0 ? '+' : '' }}{{ Math.round( timingOffset ) }}
-            <span class="text-2xl text-slate-500">ms</span>
-          </div>
-          <p class="text-sm text-slate-500 mt-2">Timing Offset</p>
-        </div>
-      </div>
-
-      <!-- Radial Groove Map (Pro Phase 2) -->
-      <div class="glass-card p-8 rounded-[3rem]">
-        <h3 class="text-[10px] font-black uppercase tracking-[0.4em] text-indigo-400 mb-6 text-center">
-          Groove Map
-        </h3>
-        <div class="flex justify-center">
-          <svg
-            viewBox="0 0 200 200"
-            class="w-64 h-64"
-          >
-            <!-- Background Circle -->
-            <circle
-              cx="100"
-              cy="100"
-              r="90"
-              fill="none"
-              stroke="rgba(255,255,255,0.05)"
-              stroke-width="2"
-            />
-            <!-- Perfect Zone (inner ring) -->
-            <circle
-              cx="100"
-              cy="100"
-              r="30"
-              fill="rgba(52, 211, 153, 0.1)"
-              stroke="rgba(52, 211, 153, 0.3)"
-              stroke-width="1"
-            />
-            <!-- Center Dot -->
-            <circle
-              cx="100"
-              cy="100"
-              r="4"
-              fill="rgba(255,255,255,0.3)"
-            />
-            <!-- Hit Dots -->
-            <circle
-              v-for=" ( hit, i ) in grooveHistory "
-              :key="i"
-              :cx="100 + Math.cos( ( i / grooveHistory.length ) * Math.PI * 2 - Math.PI / 2 ) * ( 30 + Math.min( 60, Math.abs( hit.offset ) / 200 * 60 ) )"
-              :cy="100 + Math.sin( ( i / grooveHistory.length ) * Math.PI * 2 - Math.PI / 2 ) * ( 30 + Math.min( 60, Math.abs( hit.offset ) / 200 * 60 ) )"
-              r="4"
-              :fill="Math.abs( hit.offset ) < 30 ? '#34d399' : hit.offset > 0 ? '#fb923c' : '#f43f5e'"
-              :opacity="0.5 + ( i / grooveHistory.length ) * 0.5"
-            />
-          </svg>
-        </div>
-        <p class="text-center text-slate-500 text-[10px] mt-4">Hits closer to the center are more accurate.</p>
-      </div>
-
-      <!-- Statistics Dashboard -->
-      <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
-        <div class="glass-card p-6 rounded-3xl">
-          <div class="text-[10px] font-black uppercase tracking-widest text-emerald-400 mb-2">Perfect</div>
-          <div class="text-3xl font-black">{{ stats.perfect }}</div>
-        </div>
-        <div class="glass-card p-6 rounded-3xl">
-          <div class="text-[10px] font-black uppercase tracking-widest text-rose-400 mb-2">Rush</div>
-          <div class="text-3xl font-black">{{ stats.rush }}</div>
-        </div>
-        <div class="glass-card p-6 rounded-3xl">
-          <div class="text-[10px] font-black uppercase tracking-widest text-orange-400 mb-2">Drag</div>
-          <div class="text-3xl font-black">{{ stats.drag }}</div>
-        </div>
-        <div class="glass-card p-6 rounded-3xl">
-          <div class="text-[10px] font-black uppercase tracking-widest text-indigo-400 mb-2">Tendency</div>
-          <div class="text-lg font-black">{{ tendency }}</div>
-          <div class="text-xs text-slate-500 mt-1">Avg: {{ avgOffset }}ms</div>
-        </div>
-      </div>
-
-      <div class="text-center">
+  <div class="h-full flex flex-col bg-slate-950 text-slate-200 overflow-hidden relative">
+    
+    <!-- STANDARD HEADER: Unifies look across all layouts (Always visible) -->
+    <header class="p-6 shrink-0 flex justify-between items-end border-b border-white/5 relative z-OVERLAY">
+      <div>
         <button
-          @click="reset"
-          class="px-8 py-4 bg-slate-800 hover:bg-slate-700 text-white rounded-2xl font-bold text-sm uppercase tracking-widest transition-all"
+          @click="emit( 'back' )"
+          class="text-[10px] font-black uppercase tracking-[0.3em] text-slate-600 hover:text-white transition-colors mb-4 flex items-center gap-2"
         >
-          Reset Statistics
+          <span>←</span> Back to Tonic
         </button>
+        <h2 class="text-3xl font-black text-white italic uppercase tracking-tighter">
+          Pocket <span class="text-orange-500">Engine</span>
+        </h2>
+        <div class="flex items-center gap-3 mt-1">
+          <p class="text-slate-500 text-[10px] font-mono uppercase tracking-[0.2em]">
+            Rhythm Accuracy Training
+          </p>
+          <div v-if="isInitialized" class="w-2 h-2 rounded-full" :class="isPlaying ? 'bg-orange-500 animate-pulse' : 'bg-slate-800'"></div>
+        </div>
       </div>
+      <div class="flex items-center gap-4">
+        <SettingsToggle
+          v-if="isInitialized"
+          :is-open="isSettingsOpen"
+          @click="isSettingsOpen = !isSettingsOpen"
+        />
+        <IntelligenceButton v-if="isInitialized" toolId="pocketengine" />
+      </div>
+    </header>
 
+    <!-- SETTINGS DRAWER: Centralized configuration HUB -->
+    <LocalSettingsDrawer
+      :is-open="isSettingsOpen"
+      :categories="drawerCategories"
+      @close="isSettingsOpen = false"
+    >
+      <!-- NEW: Layout Selector Category -->
+      <template #Layout>
+        <div class="p-6 space-y-4">
+           <label class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-2 block">Choose Console Experience</label>
+           <div class="grid grid-cols-1 gap-2">
+              <button 
+                v-for="layout in layouts" 
+                :key="layout.id"
+                @click="activeLayoutId = layout.id"
+                class="flex flex-col items-start p-4 rounded-2xl transition-all border group"
+                :class="activeLayoutId === layout.id ? 'bg-orange-500/20 border-orange-500/50' : 'bg-white/5 border-white/5 hover:bg-white/10'"
+              >
+                <div class="flex justify-between w-full items-center mb-1">
+                   <span class="text-xs font-black uppercase" :class="activeLayoutId === layout.id ? 'text-white' : 'text-slate-400'">{{ layout.name }}</span>
+                   <div v-if="activeLayoutId === layout.id" class="w-1.5 h-1.5 rounded-full bg-orange-500"></div>
+                </div>
+                <span class="text-[9px] text-slate-500 font-mono leading-tight group-hover:text-slate-400 transition-colors">{{ layout.description }}</span>
+              </button>
+           </div>
+        </div>
+      </template>
+
+      <template #General>
+        <div class="p-4 space-y-6">
+          <!-- Subdivision Controls -->
+          <div>
+            <label class="text-[10px] font-black uppercase tracking-widest text-slate-500 mb-3 block">Subdivision</label>
+            <div class="grid grid-cols-4 gap-2">
+              <button v-for="(label, s) in { 1: '1/4', 2: '1/8', 3: '1/12', 4: '1/16' }" :key="s"
+                @click="updateSubdivision(Math.floor(Number(s)))"
+                class="h-10 rounded-xl font-black text-[10px] transition-all border"
+                :class="subdivision === Math.floor(Number(s)) ? 'bg-orange-600 border-orange-400 text-white' : 'bg-slate-950/50 border-white/5 text-slate-600'"
+              >
+                {{ label }}
+              </button>
+            </div>
+          </div>
+          <!-- Flash Toggle -->
+          <label class="flex items-center justify-between p-4 rounded-2xl bg-white/5 border border-white/5 cursor-pointer hover:bg-white/10">
+            <span class="text-[10px] font-black uppercase tracking-widest text-slate-400">Visual Flash</span>
+            <input type="checkbox" v-model="isFlashEnabled" class="sr-only peer" />
+            <div class="w-9 h-5 bg-black/40 rounded-full peer peer-checked:bg-orange-500/80 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-300 after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-full peer-checked:after:bg-white border border-white/10 relative"></div>
+          </label>
+        </div>
+      </template>
+
+      <template #Stability>
+        <div class="p-6 space-y-4">
+           <div class="flex justify-between items-center mb-2">
+             <label class="text-[10px] font-black uppercase tracking-widest text-slate-500">Gap Intensity</label>
+             <span class="text-[12px] font-black text-emerald-400 font-mono">{{ gapIntensity }}%</span>
+           </div>
+           <input type="range" min="0" max="90" step="5" :value="gapIntensity" @input="updateGapIntensity(parseInt(($event.target as HTMLInputElement).value))" class="w-full accent-emerald-500" />
+           <p class="text-[9px] text-slate-600 font-mono leading-relaxed">Adjusts the probability that the metronome will stay silent for a beat, forcing you to maintain your internal clock.</p>
+        </div>
+      </template>
+
+      <template #Engine>
+        <EngineSettings />
+      </template>
+
+      <!-- Placeholder slots for Ladder and Stealth... -->
+      <template #Ladder>
+        <div class="p-6 text-center text-slate-500 italic text-sm">Tempo auto-progression controls available soon.</div>
+      </template>
+      <template #Stealth>
+        <div class="p-6 text-center text-slate-500 italic text-sm">Cognitive silence sequence controls available soon.</div>
+      </template>
+    </LocalSettingsDrawer>
+
+    <!-- INITIALIZE SCREEN: The "Awaiting Sync" view -->
+    <div v-if=" !isInitialized " class="flex-1 flex flex-col items-center justify-center p-6 text-center">
+       <div class="glass-container p-12 rounded-[3rem] max-w-sm relative overflow-hidden">
+          <div class="relative z-10">
+            <div v-if="!error">
+              <div class="w-20 h-20 rounded-2xl bg-orange-500/20 border border-orange-500/30 flex items-center justify-center mx-auto mb-8 animate-[pulse_2s_infinite]">
+                 <div class="w-10 h-10 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+              </div>
+              <h2 class="text-3xl font-black mb-2 italic">Pocket Engine</h2>
+              <p class="text-slate-500 text-xs mb-8 uppercase tracking-widest">Awaiting Audio Engine</p>
+              <button @click="handleInit" class="btn-primary w-full shadow-orange-500/20">Enable Sync</button>
+            </div>
+            <div v-else>
+               <h3 class="text-xl font-black text-rose-500 mb-4">Error</h3>
+               <p class="text-xs text-slate-500 mb-8">{{ error }}</p>
+               <button @click="handleInit" class="btn-primary w-full">Retry Connection</button>
+            </div>
+          </div>
+       </div>
     </div>
+
+    <!-- MAIN CONSOLE: Renders the active layout -->
+    <main v-else class="flex-1 overflow-hidden relative">
+      <component 
+        :is="activeLayout"
+        v-bind="{
+          isInitialized, isPlaying, tempo, error, timingOffset, stats,
+          subdivision, polySubdivision, isFlashEnabled, isFlashing,
+          gapIntensity, isSettingsOpen, isLadderEnabled, ladderIncrement,
+          ladderInterval, ladderGoal, stealthBarsOn, stealthBarsOff,
+          isStealthEnabled, accentPattern, currentPulse, grooveHistory,
+          drawerCategories, pocketPosition, pocketColor, tendency, avgOffset
+        }"
+        :togglePlay="togglePlay"
+        :updateTempo="updateTempo"
+        :updateSubdivision="updateSubdivision"
+        :updatePolyrhythm="updatePolyrhythm"
+        :updateGapIntensity="updateGapIntensity"
+        :updateLadder="updateLadder"
+        :updateStealth="updateStealth"
+        :cycleAccent="cycleAccent"
+        :applyPattern="applyPattern"
+        :reset="reset"
+        :onSettingsToggle="() => isSettingsOpen = !isSettingsOpen"
+        @back="$emit('back')"
+        @update:isFlashEnabled="isFlashEnabled = $event"
+        @update:ladderIncrement="ladderIncrement = $event"
+        @update:ladderInterval="ladderInterval = $event"
+        @update:ladderGoal="ladderGoal = $event"
+        @update:stealthBarsOn="stealthBarsOn = $event"
+        @update:stealthBarsOff="stealthBarsOff = $event"
+      />
+    </main>
   </div>
 </template>
 
-<style scoped>
+<style>
+/* Global Layout Styles */
 .glass-container {
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
@@ -853,15 +374,11 @@ onDeactivated( () => {
 }
 
 .glass-card {
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(48px);
+  -webkit-backdrop-filter: blur(48px);
   border: 1px solid rgba(255, 255, 255, 0.05);
   background: rgba(255, 255, 255, 0.02);
-  transition: all 0.3s;
-}
-
-.glass-card:hover {
-  background: rgba(255, 255, 255, 0.04);
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .btn-primary {
@@ -872,97 +389,12 @@ onDeactivated( () => {
   font-weight: 900;
   font-size: 1.125rem;
   transition: all 0.3s;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 10px 40px -15px rgba(0, 0, 0, 0.3);
 }
 
-.btn-primary:hover {
-  transform: scale(1.05);
-}
+.btn-primary:active { transform: scale(0.98); }
 
-.btn-primary:active {
-  transform: scale(0.95);
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 9999px;
-  background: #f43f5e;
-  cursor: pointer;
-  box-shadow: 0 10px 15px -3px rgba(244, 63, 94, 0.5);
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 1.5rem;
-  height: 1.5rem;
-  border-radius: 9999px;
-  background: #f43f5e;
-  cursor: pointer;
-  box-shadow: 0 10px 15px -3px rgba(244, 63, 94, 0.5);
-  border: none;
-}
-
-/* Drawer Transition */
-.drawer-enter-active,
-.drawer-leave-active {
-  transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
-  max-height: 800px;
-}
-
-.drawer-enter-from,
-.drawer-leave-to {
-  opacity: 0;
-  max-height: 0;
-  transform: translateY(-10px);
-}
-
-/* Icon Morph Transition */
-.icon-morph-enter-active,
-.icon-morph-leave-active {
-  transition: all 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.icon-morph-enter-from {
-  opacity: 0;
-  transform: scale(0.3) rotate(-90deg);
-}
-
-.icon-morph-leave-to {
-  opacity: 0;
-  transform: scale(0.3) rotate(90deg);
-}
-.icon-morph-leave-to {
-  opacity: 0;
-  transform: scale(0.3) rotate(90deg);
-}
-
-.fade-scale-enter-active,
-.fade-scale-leave-active {
-  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-}
-
-.fade-scale-enter-from,
-.fade-scale-leave-to {
-  opacity: 0;
-  transform: scale(0.95);
-}
-
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
+/* Remove standard scrollbar from interaction zones but keep it functional */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 </style>

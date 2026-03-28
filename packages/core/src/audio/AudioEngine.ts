@@ -70,6 +70,22 @@ export class AudioEngine {
       console.log( 'Audio stream acquired:', stream.id );
       stream.getTracks().forEach( t => console.log( 'Track:', t.label, t.readyState, t.enabled ) );
       this.stream = stream;
+
+      // GUARD: Ensure context wasn't torn down during the async getUserMedia call
+      // (e.g. if the user navigated away or close() was called concurrently)
+      if ( !this.context ) {
+        this.stream.getTracks().forEach( t => t.stop() );
+        this.stream = null;
+        return;
+      }
+
+      // GUARD: Ensure the stream is actually active before connecting it.
+      // On some browsers/OS combos, getUserMedia resolves but returns an inactive stream.
+      if ( !this.stream.active ) {
+        console.error( 'Audio stream acquired but is not active.' );
+        throw new Error( 'Microphone stream is inactive.' );
+      }
+
       this.source = this.context.createMediaStreamSource( this.stream );
 
       this.gainNode = this.context.createGain();
@@ -83,6 +99,14 @@ export class AudioEngine {
       this.initialized = true;
     } catch ( err ) {
       this.initialized = false;
+
+      // Clean up the AudioContext if stream setup failed so we don't leak it.
+      // Without this, a failed init leaves a zombie context that blocks future retries.
+      if ( this.context && this.context.state !== 'closed' ) {
+        await this.context.close();
+        this.context = null;
+      }
+
       console.error( 'Error accessing microphone:', err );
       throw err;
     }

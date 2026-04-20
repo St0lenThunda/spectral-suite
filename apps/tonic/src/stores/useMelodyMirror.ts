@@ -35,6 +35,7 @@ export function createMelodyMirrorStore (
 
     const targetMelody = ref<MelodyNote[]>( [] );
     const playedNotes = ref<NoteEvent[]>( [] );
+    const playingIndex = ref<number | null>( null ); // Tracks which note the system is currently playing back to the user
 
     // Settings
     const keyCenter = ref( 'C' );
@@ -101,19 +102,21 @@ export function createMelodyMirrorStore (
       const NOTE_DURATION = 500;
       const GAP_DURATION = 100;
 
-      for ( const note of melody ) {
+      for ( let i = 0; i < melody.length; i++ ) {
+        const note = melody[i];
+        playingIndex.value = i; // Update index to trigger UI highlighting
+
         // Play audio
         const freq = Note.freq( note.note );
         if ( freq ) {
           injectedSynthEngine.playNote( freq, NOTE_DURATION, 0.5 );
         }
 
-        // Highlight active note (handled by UI watching an index or similar if we exposed it, 
-        // but for now just wait)
-        // TODO: ideally we expose 'playingIndex' state to UI
-
+        // We wait for the duration of the note plus a small gap before the next one
         await new Promise( resolve => setTimeout( resolve, NOTE_DURATION + GAP_DURATION ) );
       }
+
+      playingIndex.value = null; // Clean up index after playback completes
     };
 
     const handleInputNote = ( event: NoteEvent ) => {
@@ -182,6 +185,7 @@ export function createMelodyMirrorStore (
       segmenter?.stop();
       deactivate();
       gameState.value = 'idle';
+      playingIndex.value = null; // Ensure UI highlighting is cleared
     };
 
     const currentTarget = computed( () => {
@@ -201,6 +205,7 @@ export function createMelodyMirrorStore (
       lives,
       targetMelody,
       playedNotes,
+      playingIndex,
       currentTarget,
       startGame,
       stopGame,
